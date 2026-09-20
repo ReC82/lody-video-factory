@@ -1,36 +1,48 @@
-# Image de Lody Video Factory, construite depuis ce dépôt (ticket #8).
+# Image de Lody Video Factory, construite depuis ce dépôt.
 #
-# Différences volontaires avec le Dockerfile hérité de MoneyPrinterTurbo :
-#   - base Debian 12 (bookworm) : les dépôts de sécurité Debian 11 (bullseye)
-#     renvoient désormais des 404 et font échouer le build ;
-#   - sources officielles Debian/PyPI uniquement (pas de miroirs chinois) ;
-#   - exécution sous un utilisateur non-root ;
-#   - démarre l'interface Lody (webui/Lody.py) ; l'ancienne WebUI et l'API
-#     restent construites/lancées par leur propre chaîne, inchangée.
-FROM python:3.11-slim-bookworm
+# Base Debian 13 (trixie) slim : pas d'Alpine/BusyBox pour le moteur multimédia
+# (glibc + FFmpeg Debian). Sources officielles Debian/PyPI uniquement.
+# Exécution sous un utilisateur non-root ; ni config.toml ni storage/ ne sont
+# copiés dans l'image (.dockerignore) : ils sont montés à l'exécution.
+FROM python:3.12-slim-trixie
 
 ENV PYTHONPATH=/MoneyPrinterTurbo \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    LODY_DATA_DIR=/data
 
 WORKDIR /MoneyPrinterTurbo
 
-# ffmpeg : nécessaire au futur moteur de rendu ; inutile au prototype d'interface
-# mais évite de reconstruire une autre image plus tard.
+# ffmpeg fournit aussi ffprobe. Polices : DejaVu (secours système) ; les polices
+# de sous-titres du moteur sont dans resource/fonts (copiées avec le code).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --retries 3 --timeout 60 -r requirements.txt
+COPY requirements.lody.txt ./
+RUN pip install --retries 3 --timeout 60 -r requirements.lody.txt
 
-RUN useradd --create-home --uid 10001 lody
-COPY . .
+# /data : base SQLite des projets. Un volume nommé vide y hérite de ce
+# propriétaire au premier montage, ce qui permet l'écriture en non-root.
+RUN useradd --create-home --uid 10001 lody \
+    && mkdir -p /data \
+    && chown lody:lody /data
+
+# Couches séparées : les ressources (polices, ~200 Mo) changent rarement et restent
+# en cache ; seule la petite couche de code est reconstruite à chaque version.
+COPY resource ./resource
+COPY app ./app
+COPY webui ./webui
+COPY test ./test
+COPY main.py cli.py config.example.toml pyproject.toml ./
 USER lody
 
 EXPOSE 8601
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python3 -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8601/_stcore/health', timeout=3)"
+
 CMD ["streamlit", "run", "./webui/Lody.py", \
      "--server.address=0.0.0.0", "--server.port=8601", "--server.headless=true", \
      "--server.enableStaticServing=true", "--browser.gatherUsageStats=false", \
