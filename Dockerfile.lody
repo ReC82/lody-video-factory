@@ -1,0 +1,40 @@
+# Image de Lody Video Factory, construite depuis ce dépôt (ticket #8).
+#
+# Différences volontaires avec le Dockerfile hérité de MoneyPrinterTurbo :
+#   - base Debian 12 (bookworm) : les dépôts de sécurité Debian 11 (bullseye)
+#     renvoient désormais des 404 et font échouer le build ;
+#   - sources officielles Debian/PyPI uniquement (pas de miroirs chinois) ;
+#   - exécution sous un utilisateur non-root ;
+#   - démarre l'interface Lody (webui/Lody.py) ; l'ancienne WebUI et l'API
+#     restent construites/lancées par leur propre chaîne, inchangée.
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONPATH=/MoneyPrinterTurbo \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /MoneyPrinterTurbo
+
+# ffmpeg : nécessaire au futur moteur de rendu ; inutile au prototype d'interface
+# mais évite de reconstruire une autre image plus tard.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --retries 3 --timeout 60 -r requirements.txt
+
+RUN useradd --create-home --uid 10001 lody
+COPY . .
+USER lody
+
+EXPOSE 8601
+CMD ["streamlit", "run", "./webui/Lody.py", \
+     "--server.address=0.0.0.0", "--server.port=8601", "--server.headless=true", \
+     "--server.enableStaticServing=true", "--browser.gatherUsageStats=false", \
+     "--client.toolbarMode=minimal", \
+     "--theme.base=dark", "--theme.primaryColor=#22D3EE", \
+     "--theme.backgroundColor=#0A0E1A", "--theme.secondaryBackgroundColor=#111729", \
+     "--theme.textColor=#E8ECF7"]
