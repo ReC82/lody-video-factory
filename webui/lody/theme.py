@@ -1,4 +1,4 @@
-"""Chargement du thème : CSS statique + variables d'accent du projet actif."""
+"""Chargement du thème : CSS statique + variables d'accent."""
 
 from __future__ import annotations
 
@@ -7,32 +7,27 @@ from pathlib import Path
 
 import streamlit as st
 
-from lody.profiles import ProjectProfile
-
 _CSS_FILE = Path(__file__).with_name("styles.css")
 
+# Palettes d'accent (de, via, vers) : cyan → bleu → violet, sans effet néon.
+PALETTES = (
+    ("#22D3EE", "#38BDF8", "#60A5FA"),
+    ("#60A5FA", "#818CF8", "#A78BFA"),
+    ("#38BDF8", "#818CF8", "#C084FC"),
+    ("#A78BFA", "#7DD3FC", "#22D3EE"),
+)
+DEFAULT_ACCENT = ("#22D3EE", "#60A5FA", "#A78BFA")
 
-def _read_css() -> str:
-    return _CSS_FILE.read_text(encoding="utf-8")
 
+def inject_theme(accent: tuple[str, str, str] = DEFAULT_ACCENT) -> None:
+    """Injecte la feuille de style et les variables d'accent.
 
-def inject_theme(project: ProjectProfile) -> None:
-    """Injecte la feuille de style et les variables d'accent du projet.
-
-    Les couleurs viennent de constantes internes (``profiles.py``), jamais d'une
-    saisie utilisateur : aucune injection n'est possible via cette voie.
+    Les couleurs viennent de constantes internes, jamais d'une saisie utilisateur.
     """
-    accent_vars = (
-        ":root{"
-        f"--accent-1:{project.accent_from};"
-        f"--accent-2:{project.accent_via};"
-        f"--accent-3:{project.accent_to};"
-        "}"
-    )
-    st.markdown(
-        f"<style>{accent_vars}\n{_read_css()}</style>",
-        unsafe_allow_html=True,
-    )
+    first, via, last = accent
+    variables = f":root{{--accent-1:{first};--accent-2:{via};--accent-3:{last};}}"
+    css = _CSS_FILE.read_text(encoding="utf-8")
+    st.markdown(f"<style>{variables}\n{css}</style>", unsafe_allow_html=True)
 
 
 def esc(value: object) -> str:

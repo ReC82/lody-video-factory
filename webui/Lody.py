@@ -1,7 +1,7 @@
-"""Point d'entrée Streamlit de Lody Video Factory (prototype).
+"""Point d'entrée Streamlit de Lody Video Factory.
 
-Lancement : ``streamlit run webui/Lody.py``. Indépendant de ``webui/Main.py``,
-qui reste l'interface historique MoneyPrinterTurbo.
+Lancement : ``streamlit run webui/Lody.py``. Indépendant de ``webui/Main.py``
+(interface historique MoneyPrinterTurbo, conservée pour comparaison).
 """
 
 import streamlit as st
@@ -14,6 +14,6 @@ st.set_page_config(
 )
 
 # set_page_config doit rester le premier appel Streamlit : import après.
-from lody import home
+from lody import app
 
-home.render()
+app.render()
