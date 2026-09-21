@@ -4,7 +4,9 @@
 #   - image construite depuis CE dépôt (jamais ghcr.io/harry0703/...:latest) ;
 #   - projet Compose, conteneur, image, réseau et port distincts ;
 #   - config.toml et storage/ montés depuis l'hôte, non versionnés ;
-#   - projets dans une base SQLite d'un volume nommé (survit aux rebuilds).
+#   - projets et productions dans une base SQLite d'un volume nommé (survit aux rebuilds) ;
+#   - joint l'API du moteur de génération par le réseau du moteur (l'API reste publiée
+#     uniquement sur 127.0.0.1:8080 côté hôte : rien de plus n'est exposé).
 #
 # Usage rapide (voir docs/lody-ui.md) :
 #   docker compose -f docker-compose.lody.yml up -d --build
@@ -42,17 +44,23 @@ services:
     environment:
       PYTHONDONTWRITEBYTECODE: "1"
       LODY_DATA_DIR: /data
+      # Connecteur de génération : adresse de l'API et dossier de sortie (monté en lecture seule).
+      # Aucune clé ici : le moteur lit lui-même son config.toml.
+      LODY_ENGINE_URL: http://moneyprinterturbo-api:8080
+      LODY_ENGINE_STORAGE: /MoneyPrinterTurbo/storage
     ports:
       # Local uniquement (8501 = ancienne WebUI, 8080 = API : non touchés).
       - "127.0.0.1:8601:8601"
     volumes:
-      # Non versionnés (.gitignore). Le prototype ne lit ni n'écrit rien dedans :
-      # montés en lecture seule ; passer storage en rw quand la génération
-      # sera branchée.
+      # Non versionnés (.gitignore). Lody lit config.toml pour savoir si une clé est renseignée
+      # (jamais sa valeur) et lit les vidéos produites dans storage/ : tout est en lecture seule.
       - ./config.toml:/MoneyPrinterTurbo/config.toml:ro
       - ./storage:/MoneyPrinterTurbo/storage:ro
       # Base SQLite des projets. NE PAS supprimer ce volume (docker compose down -v).
       - lody_data:/data
+    networks:
+      - default
+      - engine
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -64,6 +72,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+networks:
+  # Réseau du moteur de génération (créé par son propre Compose) : on s'y rattache, on ne le crée pas.
+  engine:
+    name: moneyprinterturbo_default
+    external: true
 
 volumes:
   lody_data:
