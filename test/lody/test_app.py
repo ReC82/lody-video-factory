@@ -261,7 +261,7 @@ def test_archived_project_offers_restore_and_blocks_production():
 
     repo.archive(project.id)
     blocked = _run({"projet": project.id, "vue": "production"})
-    assert not any(button.label == "Générer la vidéo" for button in blocked.button)
+    assert not any(button.label == "Préparer la génération" for button in blocked.button)
 
 
 def test_unknown_project_falls_back_to_home_with_message():
@@ -270,17 +270,25 @@ def test_unknown_project_falls_back_to_home_with_message():
     assert "Tes projets vidéo" in _text(app)
 
 
-def test_production_generate_only_builds_a_local_draft_and_calls_no_provider():
+def test_production_prepare_only_builds_a_local_estimate_and_calls_no_provider():
     project = next(p for p in _repo().list_projects() if p.name == "Audiovisuel")
     app = _run({"projet": project.id, "vue": "production"})
-    _button(app, "Générer la vidéo").click().run()
-    assert "Décris d’abord ta vidéo" in _text(app)
+    assert not any(button.label == "Générer la vidéo" for button in app.button)  # ancien libellé trompeur
+    _button(app, "Préparer la génération").click().run()
+    assert "Décris ta vidéo en quelques mots" in _text(app)
 
     app.text_area(key=f"request_{project.id}").set_value("Explique simplement le Fill et le Key.")
-    _button(app, "Générer la vidéo").click().run()
-    draft = app.session_state[f"draft_{project.id}"]
-    assert draft["projet"] == "Audiovisuel" and draft["fournisseurs_appeles"] == []
-    assert "aucune génération lancée" in _text(app)
+    _button(app, "Préparer la génération").click().run()
+    text = _text(app)
+    assert "Estimation et confirmation" in text and "tarif non configuré" in text and "Total partiel" in text
+    assert "Une seule confirmation" in text and "plusieurs appels payants" in text
+    # après estimation, le même bouton devient « Confirmer et générer la vidéo » (désactivé tant que rien n'est accepté)
+    confirm = _button(app, "Confirmer et générer la vidéo")
+    assert confirm.disabled
+    from lody.generation.store import ProductionRepository
+
+    drafts = ProductionRepository(settings.db_path()).list_for_project(project.id)
+    assert [d.status.value for d in drafts] == ["EN_ATTENTE_CONFIRMATION"] and drafts[0].external_task_id is None
 
 
 def test_storage_error_is_shown_calmly(monkeypatch, tmp_path):

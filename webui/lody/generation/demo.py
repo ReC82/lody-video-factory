@@ -41,7 +41,7 @@ def default_video_maker(target: Path) -> None:
     base = ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=360x640:rate=15",
             "-f", "lavfi", "-i", "sine=frequency=330:sample_rate=44100", "-t", str(int(DEMO_VIDEO_SECONDS))]
     encode = ["-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", str(target)]
-    text = f"drawtext=fontfile={FONT}:text='VIDEO DE DEMONSTRATION':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:x=(w-text_w)/2:y=h*0.08"
+    text = f"drawtext=fontfile={FONT}:text='DEMONSTRATION':fontcolor=white:fontsize=26:box=1:boxcolor=black@0.65:boxborderw=8:x=(w-text_w)/2:y=h*0.06"
     for extra in (["-vf", text], []):
         try:
             done = subprocess.run(base + extra + encode, capture_output=True, timeout=90, check=False)
