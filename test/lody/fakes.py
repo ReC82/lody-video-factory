@@ -20,6 +20,16 @@ from lody.generation.models import (
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import ALLOWED_VIDEO_SUFFIXES, resolve_within
 
+def _png(seed: str, size=(256, 384)) -> bytes:
+    import io
+
+    from lody.generation.thumbnail import placeholder_background
+
+    buffer = io.BytesIO()
+    placeholder_background(seed, size).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 SCRIPT = (
     "La blockchain est un registre partagé. Chaque bloc contient des transactions. "
     "Personne ne peut modifier le passé sans que tout le monde le voie. "
@@ -32,6 +42,7 @@ SCRIPT = (
 class ScriptedConnector(VideoGenerationProvider):
     id = "scripted"
     display_name = "Faux moteur"
+    supports_thumbnail_background = False   # activable par les tests : le moteur historique ne sait pas générer une image seule
 
     def __init__(self, root: Path, *, issues: list[ReadinessIssue] | None = None):
         self.root = Path(root)
@@ -43,6 +54,10 @@ class ScriptedConnector(VideoGenerationProvider):
         self.submit_error: ProviderError | None = None
         self.recover_result: GenerationResult | None = None
         self.write_video = True
+        self.scene_images: list[dict] = []
+        self.subtitles_text: str | None = None
+        self.background_bytes: bytes | None = None
+        self.background_error: ProviderError | None = None
 
     # -- scénario -----------------------------------------------------------
     def queue(self, *items: TaskSnapshot | ProviderError) -> None:
@@ -58,6 +73,20 @@ class ScriptedConnector(VideoGenerationProvider):
             ref, 52.4, assets=({"kind": "video", "ref": ref},), warnings=kwargs.get("warnings", ())))
 
     # -- interface ------------------------------------------------------------
+    def list_scene_images(self, task):
+        self.calls.append("list_scene_images")
+        return list(self.scene_images)
+
+    def read_subtitles(self, task):
+        self.calls.append("read_subtitles")
+        return self.subtitles_text
+
+    def generate_thumbnail_background(self, request, prompt):
+        self.calls.append("thumbnail_background")   # appel payant : les tests comptent chaque appel
+        if self.background_error:
+            raise self.background_error
+        return self.background_bytes if self.background_bytes is not None else _png(prompt)
+
     def describe_params(self, request):
         return {"video_aspect": request.aspect, "video_language": request.language, "subtitle_display_mode": "sentence"}
 

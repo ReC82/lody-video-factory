@@ -31,15 +31,18 @@ SECRET_MESSAGE = (
 )
 
 
-def looks_like_secret_value(value: str) -> bool:
-    return any(pattern.search(value) for pattern in _SECRET_VALUE_PATTERNS)
+def looks_like_secret_value(value: str, opaque: bool = True) -> bool:
+    """``opaque=False`` : motifs de clés connus seulement (sk-…, ghp_…, Bearer, clé privée), sans la règle « jeton opaque »,
+    qui prendrait un slug de fichier (``lodycrypto-v1-…``) pour une clé dans un texte de publication."""
+    patterns = _SECRET_VALUE_PATTERNS if opaque else _SECRET_VALUE_PATTERNS[:-1]
+    return any(pattern.search(value) for pattern in patterns)
 
 
 def looks_like_secret_key(name: str) -> bool:
     return bool(_SECRET_KEY_NAME.search(name))
 
 
-def find_secret_path(value: Any, path: str = "") -> str | None:
+def find_secret_path(value: Any, path: str = "", opaque: bool = True) -> str | None:
     """Retourne le chemin du premier élément suspect (clé ou valeur), sinon None.
 
     Le chemin ne contient jamais la valeur elle-même.
@@ -49,14 +52,14 @@ def find_secret_path(value: Any, path: str = "") -> str | None:
             here = f"{path}.{key}" if path else str(key)
             if looks_like_secret_key(str(key)):
                 return here
-            found = find_secret_path(item, here)
+            found = find_secret_path(item, here, opaque)
             if found:
                 return found
     elif isinstance(value, (list, tuple)):
         for index, item in enumerate(value):
-            found = find_secret_path(item, f"{path}[{index}]")
+            found = find_secret_path(item, f"{path}[{index}]", opaque)
             if found:
                 return found
-    elif isinstance(value, str) and looks_like_secret_value(value):
+    elif isinstance(value, str) and looks_like_secret_value(value, opaque):
         return path or "(valeur)"
     return None

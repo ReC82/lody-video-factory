@@ -8,7 +8,8 @@ import streamlit as st
 
 from lody import nav, settings
 from lody import view_form, view_home, view_production, view_project, view_settings, view_tracking, view_v2
-from lody.generation.runtime import DEFAULT_PROVIDER, build_service
+from lody.generation.kit_service import KitService
+from lody.generation.runtime import DEFAULT_PROVIDER, build_kit_service, build_service
 from lody.generation.service import ProductionService
 from lody.components import accent_for, render_flash, render_footer, render_header
 from lody.projects import ProjectNotFound, ProjectRepository
@@ -31,6 +32,12 @@ def get_repository() -> ProjectRepository:
 def get_production_service() -> ProductionService:
     """Service de production partagé (threads de génération, reprise des productions non terminées)."""
     return build_service()
+
+
+@st.cache_resource(show_spinner=False)
+def get_kit_service() -> KitService:
+    """Service des kits de publication, construit sur le service de production partagé."""
+    return build_kit_service(get_production_service())
 
 
 def _render_storage_error() -> None:
@@ -80,7 +87,7 @@ def render() -> None:
     elif route.view == nav.VIEW_PRODUCTION and project:
         view_production.render(project, service)
     elif route.view == nav.VIEW_TRACK and project and route.production_id:
-        view_tracking.render(service, project, route.production_id)
+        view_tracking.render(service, project, route.production_id, get_kit_service())
     elif route.view == nav.VIEW_V2 and project and route.production_id:
         view_v2.render(service, project, route.production_id)
     elif project:

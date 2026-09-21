@@ -172,6 +172,49 @@ corrigé (`repair/final-1-repaired.mp4`, avec `repair/repair.json`) est ajouté 
 « réparation technique » — aucune nouvelle production, aucun coût. La page de la production affiche le rendu corrigé
 en premier et conserve l'original.
 
+## Kit de publication manuelle
+
+Chaque production **terminée** a un kit (bloc « Kit de publication » sous le résultat). Rien n'est publié et aucun compte
+YouTube/TikTok n'est connecté : le kit prépare ce qu'on copie-colle et téléverse soi-même.
+
+**Architecture.** `generation/kit_service.py` (orchestration) s'appuie sur `publication.py` (métadonnées, locales et
+déterministes, règles anti-conseil financier), `thumbnail.py` (composition Pillow), `subtitles.py` (SRT/VTT),
+`kit_store.py` (SQLite), `kit_files.py` (fonds générés) et `media.py` (durée réelle via ffprobe). L'interface est
+`view_kit.py` ; le profil de publication (playlist, hashtags, mention, public…) appartient à **chaque projet**
+(Paramètres → Contenu → Publication) : aucune donnée d'un projet n'entre dans le kit d'un autre.
+
+**Migration SQLite v4** (`publication_kits`, une ligne par production, `UNIQUE(production_id)`) : `metadata`,
+`initial_metadata` (pour « Restaurer »), `thumbnail` (texte, variante, fond), `history` (40 entrées max, avec l'ancienne
+valeur), `background_job` (état du fond payant). Additive ; sauvegarde de la base avant migration au déploiement. Une V2 a
+son propre kit ; celui de la V1 n'est jamais modifié.
+
+**Miniature.** Le fond ne contient jamais de texte : le texte est dessiné localement (police fournie, contraste ≥ 4,5:1,
+corps ≥ 20 px dans l'aperçu téléphone de 360 px). Trois compositions (centré, en haut, latéral) sortent du **même fond**,
+sans appel fournisseur ; PNG et JPEG téléchargeables. Fond gratuit : image de scène déjà produite. Fond payant dédié :
+uniquement si le moteur sait générer une image seule (`supports_thumbnail_background`) ; il est alors compris dans
+l'estimation initiale, et un nouveau fond ne part qu'après estimation puis confirmation explicite (idempotente).
+
+**Sous-titres.** SRT (UTF-8) et VTT (`lang fr`) reconstruits depuis le SRT du moteur déjà produit : apostrophes
+françaises corrigées, minutages bornés à la durée réelle, rien après la dernière image. Les sous-titres restent incrustés
+dans le MP4.
+
+**Archive ZIP** : `video.mp4`, `thumbnail.png`, `subtitles-fr.srt`, `subtitles-fr.vtt`, `publication-youtube.txt`,
+`publication-tiktok.txt`, `metadata.json`. Chaque texte passe un contrôle (secrets, chemins serveur, identifiants internes)
+avant d'entrer dans l'archive.
+
+**Coûts.** Gratuit : création du kit, propositions, modifications, recomposition de la miniature, SRT/VTT, ZIP,
+régénération des métadonnées. Payant : uniquement un nouveau fond d'image, après estimation et confirmation.
+
+**Productions existantes.** Le kit se crée à l'ouverture, gratuitement, depuis le script et les sous-titres déjà produits.
+Les images de scène d'anciennes productions ont pu recevoir le gabarit d'images global du moteur : le kit l'indique.
+
+**Retour arrière.** Redéployer l'image précédente ; la table `publication_kits` peut rester (ignorée). Aucune donnée de
+production n'est modifiée par le kit.
+
+**Limites avant une publication directe.** Le moteur historique ne génère pas d'image seule (fonds = images de scène) ;
+pas de programmation, d'envoi ni de comptes ; le contrôle avant publication est indicatif ; playlist, catégorie et
+audience sont à saisir sur la plateforme.
+
 ## Nouvelle tentative après un échec
 
 Une production échouée reste dans l'historique, avec sa cause. « Préparer à nouveau » ouvre la page de production

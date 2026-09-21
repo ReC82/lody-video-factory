@@ -22,7 +22,7 @@ from lody.theme import esc
 _UNPRICED = "tarif non configuré"
 _PROVIDER_CATALOGS = {
     "text": catalog.TEXT_PROVIDERS, "visual": catalog.VISUAL_PROVIDERS,
-    "voice": catalog.VOICE_PROVIDERS, "music": catalog.MUSIC_PROVIDERS,
+    "voice": catalog.VOICE_PROVIDERS, "music": catalog.MUSIC_PROVIDERS, "thumbnail": catalog.VISUAL_PROVIDERS,
 }
 
 
@@ -40,6 +40,8 @@ def _quantity(line: dict) -> str:
         return "1 script écrit" if high else "script fourni : aucun appel"
     if component == "visual":
         return _span(low, high, "image")
+    if component == "thumbnail":
+        return "1 image de fond (le texte est ajouté localement, gratuitement)"
     if component == "voice":
         return "≈ " + _span(low, high, "caractère")
     return "1 morceau" if high else "—"

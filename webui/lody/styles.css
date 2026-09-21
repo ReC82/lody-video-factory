@@ -350,7 +350,7 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 }
 
 /* ---- Génération : estimation, suivi, résultat ------------------------------- */
-[class*="st-key-estimate_"], .st-key-run_card, .st-key-result, .st-key-productions, .st-key-repair {
+[class*="st-key-estimate_"], .st-key-run_card, .st-key-result, .st-key-productions, .st-key-repair, .st-key-kit {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.6rem;
   display: flex; flex-direction: column; gap: 1.25rem;
 }
@@ -438,3 +438,29 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 .st-key-repair { border-color: color-mix(in srgb, var(--accent-1) 35%, var(--border)); }
 .st-key-player_repaired { max-width: 360px; margin: 0 auto; }
 .st-key-player_repaired video { border-radius: var(--radius-sm); background: #000; max-height: 640px; }
+
+/* ---- Kit de publication ------------------------------------------------------ */
+.st-key-kit iframe { display: block; max-width: 100%; }
+.st-key-kit [data-testid="stTabs"] [role="tablist"] { flex-wrap: wrap; }
+.st-key-kit textarea, .st-key-kit input { overflow-wrap: anywhere; }
+.kit-dirty { color: var(--warn); }
+.kit-check { display: flex; flex-direction: column; gap: 0.15rem; margin: 0 0 0.6rem; padding: 0.7rem 0.9rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); }
+.kit-check span { color: var(--muted); font-size: 0.9rem; }
+.kit-check-ok { border-color: rgba(110, 231, 183, 0.35); }
+.kit-check-ok strong { color: var(--ok); }
+.kit-check-warn { border-color: rgba(252, 211, 77, 0.4); }
+.kit-check-warn strong { color: var(--warn); }
+.kit-check-fail { border-color: rgba(253, 164, 175, 0.45); }
+.kit-check-fail strong { color: var(--danger); }
+.kit-phone { padding: 0.7rem 0.9rem; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 0.5rem 0 0.9rem; font-size: 0.92rem; }
+.kit-phone-ok { border-color: rgba(110, 231, 183, 0.35); }
+.kit-phone-fail { border-color: rgba(253, 164, 175, 0.45); color: var(--danger); }
+.st-key-kit_meta_actions, .st-key-kit_sub_dl, [class*="st-key-kit_"][class*="_thumb_dl"], [class*="st-key-kit_"][class*="_bg_confirm"] { gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+@media (max-width: 640px) {
+  .st-key-kit_meta_actions > div, .st-key-kit_sub_dl > div, [class*="_thumb_dl"] > div, [class*="_bg_confirm"] > div { flex: 1 1 100%; }
+  .st-key-kit_meta_actions button, .st-key-kit_sub_dl button, [class*="_thumb_dl"] button, [class*="_bg_confirm"] button { width: 100%; }
+}
+/* Streamlit récent : les onglets sont des div[data-testid="stTab"] (plus des button[data-baseweb]). */
+[data-testid="stTab"], [data-testid="stTab"] * { color: var(--muted) !important; }
+[data-testid="stTab"]:hover, [data-testid="stTab"]:hover *, [data-testid="stTab"][aria-selected="true"], [data-testid="stTab"][aria-selected="true"] * { color: var(--text) !important; }
+.st-key-kit [data-testid="stRadio"] label p, .st-key-kit [data-testid="stCheckbox"] label p { color: var(--text); }
