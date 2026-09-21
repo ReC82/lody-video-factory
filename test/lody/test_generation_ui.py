@@ -283,3 +283,42 @@ def test_demo_mode_runs_end_to_end_with_no_provider_call(engine):
     assert engine.calls == []  # le faux moteur « réel » n'a jamais été touché
     app = _button(app, "Créer une V2").click().run()
     assert "Créer une V2" in _text(app)
+
+
+# -- rendu corrigé (réparation technique) ------------------------------------------------------------------------------
+def test_repaired_render_is_shown_first_with_the_original_kept_and_no_cost(engine):
+    project, app = _launch(engine)
+    engine.queue(engine.done("task-0001"))
+    _button(app, "Actualiser").click().run()
+    production = _repo().list_for_project(project.id)[0]
+    folder = engine.root / "tasks" / "task-0001" / "repair"
+    folder.mkdir()
+    (folder / "final-1-repaired.mp4").write_bytes(b"repaired")
+    (folder / "final-1.original.mp4").write_bytes(b"fake-mp4")
+    _repo().update(production.id, assets=[
+        *production.assets,
+        {"kind": "repaired_video", "ref": "tasks/task-0001/repair/final-1-repaired.mp4"},
+        {"kind": "original_video", "ref": "tasks/task-0001/repair/final-1.original.mp4"}])
+    submits = engine.calls.count("submit")
+    app = _run({"projet": project.id, "vue": "suivi", "production": production.id})
+    text = _text(app)
+    assert "Réparation technique" in text and "Rendu corrigé" in text and "Rendu original (conservé)" in text
+    assert "aucune nouvelle génération, aucun fournisseur appelé, rien de facturé" in text
+    assert len(app.get("video")) == 2                                               # corrigé + original, lisibles
+    labels = [getattr(element, "label", "") for element in app.get("download_button")]
+    assert "Télécharger le rendu corrigé" in labels and "Télécharger la vidéo" in labels
+    assert engine.calls.count("submit") == submits and _repo().get(production.id).status.value == "TERMINEE"
+
+
+def test_a_repaired_asset_pointing_outside_the_production_is_ignored(engine):
+    project, app = _launch(engine)
+    engine.queue(engine.done("task-0001"))
+    _button(app, "Actualiser").click().run()
+    production = _repo().list_for_project(project.id)[0]
+    other = engine.root / "tasks" / "task-9999"
+    other.mkdir(parents=True)
+    (other / "final-1.mp4").write_bytes(b"other")
+    _repo().update(production.id, assets=[*production.assets,
+                                          {"kind": "repaired_video", "ref": "tasks/task-9999/final-1.mp4"}])
+    app = _run({"projet": project.id, "vue": "suivi", "production": production.id})
+    assert not app.exception and "Rendu corrigé" not in _text(app) and len(app.get("video")) == 1

@@ -39,3 +39,9 @@ def engine_report_path() -> Path:
     """
     raw = os.environ.get("LODY_ENGINE_REPORT", "").strip()
     return Path(raw) if raw else Path("/engine-report/engine-capabilities.json")
+
+
+def fonts_dir() -> Path:
+    """Polices de sous-titres fournies avec le moteur (resource/fonts) ; LODY_FONTS_DIR pour les tests."""
+    raw = os.environ.get("LODY_FONTS_DIR", "").strip()
+    return Path(raw) if raw else _REPO_ROOT / "resource" / "fonts"

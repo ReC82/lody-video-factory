@@ -1,6 +1,7 @@
 .DS_Store
 /config.toml
 /config.toml.bak
+/config.toml.bak*
 /storage/
 /engine-report/
 /.idea/

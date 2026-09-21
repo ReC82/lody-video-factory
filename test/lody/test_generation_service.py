@@ -419,3 +419,33 @@ def test_end_to_end_with_the_real_connector_leaks_no_secret_to_database_or_logs(
     logs = caplog.text
     for value in ("FAKE-CONFIG-VALUE-NOT-A-KEY", "FAKE-IMAGE-VALUE-NOT-A-KEY", "FAKE-ELEVEN-VALUE-NOT-A-KEY"):
         assert value not in sent and value.encode() not in stored and value not in logs
+
+
+# -- typographie du script : « l’ idée » ne doit jamais atteindre le TTS ni les sous-titres ---------------------------------
+def test_generated_script_is_normalised_before_storage_and_sending(env):
+    env.connector.write_script = lambda request: "Mais l’  idée de base est simple, c’ est un registre. Aujourd’ hui, qu’ il n’ y a rien."
+    running = env.service.confirm(_prepare(env).id)
+    stored = env.service.repo.get(running.id)
+    assert stored.script == "Mais l’idée de base est simple, c’est un registre. Aujourd’hui, qu’il n’y a rien."
+    assert env.connector.submitted[0].script == stored.script            # même texte : narration, SRT et affichage
+    assert stored.storyboard[0]["narration"].startswith("Mais l’idée")
+
+
+def test_supplied_and_edited_scripts_are_normalised(env):
+    raw = "Voici l’  idée : c’ est simple. " * 3
+    draft = _prepare(env, script=raw)
+    assert "’ " not in draft.script and draft.script.startswith("Voici l’idée : c’est simple.")
+    v1 = _finished_v1(env)
+    v2 = env.service.prepare_v2(env.service.create_v2(v1.id).id, SCRIPT + " Et qu’ il n’ y a plus d’ espace.")
+    assert v2.script.endswith("Et qu’il n’y a plus d’espace.")
+
+
+def test_other_languages_keep_their_script_untouched(env):
+    from lody.generation.service import build_request  # noqa: F401
+    from lody.projects import ProjectRepository
+
+    projects = ProjectRepository(env.path)
+    english = projects.update(env.project.id, language="en-US")
+    text = "The dogs' toys and l' idea stay as they are, said 'Bob' today."
+    draft = env.service.prepare(english, SUBJECT, provider_id="scripted", script=text + " " + text)
+    assert draft.script == text + " " + text

@@ -350,7 +350,7 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 }
 
 /* ---- Génération : estimation, suivi, résultat ------------------------------- */
-[class*="st-key-estimate_"], .st-key-run_card, .st-key-result, .st-key-productions {
+[class*="st-key-estimate_"], .st-key-run_card, .st-key-result, .st-key-productions, .st-key-repair {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.6rem;
   display: flex; flex-direction: column; gap: 1.25rem;
 }
@@ -435,3 +435,6 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 .cfg-warn, .cfg-fail { background: rgba(253, 164, 175, 0.04); }
 @media (max-width: 640px) { .cfg-row { flex-direction: column; gap: 0.4rem; } }
 .stApp .field-warn { margin: 0.35rem 0 0; font-size: 0.86rem; color: var(--warn); line-height: 1.45; }
+.st-key-repair { border-color: color-mix(in srgb, var(--accent-1) 35%, var(--border)); }
+.st-key-player_repaired { max-width: 360px; margin: 0 auto; }
+.st-key-player_repaired video { border-radius: var(--radius-sm); background: #000; max-height: 640px; }
