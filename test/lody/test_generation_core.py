@@ -31,14 +31,14 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
     ProductionRepository(path)
     ProductionRepository(path)  # rejeu : sans effet
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 2
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 3
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions"} <= tables
     columns = {row[1] for row in connection.execute("PRAGMA table_info(productions)")}
     assert {"project_id", "version", "parent_production_id", "subject", "brief", "script", "storyboard",
             "visual_prompts", "params", "cost_currency", "cost_detail", "confirmed_at", "provider",
             "external_task_id", "status", "progress", "current_step", "error_message", "created_at",
-            "started_at", "finished_at", "video_ref", "assets"} <= columns
+            "started_at", "finished_at", "video_ref", "assets", "snapshot", "trace"} <= columns
     # « idempotency_key » est la clé d'idempotence locale, pas une clé d'API.
     assert not [c for c in columns if ("key" in c or "token" in c or "secret" in c) and c != "idempotency_key"]
 
@@ -56,9 +56,45 @@ def test_upgrade_from_schema_v1_keeps_existing_projects(tmp_path):
     connection.close()
     ProductionRepository(path)
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 3
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT COUNT(*) FROM productions").fetchone()[0] == 0
+
+
+def test_upgrade_from_schema_v2_adds_snapshot_and_trace_without_touching_existing_productions(tmp_path):
+    """Base v2 réelle (productions déjà présentes) : les anciennes lignes gardent leurs données, snapshot/trace = {}."""
+    path = tmp_path / "v2.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(db.PROJECTS_SCHEMA + db.PRODUCTIONS_SCHEMA)
+    connection.execute("PRAGMA user_version = 2")
+    connection.execute(
+        "INSERT INTO projects (id, name, created_at, updated_at, language, format, content_type, text_provider,"
+        " visual_provider, voice_provider, music_provider) VALUES ('prj_a', 'A', 'x', 'x', 'fr-FR', '9:16',"
+        " 'pedagogique', 'openai', 'openai_image', 'elevenlabs', 'none')")
+    connection.execute(
+        "INSERT INTO productions (id, project_id, root_production_id, version, subject, provider, idempotency_key,"
+        " status, created_at, updated_at, script) VALUES ('prd_old', 'prj_a', 'prd_old', 1, 'Sujet', 'p', 'k',"
+        " 'TERMINEE', 'x', 'x', 'Un script.')")
+    connection.commit()
+    connection.close()
+    repo = ProductionRepository(path)
+    ProductionRepository(path)  # rejeu : sans effet, pas de colonne dupliquée
+    old = repo.get("prd_old")
+    assert (old.script, old.snapshot, old.trace) == ("Un script.", {}, {})
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 3
+
+
+def test_snapshot_is_immutable_after_confirmation(tmp_path):
+    project = _project(tmp_path)
+    repo = ProductionRepository(tmp_path / "lody.sqlite3")
+    draft = repo.create(project_id=project.id, subject="Sujet", provider="p", status=ProductionStatus.EN_ATTENTE_CONFIRMATION,
+                        snapshot={"version": "v1"})
+    with pytest.raises(ValueError):
+        repo.update(draft.id, snapshot={"version": "autre"})             # update() ne touche jamais l'instantané
+    assert repo.transition(draft.id, [ProductionStatus.EN_ATTENTE_CONFIRMATION], snapshot={"version": "v2"})  # brouillon : refait
+    with pytest.raises(ValueError):
+        repo.transition(draft.id, [ProductionStatus.CONFIRMEE, ProductionStatus.EN_COURS], snapshot={"version": "v3"})
+    assert repo.get(draft.id).snapshot == {"version": "v2"}
 
 
 # -- coût ---------------------------------------------------------------------------

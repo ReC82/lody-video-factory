@@ -117,6 +117,28 @@ Ainsi Lody n'a jamais accès aux clés (le conteneur ne peut pas lire `config.to
 sachant exactement ce qui est configuré. Sans aucune des deux sources, chaque fournisseur est « non vérifié » et
 la production réelle est bloquée (le mode démonstration reste possible).
 
+## Isolation par projet
+
+Incident : des visuels LodyCrypto montraient tables de mixage et régie. Cause : le moteur applique un **gabarit d'images global**
+(`[app].openai_image_prompt_template` de sa configuration) à chaque image de chaque projet ; celui-ci décrivait un univers
+Audiovisuel / Fill & Key (audit : `docs/audits/lody-project-isolation-audit.md`). Garanties mises en place :
+
+- **Gabarit global bloquant.** Le rapport de capacités porte ce gabarit ; s'il n'est pas neutre (vide, `{term}`, ou sans `{term}`), le
+  preflight bloque la production réelle (« le moteur ajoute un gabarit d'images global à tous les projets »). Pour le neutraliser :
+  `python3 scripts/lody-neutralize-image-template.py --dry-run`, puis sans `--dry-run` (sauvegarde datée, toute autre valeur vérifiée
+  identique), redémarrer l'API du moteur, puis `./scripts/lody-engine-report.sh`.
+- **Instantané immuable.** À la préparation, la production enregistre une copie profonde des paramètres du projet (`snapshot` : projet,
+  version des paramètres, date, demande, origine de chaque valeur). Il n'est jamais modifié ensuite (seul le brouillon peut être re-préparé),
+  y compris si le projet change. La confirmation et le worker refusent une production dont l'instantané n'est pas celui de son projet ou
+  dont les paramètres à envoyer diffèrent ; une V2 hérite de l'instantané de sa version précédente. Aucune lecture du « dernier projet ».
+- **Prompts finaux tracés** (`trace`, enregistrée *avant* l'envoi) : requête d'écriture du script, prompt exact de chaque scène, ce que le
+  moteur y ajoute, paramètres transmis, origine de chaque élément (projet, moteur, plateforme). Visible dans « Diagnostic administrateur »
+  de la page de la production ; tout est passé par un masquage de secrets.
+- **Profil visuel propre au projet** (`brief.visual_rules`, `brief.visual_avoid`), ajouté à chaque prompt de scène de CE projet uniquement.
+  Les défauts de plateforme sont neutres (vides). LodyCrypto porte sa propre liste négative (régie TV, table de mixage, pupitre broadcast,
+  multiview, SDI, schéma FILL/KEY, caméra de plateau/PTZ, studio TV sauf demande explicite) ; migration additive au démarrage pour le
+  projet existant (ne remplit que les clés absentes, n'écrase jamais une saisie).
+
 ## Sous-titres français : apostrophes et police
 
 Incident V7 : « mais l’  idée de base est simple » à l'écran, alors que le script, le texte envoyé au moteur, le

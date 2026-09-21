@@ -346,3 +346,47 @@ def test_retry_of_a_non_failed_or_foreign_production_is_ignored(tmp_path):
     assert ok.status is not S.ECHEC
     draft = env.service.prepare(env.project, SUBJECT + " autre", provider_id="scripted", retry_of=ok.id)
     assert draft.parent_production_id is None
+
+
+# -- gabarit d'images GLOBAL du moteur : contamination entre projets ---------------------------------------------------------
+BROADCAST = ('professional broadcast television visual explaining {term}, realistic studio or control room environment, '
+             'use broadcast monitors, vision mixer, lower thirds, alpha matte')
+
+
+def _with_template(template: str) -> str:
+    return CONFIG.replace("[app]\n", f'[app]\nopenai_image_prompt_template = "{template}"\n', 1)
+
+
+def test_a_global_engine_image_template_blocks_real_generation_for_every_project(tmp_path):
+    connector, _ = _connector(tmp_path, _with_template(BROADCAST))
+    report = connector.preflight(_crypto_request())
+    visual = _status(report, Cap.VISUAL)
+    assert visual.state is CS.NOT_CONFIGURED and visual.fix == "platform" and not report.ready
+    assert "à tous les projets" in visual.message and "neutraliser" in visual.message
+    for word in TECHNICAL:
+        assert word not in visual.message
+    assert "ACTIF" in visual.admin and "broadcast television" in visual.admin and "openai_image_prompt_template" in visual.admin
+    _no_secret(visual)
+
+
+@pytest.mark.parametrize("template", ["", "{term}", "  {term}  ", "un texte sans placeholder, ignoré par le moteur"])
+def test_neutral_or_ineffective_engine_templates_do_not_block(tmp_path, template):
+    connector, _ = _connector(tmp_path, _with_template(template))
+    assert _status(connector.preflight(_crypto_request()), Cap.VISUAL).state is CS.READY
+
+
+def test_template_travels_in_the_report_and_an_old_report_is_refused(tmp_path):
+    config = _cfg(tmp_path, _with_template(BROADCAST))
+    report = tmp_path / "engine-report.json"
+    ef.main(["--config", str(config), "--out", str(report)])
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert data["version"] == 2 and data["facts"]["image_template"].startswith("professional broadcast")
+    _no_secret(report.read_text(encoding="utf-8"))
+    data["version"] = 1
+    report.write_text(json.dumps(data), encoding="utf-8")
+    if os.geteuid() != 0:
+        config.chmod(0o000)
+        try:
+            assert "report_invalid" in ef.resolve(config, report).problems      # rapport v1 : sans le gabarit, donc refusé
+        finally:
+            config.chmod(0o600)

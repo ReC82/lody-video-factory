@@ -104,6 +104,14 @@ def _label(provider: str) -> str:
     return _TEXT_LABELS.get(provider, provider or "aucun")
 
 
+def apply_image_template(template: str, term: str) -> str:
+    """Prompt final d'une image côté moteur : ``template.replace("{term}", term)`` (comme material._openai_image_prompt)."""
+    template = (template or "").strip()
+    if not template or "{term}" not in template:
+        return term
+    return template.replace("{term}", term)
+
+
 def script_prompt(request: GenerationRequest, limit: int = 2000) -> str:
     """Consignes envoyées au moteur pour écrire le script (borné à la limite du moteur)."""
     words = tuple(round(seconds / 60 * WORDS_PER_MINUTE.get(request.narration_pace, 155))
@@ -340,7 +348,16 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         if not facts.known:
             return self._unverified(C, request.visual_provider, facts)
         details = (f"endpoint+modèle d'images={'oui' if facts.image_endpoint else 'non'} ; clé images={'renseignée' if facts.image_key else 'vide'} ; "
-                   f"modèle={facts.image_model or '(vide)'} (source : {facts.source})")
+                   f"modèle={facts.image_model or '(vide)'} ; gabarit d'images global du moteur="
+                   f"{'aucun' if not facts.image_template else ('neutre' if facts.image_template_neutral else 'ACTIF : ' + facts.image_template)} "
+                   f"(source : {facts.source})")
+        if not facts.image_template_neutral:  # isolation par projet : le moteur ne doit rien ajouter au prompt du projet
+            return CapabilityStatus(
+                C, St.NOT_CONFIGURED, request.visual_provider, "openai_image", facts.image_model,
+                message=("Le moteur ajoute un gabarit d’images global à tous les projets : les visuels d’un projet peuvent alors "
+                         "être influencés par un autre univers. L’administrateur doit le neutraliser pour que chaque projet garde son propre style."),
+                fix="platform", admin=details + " ; correction : `openai_image_prompt_template = \"\"` dans la section [app] de config.toml, "
+                                                 "redémarrer l'API, puis ./scripts/lody-engine-report.sh")
         if not facts.image_endpoint:
             return CapabilityStatus(C, St.NOT_CONFIGURED, request.visual_provider, message="La génération d’images n’est pas configurée côté serveur.",
                                     fix="platform", admin=details)
@@ -385,11 +402,27 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
                                     fix="platform", admin=details)
         return CapabilityStatus(C, St.READY, music, "elevenlabs", message="Musique générée par le fournisseur choisi.", admin=details)
 
+    def describe_script_request(self, request: GenerationRequest) -> dict[str, Any]:
+        """Requête d'écriture du script (POST /api/v1/scripts) : aucun prompt système personnalisé n'est envoyé."""
+        return {"video_subject": request.subject, "video_language": request.language, "paragraph_number": 1,
+                "video_script_prompt": script_prompt(request),
+                "custom_system_prompt": "(non envoyé : prompt système par défaut du moteur)"}
+
+    def trace_prompts(self, request: GenerationRequest) -> dict[str, Any]:
+        facts = resolve(self.config_path, self.report_path)
+        template = facts.image_template if facts.known else ""
+        applied = not facts.image_template_neutral if facts.known else False
+        scenes = []
+        for index, term in enumerate(request.visual_prompts, 1):
+            final = apply_image_template(template, term) if applied else term
+            scenes.append({"index": index, "prompt_sent": term, "final_prompt": final, "engine_template_applied": final != term})
+        return {"scenes": scenes, "image_template": {
+            "applied": applied, "text": template if applied else "",
+            "origin": "moteur — config.toml, gabarit GLOBAL partagé par tous les projets" if applied
+            else ("inconnu (configuration du moteur non vérifiable)" if not facts.known else "aucun")}}
+
     def write_script(self, request: GenerationRequest) -> str:
-        payload = {
-            "video_subject": request.subject, "video_language": request.language, "paragraph_number": 1,
-            "video_script_prompt": script_prompt(request),
-        }
+        payload = {key: value for key, value in self.describe_script_request(request).items() if key != "custom_system_prompt"}
         status, envelope = self._call("POST", "/api/v1/scripts", payload, timeout=240.0)
         self._raise_for_status(status, envelope, "script")
         data = envelope.get("data")

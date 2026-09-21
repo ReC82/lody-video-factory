@@ -90,11 +90,43 @@ def build_request(project: Project, subject: str, script: str = "") -> Generatio
         tone=project.tone, audience=settings["audience"], orientation=settings["orientation"],
         narration_pace=settings["narration_pace"], structure=tuple(settings["structure"]),
         instructions=settings["standing_instructions"], visual_style=project.visual_style,
+        visual_rules=settings["visual_rules"], visual_avoid=tuple(settings["visual_avoid"]),
         scenes_per_minute_min=settings["scenes_per_minute_min"], scenes_per_minute_max=settings["scenes_per_minute_max"],
         voice=VoiceSpec(project.voice_provider, settings["voice_id"], project.voice_name, settings["voice_model"]),
         text_provider=project.text_provider, visual_provider=project.visual_provider,
         music_provider=project.music_provider, script=script.strip(),
     )
+
+
+_PER_RUN_FIELDS = ("subject", "script", "visual_prompts")  # propres à la production, pas au projet
+_PROJECT_ORIGIN = "projet"
+_ORIGIN_OF_RUN_FIELD = {"subject": "saisi par l’utilisateur", "script": "écrit par le moteur, ou fourni par l’utilisateur",
+                        "visual_prompts": "dérivés du script par Lody"}
+
+
+def project_part(request: dict[str, Any]) -> dict[str, Any]:
+    """Les paramètres du projet contenus dans une demande (sans sujet, script ni prompts de la production)."""
+    return {key: value for key, value in request.items() if key not in _PER_RUN_FIELDS}
+
+
+def make_snapshot(project: Project, request: GenerationRequest, captured_at: str, inherited_from: str | None = None) -> dict[str, Any]:
+    """Instantané IMMUABLE des paramètres du projet au moment de la préparation.
+
+    Copie profonde (JSON) : aucun objet n'est partagé avec le projet ni avec une autre production. ``origins``
+    dit d'où vient chaque valeur ; ``version`` est l'empreinte des seuls paramètres du projet.
+    """
+    import copy
+    import hashlib
+    import json
+
+    data = copy.deepcopy(request.to_dict())
+    frozen = project_part(data)
+    version = hashlib.sha256(json.dumps({"project": project.id, "params": frozen}, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:10]
+    origins = {key: _PROJECT_ORIGIN for key in frozen}
+    origins.update({key: origin for key, origin in _ORIGIN_OF_RUN_FIELD.items() if key in data})
+    return {"version": version, "captured_at": captured_at, "inherited_from": inherited_from,
+            "project": {"id": project.id, "name": project.name, "updated_at": project.updated_at},
+            "request": data, "origins": origins}
 
 
 def request_of(production: Production) -> GenerationRequest:
@@ -208,7 +240,8 @@ class ProductionService:
             "script_source": "manual" if script_text else "",
             "params": {"request": request.to_dict(), "engine": provider.describe_params(request)},
             "storyboard": [], "visual_prompts": [], "current_step": "En attente de confirmation",
-            "error_code": "", "error_message": "", **cost,
+            "error_code": "", "error_message": "", "trace": {},
+            "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of), **cost,
         }
         if retry_of:
             failed = self.repo.get(retry_of)
@@ -235,11 +268,17 @@ class ProductionService:
         parent = self.repo.get(parent_id)
         if parent.status is not ProductionStatus.TERMINEE and not parent.script:
             raise LaunchError("Seule une production terminée (ou dont le script existe) peut avoir une V2.")
+        import copy
+
+        inherited = copy.deepcopy(parent.snapshot) or {
+            "version": "", "captured_at": parent.created_at, "project": {"id": parent.project_id, "name": ""},
+            "request": copy.deepcopy(parent.params.get("request", {})), "origins": {}}
+        inherited["inherited_from"] = parent.id  # la V2 reprend les paramètres de sa version précédente, pas ceux du projet actuel
         return self.repo.create(
             project_id=parent.project_id, subject=parent.subject, provider=parent.provider,
             status=ProductionStatus.BROUILLON, parent_production_id=parent.id, brief=parent.brief,
             script=parent.script, script_source="previous", params=parent.params, storyboard=parent.storyboard,
-            visual_prompts=parent.visual_prompts, cost_currency=parent.cost_currency, cost_low=parent.cost_low,
+            visual_prompts=parent.visual_prompts, snapshot=inherited, cost_currency=parent.cost_currency, cost_low=parent.cost_low,
             cost_high=parent.cost_high, cost_partial=parent.cost_partial, cost_detail=parent.cost_detail,
             current_step="Brouillon de V2",
         )
@@ -255,7 +294,8 @@ class ProductionService:
         _, cost = self._plan(provider, request)
         parent = self.repo.get(draft.parent_production_id)
         scenes = build_storyboard(text, self._scene_count(provider, request), visual_style=request.visual_style,
-                                  aspect=request.aspect, narration_pace=request.narration_pace)
+                                  aspect=request.aspect, narration_pace=request.narration_pace,
+                                  visual_rules=request.visual_rules, visual_avoid=request.visual_avoid)
         fields = {
             "script": text, "script_source": "previous" if text == parent.script.strip() else "manual",
             "params": {"request": request.to_dict(), "engine": provider.describe_params(request)},
@@ -267,12 +307,25 @@ class ProductionService:
             raise LaunchError("Cette version vient d’être lancée ou modifiée ailleurs.")
         return self.repo.get(draft.id)
 
+    @staticmethod
+    def _check_isolation(production: Production) -> None:
+        """Instantané présent, du bon projet, et cohérent avec les paramètres qui seront réellement envoyés."""
+        snapshot = production.snapshot
+        if not snapshot:
+            raise LaunchError("Cette estimation date d’avant l’instantané des paramètres du projet : prépare-la à nouveau.")
+        if snapshot.get("project", {}).get("id") != production.project_id:
+            raise LaunchError("Cette production n’appartient pas au projet de son instantané : lancement refusé.")
+        sent = project_part(production.params.get("request", {}))
+        if sent != project_part(snapshot.get("request", {})):
+            raise LaunchError("Les paramètres à envoyer diffèrent de l’instantané du projet : lancement refusé.")
+
     # -- confirmation unique -----------------------------------------------------
     def confirm(self, production_id: str, *, accept_partial: bool = False) -> Production:
         """Lance la génération. Idempotent : rappelée sur une production déjà lancée, elle ne relance rien."""
         production = self.repo.get(production_id)
         if production.status is not ProductionStatus.EN_ATTENTE_CONFIRMATION:
             return production
+        self._check_isolation(production)
         # Une simulation n'a aucun coût réel : l'avertissement de total partiel ne s'y applique pas.
         if production.cost_partial and not accept_partial and not self.provider(production.provider).is_demo:
             raise LaunchError("Le total est partiel (tarif non configuré) : confirme en acceptant explicitement cet avertissement.")
@@ -311,7 +364,13 @@ class ProductionService:
         production = self.repo.get(production_id)
         provider = self.provider(production.provider)
         try:
+            self._check_isolation(production)  # les paramètres envoyés sont ceux de l'instantané de CE projet, jamais d'un autre
+        except LaunchError as error:
+            self._fail(production_id, ErrorKind.REJECTED, error.message)
+            return
+        try:
             request = request_of(production)
+            script_request = provider.describe_script_request(request) if not request.script else None
             if not request.script:
                 script = typography.normalize_for_language(provider.write_script(request).strip(), request.language)
                 if not script:
@@ -322,14 +381,16 @@ class ProductionService:
             self.repo.update(production_id, current_step="Préparation des scènes")
             scenes = build_storyboard(request.script, self._scene_count(provider, request),
                                       visual_style=request.visual_style, aspect=request.aspect,
-                                      narration_pace=request.narration_pace)
+                                      narration_pace=request.narration_pace, visual_rules=request.visual_rules,
+                                      visual_avoid=request.visual_avoid)
             if not scenes:
                 raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script ne contient aucune phrase exploitable.", stage="script")
             request = request.with_updates(visual_prompts=[scene.prompt for scene in scenes])
             self.repo.update(
                 production_id, storyboard=[scene.to_dict() for scene in scenes],
                 visual_prompts=list(request.visual_prompts), current_step="Envoi au moteur",
-                params={"request": request.to_dict(), "engine": provider.describe_params(request)})
+                params={"request": request.to_dict(), "engine": provider.describe_params(request)},
+                trace=self._trace(production, provider, request, script_request))  # avant l'envoi : conservée même en cas d'échec
             task = provider.submit(request, production.idempotency_key)
             self.repo.update(production_id, external_task_id=task.task_id, status=ProductionStatus.EN_FILE,
                              current_step="Dans la file du moteur", progress=0, last_polled_at=self._clock())
@@ -338,6 +399,25 @@ class ProductionService:
         except Exception as error:  # jamais de trace brute vers l'utilisateur ; détail nettoyé dans les logs
             logger.error("production %s : erreur inattendue (%s) %s", production_id, type(error).__name__, sanitize(error))
             self._fail(production_id, ErrorKind.PROVIDER, "Une erreur inattendue est survenue pendant la préparation.")
+
+    def _trace(self, production: Production, provider: VideoGenerationProvider, request: GenerationRequest,
+               script_request: dict[str, Any] | None) -> dict[str, Any]:
+        """Ce qui est RÉELLEMENT envoyé, et d'où vient chaque élément (sans clé : aucun champ secret n'existe ici)."""
+        detail = provider.trace_prompts(request)
+        engine_template = detail.get("image_template", {})
+        origins = [
+            {"item": "Prompt éditorial du script", "origin": "projet — durée, ton, public, orientation, structure, consignes permanentes"
+             if script_request else "script fourni ou repris : aucun appel texte"},
+            {"item": "Prompt système du script", "origin": "moteur — prompt par défaut (aucun prompt système personnalisé n'est envoyé)"},
+            {"item": "Prompts de scène (envoyés par Lody)", "origin": "projet — style visuel, consignes visuelles, liste négative + passage du script"},
+            {"item": "Gabarit d'images du moteur", "origin": engine_template.get("origin", "aucun")},
+            {"item": "Police et réglages de sous-titres", "origin": "plateforme (connecteur) et moteur (section [ui] de la configuration)"},
+            {"item": "Voix, langue, format, durée", "origin": "projet"},
+        ]
+        return {"recorded_at": self._clock(), "project": production.snapshot.get("project", {}),
+                "snapshot_version": production.snapshot.get("version", ""), "script_request": script_request,
+                "scenes": detail.get("scenes", []), "image_template": engine_template,
+                "engine_params": provider.describe_params(request), "origins": origins}
 
     def _fail(self, production_id: str, kind: ErrorKind, message: str) -> None:
         self.repo.transition(

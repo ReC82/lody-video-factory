@@ -10,6 +10,7 @@ Aucune colonne ne peut recevoir de clé API : ce sont des champs métier (voir `
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 PROJECTS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -84,9 +85,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_productions_external
     ON productions (provider, external_task_id) WHERE external_task_id IS NOT NULL;
 """
 
-MIGRATIONS: tuple[tuple[int, str], ...] = (
+def _add_columns(connection: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    """ALTER TABLE ... ADD COLUMN, seulement pour les colonnes absentes (SQLite n'a pas IF NOT EXISTS ici)."""
+    existing = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+    for name, definition in columns.items():
+        if name not in existing:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+
+def _productions_isolation(connection: sqlite3.Connection) -> None:
+    """v3 : instantané immuable des paramètres du projet (``snapshot``) et trace des prompts réellement envoyés
+    (``trace``). Les productions antérieures gardent ``{}`` : leurs données ne sont ni réécrites ni inventées."""
+    _add_columns(connection, "productions", {
+        "snapshot": "TEXT NOT NULL DEFAULT '{}'",
+        "trace": "TEXT NOT NULL DEFAULT '{}'",
+    })
+
+
+MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
+    (3, _productions_isolation),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
@@ -94,9 +113,12 @@ SCHEMA_VERSION = MIGRATIONS[-1][0]
 def migrate(connection: sqlite3.Connection) -> None:
     """Applique les migrations manquantes, dans l'ordre. Sans effet si la base est à jour."""
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    for target, script in MIGRATIONS:
+    for target, step in MIGRATIONS:
         if version < target:
-            connection.executescript(script)
+            if callable(step):
+                step(connection)
+            else:
+                connection.executescript(step)
             connection.execute(f"PRAGMA user_version = {target}")
             version = target
     connection.execute("PRAGMA journal_mode = WAL")

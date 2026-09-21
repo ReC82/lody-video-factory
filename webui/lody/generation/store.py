@@ -22,19 +22,23 @@ from lody import db
 from lody.generation.models import ACTIVE_STATUSES, ProductionStatus
 from lody.secrets_guard import find_secret_path
 
-JSON_COLUMNS = ("brief", "storyboard", "visual_prompts", "params", "cost_detail", "assets", "warnings")
+JSON_COLUMNS = ("brief", "storyboard", "visual_prompts", "params", "cost_detail", "assets", "warnings", "snapshot", "trace")
 _JSON_DEFAULTS: dict[str, Any] = {
     "brief": {}, "storyboard": [], "visual_prompts": [], "params": {}, "cost_detail": {}, "assets": [], "warnings": [],
+    "snapshot": {}, "trace": {},
 }
 UPDATABLE = frozenset({
     "subject", "brief", "script", "script_source", "storyboard", "visual_prompts", "params",
     "cost_currency", "cost_low", "cost_high", "cost_partial", "cost_detail", "confirmed_at", "provider",
     "external_task_id", "status", "progress", "current_step", "error_code", "error_message",
     "started_at", "finished_at", "last_polled_at", "video_ref", "video_duration", "assets", "warnings",
+    "snapshot", "trace",
 })
+# L'instantané des paramètres du projet n'est écrit qu'à la préparation (brouillon) : jamais après lancement.
+SNAPSHOT_WRITABLE_FROM = frozenset({ProductionStatus.BROUILLON, ProductionStatus.EN_ATTENTE_CONFIRMATION})
 # Colonnes de contenu saisi ou dérivé du brief : jamais de clé. (Les identifiants de tâche et les
 # chemins de fichiers ressemblent à des jetons opaques : ils sont validés ailleurs, pas ici.)
-GUARDED = frozenset({"brief", "storyboard", "visual_prompts", "params", "cost_detail", "subject", "script"})
+GUARDED = frozenset({"brief", "storyboard", "visual_prompts", "params", "cost_detail", "subject", "script", "snapshot", "trace"})
 
 
 class ProductionNotFound(LookupError):
@@ -78,6 +82,8 @@ class Production:
     video_duration: float | None
     assets: list[dict[str, str]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    snapshot: dict[str, Any] = field(default_factory=dict)
+    trace: dict[str, Any] = field(default_factory=dict)
 
     @property
     def label(self) -> str:
@@ -212,6 +218,8 @@ class ProductionRepository:
         return self.get(production_id)
 
     def update(self, production_id: str, **fields: Any) -> Production:
+        if "snapshot" in fields:
+            raise ValueError("L'instantané des paramètres est immuable : il ne s'écrit qu'à la préparation.")
         if not fields:
             return self.get(production_id)
         values = self._prepare(fields)
@@ -232,6 +240,8 @@ class ProductionRepository:
         lancement (deux clics, deux onglets).
         """
         sources = [ProductionStatus(status).value for status in allowed_from]
+        if "snapshot" in fields and not {ProductionStatus(status) for status in allowed_from} <= SNAPSHOT_WRITABLE_FROM:
+            raise ValueError("L'instantané des paramètres est immuable une fois la production confirmée.")
         values = self._prepare(fields)
         assignments = ", ".join(f"{name} = :{name}" for name in values)
         marks = ",".join(f":_from{index}" for index in range(len(sources)))

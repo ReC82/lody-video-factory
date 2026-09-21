@@ -63,6 +63,19 @@ class VideoGenerationProvider(ABC):
     def plan_units(self, request: GenerationRequest) -> SceneUnits:
         return estimate_units(request)
 
+    def describe_script_request(self, request: GenerationRequest) -> dict:
+        """Ce qui est envoyé au fournisseur pour ÉCRIRE le script (sujet, langue, prompt éditorial) — pour archivage."""
+        return {}
+
+    def trace_prompts(self, request: GenerationRequest) -> dict:
+        """Prompts réellement transmis par scène, avec ce que le moteur y ajoute de son côté (gabarit global…).
+
+        Par défaut le moteur n'ajoute rien : le prompt final d'une scène est celui envoyé par Lody.
+        """
+        return {"scenes": [{"index": i, "prompt_sent": prompt, "final_prompt": prompt, "engine_template_applied": False}
+                           for i, prompt in enumerate(request.visual_prompts, 1)],
+                "image_template": {"applied": False, "text": "", "origin": "aucun"}}
+
     def describe_params(self, request: GenerationRequest) -> dict:
         """Paramètres effectifs envoyés au moteur (sans script, sans prompts, sans secret) — pour archivage."""
         return {}
