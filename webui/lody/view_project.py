@@ -6,12 +6,13 @@ import streamlit as st
 
 from lody import brief as brief_lib
 from lody import catalog, nav
-from lody.components import format_datetime, readiness_pill, status_badge
+from lody.components import capability_pill, format_datetime, status_badge
 from lody.generation.models import ACTIVE_STATUSES
 from lody.generation.service import ProductionService
 from lody.view_tracking import status_pill
 from lody.projects import Project, ProjectNotFound, ProjectRepository
-from lody.provider_status import Readiness
+from lody.generation.models import Capability, PreflightReport
+from lody.generation.runtime import DEFAULT_PROVIDER
 from lody.theme import esc
 
 CONFIRM_KEY = "_confirm_archive_project_id"
@@ -52,7 +53,7 @@ def _row(label: str, value: str, extra: str = "") -> str:
     return f"<div><dt>{esc(label)}</dt><dd>{esc(value) or '—'}{extra}</dd></div>"
 
 
-def _summary_cards(project: Project, table: Readiness) -> str:
+def _summary_cards(project: Project, report: PreflightReport) -> str:
     settings = brief_lib.brief_settings(project.settings)
     platforms = ", ".join(catalog.label(catalog.PLATFORMS, value) for value in project.platforms) or "Non précisées"
     duration = f"{settings['duration_min']} à {settings['duration_max']} secondes"
@@ -75,15 +76,15 @@ def _summary_cards(project: Project, table: Readiness) -> str:
         _row("Style", project.visual_style),
         _row("Rythme visuel", f"{settings['scenes_per_minute_min']} à {settings['scenes_per_minute_max']} scènes par minute"),
         _row("Narration", catalog.label(brief_lib.NARRATION_PACES, settings["narration_pace"])),
-        _row("Voix", voice_label, readiness_pill(project, "voice_provider", table)),
+        _row("Voix", voice_label, capability_pill(report.get(Capability.VOICE))),
     ])
     generation = "".join([
         _row("Script", catalog.label(catalog.TEXT_PROVIDERS, project.text_provider),
-             readiness_pill(project, "text_provider", table)),
+             capability_pill(report.get(Capability.TEXT))),
         _row("Images", catalog.label(catalog.VISUAL_PROVIDERS, project.visual_provider),
-             readiness_pill(project, "visual_provider", table)),
+             capability_pill(report.get(Capability.VISUAL))),
         _row("Musique", catalog.label(catalog.MUSIC_PROVIDERS, project.music_provider),
-             readiness_pill(project, "music_provider", table)),
+             capability_pill(report.get(Capability.MUSIC))),
     ])
     structure_card = ""
     if steps:
@@ -105,6 +106,22 @@ def _summary_cards(project: Project, table: Readiness) -> str:
         f'<section class="card"><p class="card-eyebrow">Fournisseurs</p><dl class="kv">{generation}</dl></section>'
         f"{structure_card}{instructions}"
     )
+
+
+def _render_config_notice(project: Project, report: PreflightReport) -> None:
+    """Configuration de production incomplète : dit quoi et où (projet ou serveur), sans rien choisir à la place."""
+    blocking = report.blocking
+    if not blocking:
+        return
+    items = "".join(f"<li><strong>{esc(item.label)}</strong> — {esc(item.state_text)} : {esc(item.message)}</li>" for item in blocking)
+    st.markdown(
+        '<div class="banner banner-error" role="alert"><strong>Production réelle impossible pour l’instant.</strong> '
+        f'<ul class="rules">{items}</ul></div>',
+        unsafe_allow_html=True,
+    )
+    if any(item.fix == "project" for item in blocking):
+        st.button("Choisir des réglages valides", icon=":material/tune:", key="fix_settings_notice",
+                  on_click=nav.go, args=(nav.VIEW_SETTINGS, project.id))
 
 
 def _render_productions(service: ProductionService, project: Project) -> None:
@@ -132,7 +149,7 @@ def _render_productions(service: ProductionService, project: Project) -> None:
                           on_click=nav.go, args=(nav.VIEW_TRACK, project.id, production.id))
 
 
-def render(repo: ProjectRepository, project: Project, table: Readiness, service: ProductionService) -> None:
+def render(repo: ProjectRepository, project: Project, service: ProductionService) -> None:
     description = (
         f'<p class="hero-sub">{esc(project.description)}</p>' if project.description else ""
     )
@@ -175,6 +192,9 @@ def render(repo: ProjectRepository, project: Project, table: Readiness, service:
                               on_click=_archive, args=(repo, project.id))
                     st.button("Annuler", key="cancel_archive", on_click=_cancel_archive)
 
+    report = service.project_preflight(project, DEFAULT_PROVIDER)
+    if not project.is_archived:
+        _render_config_notice(project, report)
     _render_productions(service, project)
     with st.container(key="summary"):
-        st.markdown(_summary_cards(project, table), unsafe_allow_html=True)
+        st.markdown(_summary_cards(project, report), unsafe_allow_html=True)

@@ -11,9 +11,8 @@ import streamlit as st
 from lody import brief as brief_lib
 from lody import catalog, nav
 from lody.projects import Project, ProjectNotFound, ProjectRepository, ProjectValidationError
-from lody.provider_status import Readiness
 from lody.theme import esc
-from lody.view_form import ERRORS_KEY, error_under, provider_select
+from lody.view_form import ERRORS_KEY, States, error_under, provider_select
 
 
 def _prefix(project_id: str) -> str:
@@ -70,7 +69,7 @@ def _cancel(project_id: str) -> None:
     nav.go(nav.VIEW_PROJECT, project_id)
 
 
-def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
+def render(repo: ProjectRepository, project: Project, states: States) -> None:
     p = _prefix(project.id)
     current = brief_lib.brief_settings(project.settings)
 
@@ -156,7 +155,7 @@ def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
 
             with tab_voice:
                 provider_select(p, "voice_provider", "Fournisseur de voix", catalog.VOICE_PROVIDERS,
-                                project.voice_provider, table)
+                                project.voice_provider, states)
                 st.text_input("Voix ElevenLabs", value=project.voice_name, max_chars=80, key=f"{p}_voice_name",
                               placeholder="Ex. Kev - Young, Dynamic and Bright")
                 error_under("voice_name")
@@ -173,11 +172,11 @@ def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
                     st.text_input("Modèle de voix", value=current["voice_model"], max_chars=60, key=f"{p}_voice_model")
                     error_under("brief.voice_model")
                     provider_select(p, "text_provider", "Rédaction du script", catalog.TEXT_PROVIDERS,
-                                    project.text_provider, table)
+                                    project.text_provider, states)
                     provider_select(p, "visual_provider", "Images et vidéos", catalog.VISUAL_PROVIDERS,
-                                    project.visual_provider, table)
+                                    project.visual_provider, states)
                     provider_select(p, "music_provider", "Musique", catalog.MUSIC_PROVIDERS,
-                                    project.music_provider, table)
+                                    project.music_provider, states)
                     st.caption("Les clés d’accès restent dans la configuration du serveur : elles ne se saisissent jamais ici.")
 
             error_under("settings")

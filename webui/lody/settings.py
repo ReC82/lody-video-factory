@@ -29,3 +29,13 @@ def config_path() -> Path:
 
 def seed_defaults_enabled() -> bool:
     return os.environ.get("LODY_SEED_DEFAULTS", "1").strip().lower() not in {"0", "false", "no"}
+
+
+def engine_report_path() -> Path:
+    """Rapport de capacités du moteur (booléens et noms de modèles, jamais de valeur de clé).
+
+    Produit côté hôte par ``python3 -m lody.generation.engine_facts`` ; lu quand ``config.toml`` n'est
+    pas lisible par le conteneur. LODY_ENGINE_REPORT le redéfinit (tests).
+    """
+    raw = os.environ.get("LODY_ENGINE_REPORT", "").strip()
+    return Path(raw) if raw else Path("/engine-report/engine-capabilities.json")

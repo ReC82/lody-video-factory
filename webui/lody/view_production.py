@@ -10,7 +10,7 @@ import streamlit as st
 
 from lody import brief as brief_lib
 from lody import nav, view_estimate
-from lody.generation.models import ReadinessIssue
+from lody.generation.models import PreflightReport
 from lody.generation.runtime import DEFAULT_PROVIDER, DEMO_PROVIDER
 from lody.generation.service import (
     AlreadyRunning,
@@ -38,6 +38,7 @@ def _keys(project: Project) -> dict[str, str]:
         "error": f"request_error_{project.id}",
         "accept": f"accept_partial_{project.id}",
         "running": f"running_{project.id}",
+        "retry": f"retry_{project.id}",
     }
 
 
@@ -72,6 +73,8 @@ def fresh_draft(service: ProductionService, project: Project) -> Production | No
         return None
     if draft.subject != text or request_of(draft) != build_request(project, text, script):
         return None
+    if draft.parent_production_id != (st.session_state.get(keys["retry"]) or None):
+        return None
     return draft
 
 
@@ -86,11 +89,13 @@ def _primary(project: Project, service: ProductionService) -> None:
         draft = fresh_draft(service, project)
         if draft is None:
             prepared = service.prepare(project, text, provider_id=_provider_id(project), script=script,
-                                       draft_id=st.session_state.get(keys["draft"]))
+                                       draft_id=st.session_state.get(keys["draft"]),
+                                       retry_of=st.session_state.get(keys["retry"]) or None)
             st.session_state[keys["draft"]] = prepared.id
             return
         launched = service.confirm(draft.id, accept_partial=bool(st.session_state.get(keys["accept"])))
         st.session_state.pop(keys["draft"], None)
+        st.session_state.pop(keys["retry"], None)
         nav.go(nav.VIEW_TRACK, project.id, launched.id)
     except AlreadyRunning as error:
         st.session_state[keys["error"]] = error.message
@@ -148,6 +153,23 @@ def brief_html(brief: dict) -> str:
     )
 
 
+def _render_retry_notice(service: ProductionService, keys: dict[str, str], retry_id: str) -> None:
+    try:
+        failed = service.repo.get(retry_id)
+    except LookupError:
+        st.session_state.pop(keys["retry"], None)
+        return
+    kept = ("Le script déjà écrit est conservé (aucun nouvel appel texte) : modifie-le ou vide le champ pour en faire écrire un nouveau. "
+            if failed.script else "")
+    st.markdown(
+        f'<div class="banner banner-info" role="status"><strong>Nouvelle tentative de {esc(failed.label)}.</strong> '
+        f"La tentative échouée reste dans l’historique. Le sujet est conservé. {esc(kept)}"
+        "Rien de la tentative précédente n’est repris côté coût ou confirmation : une nouvelle estimation et une nouvelle "
+        "confirmation sont nécessaires.</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def render(project: Project, service: ProductionService) -> None:
     keys = _keys(project)
     st.markdown(
@@ -161,10 +183,13 @@ def render(project: Project, service: ProductionService) -> None:
         service.refresh(running.id)
     active = service.repo.active_for_project(project.id)
 
+    retry_id = st.session_state.get(keys["retry"])
+    if retry_id:
+        _render_retry_notice(service, keys, retry_id)
     draft = fresh_draft(service, project)
-    issues: list[ReadinessIssue] = service.readiness(draft) if draft else []
+    report: PreflightReport | None = service.preflight(draft) if draft else None
     partial_ok = bool(st.session_state.get(keys["accept"])) or not (draft and draft.cost_partial and draft.provider != DEMO_PROVIDER)
-    blocked = bool(active) or (draft is not None and (any(i.blocking for i in issues) or not partial_ok))
+    blocked = bool(active) or (draft is not None and (not report.ready or not partial_ok))
 
     with st.container(key="composer"):
         st.markdown('<h2 class="composer-title">Que veux-tu créer ?</h2>', unsafe_allow_html=True)
@@ -181,7 +206,7 @@ def render(project: Project, service: ProductionService) -> None:
                 f'<p class="field-error" role="alert">{esc(st.session_state[keys["error"]])}</p>',
                 unsafe_allow_html=True,
             )
-        with st.expander("J’ai déjà mon script (optionnel)"):
+        with st.expander("J’ai déjà mon script (optionnel)", expanded=bool(st.session_state.get(keys["script"]))):
             st.text_area("Script à utiliser", key=keys["script"], height=150, max_chars=8000,
                          placeholder="Colle ici ton texte : aucun script ne sera écrit par un fournisseur.")
         st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"])
@@ -209,7 +234,7 @@ def render(project: Project, service: ProductionService) -> None:
         st.session_state.pop(keys["running"], None)
 
     if draft is not None:
-        view_estimate.render_panel(draft, issues, demo=draft.provider == DEMO_PROVIDER, key=project.id)
+        view_estimate.render_panel(draft, report, demo=draft.provider == DEMO_PROVIDER, key=project.id, project=project)
 
     # Aperçu vivant : la demande saisie + les paramètres enregistrés du projet.
     live_request = str(st.session_state.get(keys["request"], ""))

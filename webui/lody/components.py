@@ -8,9 +8,8 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from lody import nav
-from lody.catalog import PROVIDER_KIND_BY_FIELD, PROVIDER_REQUIREMENTS
 from lody.projects import Project
-from lody.provider_status import Readiness, is_ready, is_unverified
+from lody.generation.models import CapabilityState, CapabilityStatus
 from lody.theme import DEFAULT_ACCENT, PALETTES, esc
 
 _MONTHS = ("janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.")
@@ -63,17 +62,19 @@ def status_badge(project: Project) -> str:
     return '<span class="status status-active">Actif</span>'
 
 
-def readiness_pill(project: Project, field: str, table: Readiness) -> str:
-    """« Prêt » / « Clé à configurer » — uniquement pour les fournisseurs à clé."""
-    kind = PROVIDER_KIND_BY_FIELD[field]
-    value = getattr(project, field)
-    if (kind, value) not in PROVIDER_REQUIREMENTS:
+_PILL_TEXT = {
+    CapabilityState.READY: ("ok", "Prêt"), CapabilityState.NOT_NEEDED: ("muted", "Non nécessaire"),
+    CapabilityState.DISABLED: ("muted", "Désactivée"), CapabilityState.NOT_CONFIGURED: ("warn", "À configurer"),
+    CapabilityState.UNAVAILABLE: ("fail", "Indisponible"), CapabilityState.UNVERIFIED: ("warn", "Non vérifié"),
+}
+
+
+def capability_pill(status: CapabilityStatus | None) -> str:
+    """Pastille d'état réel d'un fournisseur (configuré, à configurer, indisponible, non vérifié)."""
+    if status is None:
         return ""
-    if is_unverified(kind, value, table):
-        return '<span class="pill pill-muted" title="Lody ne peut pas lire la configuration du serveur">Non vérifiée</span>'
-    if is_ready(kind, value, table):
-        return '<span class="pill pill-ok">Prêt</span>'
-    return '<span class="pill pill-warn">Clé à configurer</span>'
+    kind, text = _PILL_TEXT[status.state]
+    return f'<span class="pill pill-{kind}" title="{esc(status.message)}">{esc(text)}</span>'
 
 
 def render_header(with_home_link: bool) -> None:

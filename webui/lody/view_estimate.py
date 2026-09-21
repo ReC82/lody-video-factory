@@ -10,11 +10,13 @@ from decimal import Decimal
 
 import streamlit as st
 
-from lody import catalog
+from lody import catalog, nav
 from lody.generation import costing
-from lody.generation.models import ReadinessIssue
+from lody.generation.models import PreflightReport, ReadinessIssue
+from lody.generation.models import CapabilityState as CS
 from lody.generation.service import request_of
 from lody.generation.store import Production
+from lody.projects import Project
 from lody.theme import esc
 
 _UNPRICED = "tarif non configuré"
@@ -104,17 +106,58 @@ def summary_html(production: Production) -> str:
     return f'<dl class="kv est-summary">{items}</dl>'
 
 
+_PILL = {CS.READY: "ok", CS.NOT_NEEDED: "muted", CS.DISABLED: "muted", CS.NOT_CONFIGURED: "warn",
+         CS.UNAVAILABLE: "fail", CS.UNVERIFIED: "warn"}
+
+
 def render_issues(issues: list[ReadinessIssue]) -> None:
     for issue in issues:
         kind = "error" if issue.blocking else "info"
         st.markdown(f'<div class="banner banner-{kind}" role="alert">{esc(issue.message)}</div>', unsafe_allow_html=True)
 
 
-def render_panel(production: Production, issues: list[ReadinessIssue], *, demo: bool, key: str,
-                 v2: bool = False) -> bool:
-    """Affiche estimation + résumé. Retourne True si la confirmation peut être proposée.
+def config_html(report: PreflightReport) -> str:
+    """« Configuration de production » : un état simple par capacité, sans nom technique."""
+    rows = []
+    for item in report.items:
+        if item.capability.value in ("storage", "settings") and not item.blocking:
+            continue  # contrôlés, mais rien à montrer quand tout va bien
+        detail = f'<span class="cfg-detail">{esc(item.message)}</span>' if item.message else ""
+        rows.append(
+            f'<div class="cfg-row cfg-{_PILL[item.state]}"><div class="cfg-what"><span class="cfg-label">{esc(item.label)}</span>'
+            f"{detail}</div><span class=\"cfg-state\">{esc(item.state_text.capitalize())}</span></div>")
+    return f'<div class="cfg-rows">{"".join(rows)}</div>'
 
-    Bloque tant qu'un problème bloquant existe ; exige une case cochée si le total est partiel.
+
+def render_config(report: PreflightReport, project: Project | None, *, key: str) -> None:
+    """Section de preflight + accès aux réglages + diagnostic administrateur (nettoyé)."""
+    st.markdown('<p class="card-eyebrow">Configuration de production</p>' + config_html(report), unsafe_allow_html=True)
+    blocking = report.blocking
+    if blocking:
+        st.markdown(
+            '<div class="banner banner-error" role="alert"><strong>La génération est bloquée.</strong> '
+            "Rien n’a été confirmé ni lancé, et rien n’est facturé. Corrige ce qui est indiqué ci-dessus, puis reviens ici.</div>",
+            unsafe_allow_html=True,
+        )
+        if project is not None and any(item.fix == "project" for item in blocking):
+            st.button("Ouvrir les paramètres du projet", icon=":material/tune:", key=f"fix_project_{key}",
+                      on_click=nav.go, args=(nav.VIEW_SETTINGS, project.id))
+        if any(item.fix == "platform" for item in blocking):
+            st.markdown('<p class="muted-note">Ce réglage se fait sur le serveur : transmets le diagnostic ci-dessous à '
+                        "l’administrateur.</p>", unsafe_allow_html=True)
+    lines = [f"{item.label} — {item.state_text} : {item.admin}" for item in report.items if item.admin]
+    if lines:
+        with st.expander("Diagnostic administrateur"):
+            st.markdown('<ul class="rules">' + "".join(f"<li>{esc(line)}</li>" for line in lines) + "</ul>"
+                        '<p class="muted-note">Aucune valeur de clé n’est jamais affichée : seulement leur présence.</p>',
+                        unsafe_allow_html=True)
+
+
+def render_panel(production: Production, report: PreflightReport, *, demo: bool, key: str,
+                 v2: bool = False, project: Project | None = None) -> bool:
+    """Affiche configuration, estimation et résumé. Retourne True si la confirmation peut être proposée.
+
+    Bloque tant qu'une capacité obligatoire manque ; exige une case cochée si le total est partiel.
     """
     with st.container(key=f"estimate_{key}"):
         st.markdown(
@@ -128,6 +171,7 @@ def render_panel(production: Production, issues: list[ReadinessIssue], *, demo: 
                 "coûterait une vraie génération.</div>",
                 unsafe_allow_html=True,
             )
+        render_config(report, project, key=key)
         st.markdown(summary_html(production) + estimate_html(production), unsafe_allow_html=True)
         if not demo:
             what = "une V2 entraîne de nouveaux appels payants et régénère tous les médias" if v2 else (
@@ -137,12 +181,10 @@ def render_panel(production: Production, issues: list[ReadinessIssue], *, demo: 
                 f"Après ton accord, {esc(what)} seront lancés automatiquement, sans autre validation.</div>",
                 unsafe_allow_html=True,
             )
-        render_issues(issues)
-        blocking = any(issue.blocking for issue in issues)
         accepted = True
         if production.cost_partial and not demo:
             accepted = st.checkbox(
                 "Je comprends que ce total est partiel : certains tarifs ne sont pas configurés.",
                 key=f"accept_partial_{key}",
             )
-        return not blocking and accepted
+        return report.ready and accepted

@@ -32,7 +32,7 @@ def test_dockerfile_keeps_media_tools_fonts_nonroot_user_and_healthcheck():
 
 def test_dockerfile_never_copies_configuration_or_secrets():
     assert not re.search(r"COPY[^\n]*config\.toml", DOCKERFILE)
-    for ignored in ("config.toml", "storage", "data", ".env", ".git"):
+    for ignored in ("config.toml", "storage", "engine-report", "data", ".env", ".git"):
         assert re.search(rf"^{re.escape(ignored)}$", DOCKERIGNORE, re.MULTILINE), ignored
 
 
@@ -65,6 +65,8 @@ def test_compose_reaches_the_engine_without_exposing_more_or_holding_secrets():
     assert service["environment"]["LODY_ENGINE_STORAGE"] == "/MoneyPrinterTurbo/storage"
     assert set(service["networks"]) == {"default", "engine"}
     assert compose["networks"]["engine"] == {"name": "moneyprinterturbo_default", "external": True}
+    assert "./engine-report:/engine-report:ro" in service["volumes"]  # rapport assaini, lecture seule
+    assert service["environment"]["LODY_ENGINE_REPORT"] == "/engine-report/engine-capabilities.json"
     assert service["ports"] == ["127.0.0.1:8601:8601"]  # l'API n'est pas republiée
     raw = (ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8")
     assert not re.search(r"(?i)(api_key|secret|token|password)\s*[:=]\s*\S", raw.replace("Aucune clé ici", ""))

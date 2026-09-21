@@ -137,11 +137,27 @@ def _go_v2(service: ProductionService, project: Project, production: Production)
 
 
 def _retry(project: Project, production: Production) -> None:
-    keys = {"request": f"request_{project.id}", "script": f"script_{project.id}", "demo": f"demo_{project.id}"}
+    """Prépare une NOUVELLE tentative : sujet et éléments valides repris, jamais la confirmation ni le coût."""
+    keys = {name: f"{name}_{project.id}" for name in ("request", "script", "demo", "draft", "retry", "request_error")}
     st.session_state[keys["request"]] = production.subject
     st.session_state[keys["script"]] = production.script
     st.session_state[keys["demo"]] = production.provider == DEMO_PROVIDER
+    st.session_state[keys["retry"]] = production.id
+    st.session_state.pop(keys["draft"], None)
+    st.session_state[keys["request_error"]] = ""
     nav.go(nav.VIEW_PRODUCTION, project.id)
+
+
+def attempt_note(service: ProductionService, production: Production) -> str:
+    """« nouvelle tentative de V1 » quand la production suit directement une tentative échouée."""
+    if production.parent_production_id:
+        try:
+            parent = service.repo.get(production.parent_production_id)
+        except LookupError:
+            return ""
+        if parent.status is S.ECHEC:
+            return f"nouvelle tentative de {parent.label}"
+    return ""
 
 
 def _versions(service: ProductionService, project: Project, production: Production) -> None:
@@ -220,7 +236,8 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
         return
 
     st.markdown(
-        f'<section class="hero"><p class="eyebrow">{esc(project.name)} · {esc(production.label)}</p>'
+        f'<section class="hero"><p class="eyebrow">{esc(project.name)} · {esc(production.label)}'
+        f'{" · " + esc(attempt_note(service, production)) if attempt_note(service, production) else ""}</p>'
         f'<h1 class="hero-title">Suivi de la production</h1>'
         f'<p class="hero-sub">{esc(production.subject)}</p></section>',
         unsafe_allow_html=True,

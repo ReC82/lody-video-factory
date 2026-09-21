@@ -117,7 +117,7 @@ def test_blocking_readiness_prevents_confirmation_but_a_warning_does_not(tmp_pat
     draft = _prepare(env)
     with pytest.raises(LaunchError) as error:
         env.service.confirm(draft.id)
-    assert [i.code for i in error.value.issues] == ["engine_unreachable"]
+    assert [i.message for i in error.value.issues] == ["Moteur injoignable."]
     assert env.connector.calls == ["check_ready"] and env.executor.jobs == 0
     env.connector.issues = [ReadinessIssue("voice_model_differs", "Modèle différent.", blocking=False)]
     assert env.service.confirm(draft.id).status is not S.EN_ATTENTE_CONFIRMATION

@@ -8,11 +8,10 @@ import streamlit as st
 
 from lody import nav, settings
 from lody import view_form, view_home, view_production, view_project, view_settings, view_tracking, view_v2
-from lody.generation.runtime import build_service
+from lody.generation.runtime import DEFAULT_PROVIDER, build_service
 from lody.generation.service import ProductionService
 from lody.components import accent_for, render_flash, render_footer, render_header
 from lody.projects import ProjectNotFound, ProjectRepository
-from lody.provider_status import readiness
 from lody.seeds import SEED_PROJECTS
 from lody.theme import DEFAULT_ACCENT, inject_theme
 
@@ -72,13 +71,12 @@ def render() -> None:
     render_header(with_home_link=route.view != nav.VIEW_HOME)
     render_flash()
 
-    table = readiness()
     if route.view == nav.VIEW_HOME:
         view_home.render(repo)
     elif route.view == nav.VIEW_NEW:
-        view_form.render(repo, table)
+        view_form.render(repo, service.option_states(None, DEFAULT_PROVIDER))
     elif route.view == nav.VIEW_SETTINGS and project:
-        view_settings.render(repo, project, table)
+        view_settings.render(repo, project, service.option_states(project, DEFAULT_PROVIDER))
     elif route.view == nav.VIEW_PRODUCTION and project:
         view_production.render(project, service)
     elif route.view == nav.VIEW_TRACK and project and route.production_id:
@@ -86,5 +84,5 @@ def render() -> None:
     elif route.view == nav.VIEW_V2 and project and route.production_id:
         view_v2.render(service, project, route.production_id)
     elif project:
-        view_project.render(repo, project, table, service)
+        view_project.render(repo, project, service)
     render_footer()

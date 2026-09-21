@@ -14,6 +14,7 @@ from lody.generation.models import (
     ExternalTask,
     GenerationRequest,
     GenerationResult,
+    PreflightReport,
     ReadinessIssue,
     SceneUnits,
     TaskSnapshot,
@@ -67,8 +68,13 @@ class VideoGenerationProvider(ABC):
         return {}
 
     @abstractmethod
+    def preflight(self, request: GenerationRequest) -> PreflightReport:
+        """Contrôle complet, sans aucun coût, de ce dont la génération a besoin (texte, visuels, voix, musique,
+        moteur, stockage, paramètres) : ce qui est demandé, ce qui est réellement configuré, et pourquoi."""
+
     def check_ready(self, request: GenerationRequest) -> list[ReadinessIssue]:
-        """Vérifie sans coût que la génération peut partir (moteur joignable, clés renseignées)."""
+        """Problèmes bloquants issus du preflight (compatibilité)."""
+        return self.preflight(request).to_issues()
 
     @abstractmethod
     def write_script(self, request: GenerationRequest) -> str:
