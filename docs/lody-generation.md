@@ -117,6 +117,39 @@ Ainsi Lody n'a jamais accès aux clés (le conteneur ne peut pas lire `config.to
 sachant exactement ce qui est configuré. Sans aucune des deux sources, chaque fournisseur est « non vérifié » et
 la production réelle est bloquée (le mode démonstration reste possible).
 
+## Sous-titres français : apostrophes et police
+
+Incident V7 : « mais l’  idée de base est simple » à l'écran, alors que le script, le texte envoyé au moteur, le
+texte du TTS et le SRT du moteur sont tous corrects (`l’idée`, U+2019, aucune espace). **Cause :** l'incrustation
+(MoviePy/PIL) utilisait `MicrosoftYaHeiBold.ttc`, police CJK reprise de `[ui].font_name` : son `’` est en **pleine
+largeur** (58 px à corps 58, 3,4 espaces). Les polices `STHeiti*` et `MicrosoftYaHei*` ont le même défaut ; l'apostrophe
+droite `'` est normale.
+
+- **Correction à la source** (`typography.pick_subtitle_font`, appelé par le connecteur) : pour une langue latine, une
+  police dont l'apostrophe typographique est pleine largeur (mesurée avec Pillow) est remplacée par
+  `BeVietnamPro-Bold.ttf` (fournie, couvre le français) ; les langues chinoise, japonaise et coréenne gardent leur
+  police. La police réellement envoyée est visible dans les paramètres effectifs.
+- **Protection supplémentaire** (`typography.normalize_french_text`) : retire les espaces réellement présentes après
+  une élision (`l’ idée` → `l’idée`, `qu’ il`, `aujourd’ hui`…), sans toucher aux URL, chemins, courriels ni code,
+  aux autres langues, ni au type d'apostrophe. Appliquée au script (généré, fourni ou modifié en V2) pour que
+  narration, SRT et affichage ne divergent jamais, ainsi qu'aux SRT/ASS de la réparation.
+
+## Réparer le rendu (sans rien régénérer)
+
+**Limite du moteur :** son API ne sait pas reprendre seulement le montage (`POST /api/v1/videos` relance tout, donc
+voix, images et musique payantes). Sa fonction interne `generate_video` ne travaille toutefois que sur des fichiers
+locaux ; `scripts/lody-repair-render.sh` l'appelle sur les assets existants d'une production terminée :
+
+```
+DOCKER="sudo -n docker" ./scripts/lody-repair-render.sh prd_xxxxxxxxxxxx
+```
+
+Réutilise `combined-1.mp4`, `audio.mp3`, `subtitle.srt` (normalisé) et la musique déjà générée ; **réseau bloqué**
+pendant le montage ; le rendu original n'est jamais modifié (copie vérifiée par empreinte dans `repair/`) ; le rendu
+corrigé (`repair/final-1-repaired.mp4`, avec `repair/repair.json`) est ajouté à la même production comme
+« réparation technique » — aucune nouvelle production, aucun coût. La page de la production affiche le rendu corrigé
+en premier et conserve l'original.
+
 ## Nouvelle tentative après un échec
 
 Une production échouée reste dans l'historique, avec sa cause. « Préparer à nouveau » ouvre la page de production

@@ -183,7 +183,9 @@ def _render_result(service: ProductionService, project: Project, production: Pro
         )
         video_path = None
     with st.container(key="result"):
-        st.markdown('<p class="card-eyebrow">Résultat</p><h2 class="brief-title">Ta vidéo est prête</h2>', unsafe_allow_html=True)
+        repaired = _asset(production, "repaired_video") is not None
+        st.markdown('<p class="card-eyebrow">Résultat</p><h2 class="brief-title">'
+                    + ("Rendu original (conservé)" if repaired else "Ta vidéo est prête") + "</h2>", unsafe_allow_html=True)
         if video_path is not None:
             with st.container(key="player"):
                 st.video(str(video_path), format="video/mp4")
@@ -208,6 +210,34 @@ def _render_result(service: ProductionService, project: Project, production: Pro
                       on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         st.markdown('<p class="muted-note">Une V2 conserve cette version intacte et lance de nouveaux appels payants.</p>',
                     unsafe_allow_html=True)
+
+
+def _asset(production: Production, kind: str) -> dict | None:
+    return next((asset for asset in production.assets if asset.get("kind") == kind), None)
+
+
+def _render_repair(service: ProductionService, project: Project, production: Production) -> None:
+    """Rendu corrigé (réparation technique des sous-titres) : présenté en premier, l'original reste disponible."""
+    repaired = _asset(production, "repaired_video")
+    if not repaired:
+        return
+    try:
+        repaired_path = service.resolve_asset(production, repaired["ref"])
+    except ValueError:
+        return
+    with st.container(key="repair"):
+        st.markdown(
+            '<p class="card-eyebrow">Réparation technique</p><h2 class="brief-title">Rendu corrigé</h2>'
+            '<div class="banner banner-info" role="note">Les sous-titres ont été refaits à partir des médias déjà générés '
+            "(voix, images, musique) : <strong>aucune nouvelle génération, aucun fournisseur appelé, rien de facturé</strong>. "
+            "Seul l’espacement des apostrophes a changé ; le rendu original est conservé ci-dessous.</div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="player_repaired"):
+            st.video(str(repaired_path), format="video/mp4")
+        st.download_button("Télécharger le rendu corrigé", data=lambda: repaired_path.read_bytes(),
+                           file_name=f"{project.name}-{production.label}-corrige.mp4".replace(" ", "-"),
+                           mime="video/mp4", icon=":material/download:", key=f"download_repaired_{production.id}")
 
 
 def _render_details(production: Production) -> None:
@@ -275,6 +305,7 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
     live()
     latest = service.repo.get(production_id)
     if latest.status is S.TERMINEE:
+        _render_repair(service, project, latest)
         _render_result(service, project, latest)
     if latest.script or latest.storyboard:
         _render_details(latest)
