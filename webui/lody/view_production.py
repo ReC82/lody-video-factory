@@ -1,10 +1,11 @@
-"""Nouvelle production : brief de la vidéo (génération non branchée)."""
+"""Nouvelle production : demande + brief final (la génération n'est pas branchée)."""
 
 from __future__ import annotations
 
 import streamlit as st
 
-from lody import catalog, nav
+from lody import brief as brief_lib
+from lody import nav
 from lody.projects import Project
 from lody.theme import esc
 
@@ -32,7 +33,7 @@ def _use_example(project: Project) -> None:
 
 
 def _prepare_draft(project: Project) -> None:
-    """Compose un brouillon en mémoire de session. N'appelle AUCUN fournisseur."""
+    """Fige le brief en mémoire de session. N'appelle AUCUN fournisseur."""
     keys = _keys(project)
     request = str(st.session_state.get(keys["request"], "")).strip()
     if len(request) < MIN_REQUEST_LENGTH:
@@ -40,16 +41,56 @@ def _prepare_draft(project: Project) -> None:
         st.session_state[keys["draft"]] = None
         return
     st.session_state[keys["error"]] = False
-    st.session_state[keys["draft"]] = {
-        "projet": project.name,
-        "demande": request,
-        "format": catalog.label(catalog.FORMATS, project.format),
-        "langue": catalog.label(catalog.LANGUAGES, project.language),
-        "ton": project.tone,
-        "style_visuel": project.visual_style,
-        "voix": project.voice_name,
-        "fournisseurs_appeles": [],
-    }
+    st.session_state[keys["draft"]] = {**brief_lib.build_brief(project, request), "fournisseurs_appeles": []}
+
+
+def _rows(pairs: list[tuple[str, str]]) -> str:
+    items = "".join(f"<div><dt>{esc(label)}</dt><dd>{esc(value)}</dd></div>" for label, value in pairs if value)
+    return f'<dl class="kv">{items}</dl>' if items else '<p class="muted-note">Non renseigné</p>'
+
+
+def brief_html(brief: dict) -> str:
+    """Aperçu lisible du brief (toutes les valeurs sont échappées)."""
+    request = (
+        f'<p class="brief-request">{esc(brief["demande"])}</p>'
+        if brief["demande"]
+        else '<p class="brief-request brief-placeholder">Ta demande apparaîtra ici dès que tu l’auras saisie.</p>'
+    )
+    stats = "".join(
+        f'<div class="stat"><span class="stat-value">{esc(value)}</span><span class="stat-label">{esc(label)}</span></div>'
+        for label, value in (
+            ("Durée cible", brief["duree_cible"]),
+            ("Texte estimé", brief["reperes"]["mots"]),
+            ("Visuels estimés", brief["reperes"]["scenes"]),
+        )
+    )
+    steps = (
+        '<ol class="timeline">' + "".join(f"<li>{esc(step)}</li>" for step in brief["structure"]) + "</ol>"
+        if brief["structure"]
+        else '<p class="muted-note">Structure libre</p>'
+    )
+    rules = (
+        '<ul class="rules">'
+        + "".join(f"<li>{esc(line)}</li>" for line in brief["consignes_permanentes"].splitlines() if line.strip())
+        + "</ul>"
+        if brief["consignes_permanentes"]
+        else '<p class="muted-note">Aucune consigne permanente</p>'
+    )
+    voice = brief["voix"]
+    voice_label = " · ".join(filter(None, [voice["fournisseur"], voice["nom"]]))
+    return (
+        f'<div class="brief-block brief-wide"><p class="card-eyebrow">Demande</p>{request}</div>'
+        f'<div class="brief-block brief-wide"><div class="stats">{stats}</div>'
+        '<p class="muted-note">Repères estimés à partir du rythme de narration et du rythme visuel du projet.</p></div>'
+        f'<div class="brief-block"><p class="card-eyebrow">Public et ton</p>'
+        f'{_rows([("Public", brief["public"]), ("Orientation", brief["orientation"]), ("Ton", brief["ton"])])}</div>'
+        f'<div class="brief-block"><p class="card-eyebrow">Format</p>'
+        f'{_rows([("Format", brief["format"]), ("Langue", brief["langue"]), ("Narration", brief["narration"])])}</div>'
+        f'<div class="brief-block brief-wide"><p class="card-eyebrow">Visuels et voix</p>'
+        f'{_rows([("Style", brief["visuels"]["style"]), ("Rythme", brief["visuels"]["rythme"]), ("Voix", voice_label)])}</div>'
+        f'<div class="brief-block brief-wide"><p class="card-eyebrow">Structure de la vidéo</p>{steps}</div>'
+        f'<div class="brief-block brief-wide"><p class="card-eyebrow">Consignes permanentes</p>{rules}</div>'
+    )
 
 
 def render(project: Project) -> None:
@@ -57,7 +98,7 @@ def render(project: Project) -> None:
     st.markdown(
         f'<section class="hero"><p class="eyebrow">{esc(project.name)}</p>'
         '<h1 class="hero-title">Nouvelle production</h1>'
-        '<p class="hero-sub">Décris la vidéo que tu veux : on prépare le brief.</p></section>',
+        '<p class="hero-sub">Décris la vidéo que tu veux : les réglages du projet sont ajoutés automatiquement.</p></section>',
         unsafe_allow_html=True,
     )
     with st.container(key="composer"):
@@ -93,11 +134,25 @@ def render(project: Project) -> None:
                 '<h3 class="draft-title">Brief prêt — aucune génération lancée</h3>'
                 '<p class="draft-text">La génération de vidéos n’est pas encore branchée : rien n’a été envoyé '
                 "à un fournisseur (texte, voix, image, musique) et rien n’a été facturé. "
-                "Voici le brief qui sera transmis au moteur.</p>",
+                "Le brief ci-dessous est celui qui sera transmis au moteur.</p>",
                 unsafe_allow_html=True,
             )
-            with st.expander("Voir le brief"):
-                st.json(draft, expanded=True)
+
+    # Aperçu vivant : la demande saisie + les paramètres enregistrés du projet.
+    live_request = str(st.session_state.get(keys["request"], ""))
+    brief = brief_lib.build_brief(project, live_request)
+    with st.container(key="brief_preview"):
+        with st.container(horizontal=True, vertical_alignment="center", key="brief_head"):
+            st.markdown(
+                '<div><p class="card-eyebrow">Aperçu avant génération</p>'
+                '<h2 class="brief-title">Brief final</h2></div>',
+                unsafe_allow_html=True,
+            )
+            st.button("Ajuster les paramètres", icon=":material/tune:", key="adjust_settings",
+                      on_click=nav.go, args=(nav.VIEW_SETTINGS, project.id))
+        st.markdown(f'<div class="brief-grid">{brief_html(brief)}</div>', unsafe_allow_html=True)
+        with st.expander("Version texte à copier"):
+            st.code(brief_lib.brief_to_text(brief), language=None)
 
     with st.container(horizontal=True, key="production_nav"):
         st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project",

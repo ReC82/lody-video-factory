@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from lody import catalog
+from lody.brief import BRIEF_KEY, validate_brief
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
 logger = logging.getLogger("lody.projects")
@@ -201,6 +202,14 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
             if too_big:
                 errors["settings"] = "Les réglages avancés sont trop volumineux."
         clean["settings"] = raw_settings
+        if BRIEF_KEY in raw_settings:
+            raw_brief = raw_settings[BRIEF_KEY]
+            if isinstance(raw_brief, dict):
+                clean_brief, brief_errors = validate_brief(raw_brief)
+                errors.update(brief_errors)
+                clean["settings"] = {**raw_settings, BRIEF_KEY: clean_brief}
+            else:
+                errors["settings"] = "Les paramètres de production sont invalides."
 
     # Garde-fou secrets : tout champ texte, plateformes et réglages.
     for key in ("name", "description", "tone", "visual_style", "voice_name", "platforms", "settings"):
@@ -342,8 +351,9 @@ class ProjectRepository:
     def seed_defaults(self, seeds: list[dict[str, Any]]) -> int:
         """Insère les projets d'exemple absents (clé ``seed_key``). Idempotent.
 
-        Un exemple déjà présent — même modifié, renommé ou archivé — n'est jamais
-        recréé ni réinitialisé. Retourne le nombre de projets ajoutés.
+        Un exemple déjà présent — même modifié, renommé ou archivé — n'est jamais recréé ni
+        réinitialisé. Retourne le nombre de projets ajoutés ; les mises à niveau des exemples
+        existants sont gérées par ``upgrade_seeds`` (appelée ensuite).
         """
         added = 0
         for seed in seeds:
@@ -365,4 +375,43 @@ class ProjectRepository:
                 added += cursor.rowcount
         if added:
             logger.info("projets d'exemple ajoutés : %d", added)
+        self.upgrade_seeds(seeds)
         return added
+
+    def upgrade_seeds(self, seeds: list[dict[str, Any]]) -> int:
+        """Ajoute les paramètres de production aux exemples créés avant leur existence.
+
+        Ne concerne que les exemples dont la définition contient un bloc ``brief`` : un projet
+        qui possède déjà ce bloc n'est jamais touché. Un champ n'est remplacé que s'il porte
+        encore sa valeur d'origine (``legacy_values``) : une modification de l'utilisateur est
+        toujours conservée. Retourne le nombre de projets mis à niveau.
+        """
+        upgraded = 0
+        for seed in seeds:
+            seed_brief = seed.get("settings", {}).get(BRIEF_KEY)
+            if not seed_brief:
+                continue
+            with self._connect() as connection:
+                row = connection.execute("SELECT * FROM projects WHERE seed_key = ?", (seed["seed_key"],)).fetchone()
+                if row is None:
+                    continue
+                project = self._from_row(row)
+                if BRIEF_KEY in project.settings:
+                    continue
+                merged = {key: getattr(project, key) for key in EDITABLE_FIELDS}
+                for field, legacy_value in seed.get("legacy_values", {}).items():
+                    if getattr(project, field) == legacy_value:
+                        merged[field] = seed[field]
+                settings = {key: value for key, value in project.settings.items() if key != "target_duration"}
+                settings[BRIEF_KEY] = seed_brief
+                merged["settings"] = settings
+                values = self._values(validate_fields(merged))
+                connection.execute(
+                    "UPDATE projects SET " + ", ".join(f"{key} = ?" for key in EDITABLE_FIELDS)
+                    + ", updated_at = ? WHERE id = ?",
+                    (*(values[key] for key in EDITABLE_FIELDS), self._clock(), project.id),
+                )
+                upgraded += 1
+        if upgraded:
+            logger.info("exemples mis à niveau : %d", upgraded)
+        return upgraded

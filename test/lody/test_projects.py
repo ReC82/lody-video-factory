@@ -176,3 +176,61 @@ def test_database_file_holds_no_secret_pattern(tmp_path):
         dump = "\n".join(connection.iterdump())
     for marker in ("sk-", "Bearer ", "api_key", "password"):
         assert marker not in dump
+
+
+# -- mise à niveau des exemples (paramètres de production de LodyCrypto) ------------------
+def _old_seeds():
+    """Exemples tels qu'ils étaient déployés avant l'ajout des paramètres de production."""
+    import copy
+
+    old = copy.deepcopy(SEED_PROJECTS)
+    for seed in old:
+        seed.pop("legacy_values", None)
+        seed["settings"].pop("brief", None)
+        seed["settings"]["target_duration"] = "45 – 65 s"
+    old[1]["tone"] = "Pédagogique et dynamique"
+    old[1]["visual_style"] = "Sombre et moderne, cyan et bleu — sans texte ni logo"
+    return old
+
+
+def test_upgrade_adds_the_brief_to_an_existing_lodycrypto_once(tmp_path):
+    repo = ProjectRepository(tmp_path / "lody.sqlite3")
+    repo.seed_defaults(_old_seeds())
+    assert repo.upgrade_seeds(SEED_PROJECTS) == 1
+    assert repo.upgrade_seeds(SEED_PROJECTS) == 0  # idempotent
+    crypto = next(p for p in repo.list_projects() if p.name == "LodyCrypto")
+    assert crypto.settings["brief"]["audience"] == "Débutants complets en crypto"
+    assert "target_duration" not in crypto.settings
+    assert crypto.tone == "Simple, honnête, dynamique, sans posture d’expert"
+    assert "sans marque" in crypto.visual_style
+    assert repo.count() == 2
+
+
+def test_upgrade_never_touches_audiovisuel(tmp_path):
+    repo = ProjectRepository(tmp_path / "lody.sqlite3")
+    repo.seed_defaults(_old_seeds())
+    before = next(p for p in repo.list_projects() if p.name == "Audiovisuel")
+    repo.seed_defaults(SEED_PROJECTS)
+    after = repo.get(before.id)
+    assert after == before
+
+
+def test_upgrade_keeps_user_modified_fields(tmp_path):
+    repo = ProjectRepository(tmp_path / "lody.sqlite3")
+    repo.seed_defaults(_old_seeds())
+    crypto = next(p for p in repo.list_projects() if p.name == "LodyCrypto")
+    repo.update(crypto.id, tone="Mon ton perso")
+    repo.upgrade_seeds(SEED_PROJECTS)
+    upgraded = repo.get(crypto.id)
+    assert upgraded.tone == "Mon ton perso"             # modification utilisateur conservée
+    assert "sans marque" in upgraded.visual_style        # champ resté à sa valeur d'origine : mis à niveau
+    assert "brief" in upgraded.settings
+
+
+def test_upgrade_does_not_overwrite_an_existing_brief(tmp_path):
+    repo = ProjectRepository(tmp_path / "lody.sqlite3")
+    repo.seed_defaults(SEED_PROJECTS)
+    crypto = next(p for p in repo.list_projects() if p.name == "LodyCrypto")
+    repo.update(crypto.id, settings={**crypto.settings, "brief": {**crypto.settings["brief"], "audience": "Modifié"}})
+    assert repo.upgrade_seeds(SEED_PROJECTS) == 0
+    assert repo.get(crypto.id).settings["brief"]["audience"] == "Modifié"
