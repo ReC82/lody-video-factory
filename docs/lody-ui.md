@@ -12,7 +12,8 @@ et peuvent tourner à côté (ports 8501 / 8080), mais ne sont plus l'identité 
 | Port | `127.0.0.1:8601` (nginx `video.lodylands.com` y pointe) |
 | Projets | SQLite `/data/lody.sqlite3`, volume nommé `lody-video-factory-data` |
 | Configuration | `./config.toml` monté en lecture seule — **jamais copié dans l'image** |
-| Stockage | `./storage` monté en lecture seule (le moteur de génération l'utilisera plus tard) |
+| Stockage | `./storage` monté en lecture seule (vidéos produites par le moteur de génération) |
+| Génération | voir [`lody-generation.md`](lody-generation.md) et [`lody-engine-contract.md`](lody-engine-contract.md) |
 
 ## Commandes
 
