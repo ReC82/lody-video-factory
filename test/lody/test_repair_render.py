@@ -206,3 +206,12 @@ def test_repair_tool_is_stdlib_only_and_never_reads_config(monkeypatch):
     source = Path(rr.__file__).read_text(encoding="utf-8") + Path(typography.__file__).read_text(encoding="utf-8")
     for forbidden in ("requests", "urllib", "openai", "httpx", "config.toml", "api_key"):
         assert forbidden not in source, forbidden
+
+
+def test_repair_script_targets_both_containers_correctly():
+    """Régression : le paquet « lody » n'est importable dans l'image qu'avec PYTHONPATH=/MoneyPrinterTurbo/webui."""
+    script = (Path(rr.__file__).resolve().parents[3] / "scripts" / "lody-repair-render.sh").read_text(encoding="utf-8")
+    assert "PYTHONPATH=/MoneyPrinterTurbo/webui" in script and "PYTHONPATH=/tmp/lody-repair:/MoneyPrinterTurbo" in script
+    assert 'register --production "$PROD"' in script and "set -eu" in script
+    for forbidden in ("api_key", "curl", "wget", "openai"):
+        assert forbidden not in script
