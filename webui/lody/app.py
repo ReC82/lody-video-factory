@@ -1,0 +1,77 @@
+"""Assemblage de l'application : base de données, routage, pages."""
+
+from __future__ import annotations
+
+import logging
+
+import streamlit as st
+
+from lody import nav, settings
+from lody import view_form, view_home, view_production, view_project
+from lody.components import accent_for, render_flash, render_footer, render_header
+from lody.projects import ProjectNotFound, ProjectRepository
+from lody.provider_status import readiness
+from lody.seeds import SEED_PROJECTS
+from lody.theme import DEFAULT_ACCENT, inject_theme
+
+logger = logging.getLogger("lody.app")
+
+
+@st.cache_resource(show_spinner=False)
+def get_repository() -> ProjectRepository:
+    """Ouvre la base (créée si besoin) et ajoute les exemples manquants, sans doublon."""
+    repo = ProjectRepository(settings.db_path())
+    if settings.seed_defaults_enabled():
+        repo.seed_defaults(SEED_PROJECTS)
+    return repo
+
+
+def _render_storage_error() -> None:
+    inject_theme(DEFAULT_ACCENT)
+    render_header(False)
+    st.markdown(
+        '<div class="banner banner-error" role="alert"><strong>Les projets sont momentanément inaccessibles.</strong> '
+        "Le dossier de données n’est pas disponible en écriture. Réessaie dans un instant ; "
+        "si le problème persiste, contacte l’administrateur.</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render() -> None:
+    try:
+        repo = get_repository()
+    except Exception as error:  # base illisible ou volume non inscriptible
+        logger.error("ouverture de la base impossible : %s", type(error).__name__)
+        _render_storage_error()
+        return
+
+    route = nav.current_route()
+    project = None
+    if route.project_id:
+        try:
+            project = repo.get(route.project_id)
+        except ProjectNotFound:
+            nav.flash("error", "Ce projet est introuvable.")
+            nav.go()
+            route = nav.Route(nav.VIEW_HOME)
+    if project is not None and project.is_archived and route.view in (nav.VIEW_EDIT, nav.VIEW_PRODUCTION):
+        nav.flash("info", "Ce projet est archivé : restaure-le pour continuer.")
+        nav.go(nav.VIEW_PROJECT, project.id)
+        route = nav.Route(nav.VIEW_PROJECT, project.id)
+
+    inject_theme(accent_for(project))
+    render_header(with_home_link=route.view != nav.VIEW_HOME)
+    render_flash()
+
+    table = readiness()
+    if route.view == nav.VIEW_HOME:
+        view_home.render(repo)
+    elif route.view == nav.VIEW_NEW:
+        view_form.render(repo, table)
+    elif route.view == nav.VIEW_EDIT and project:
+        view_form.render(repo, table, project)
+    elif route.view == nav.VIEW_PRODUCTION and project:
+        view_production.render(project)
+    elif project:
+        view_project.render(repo, project, table)
+    render_footer()

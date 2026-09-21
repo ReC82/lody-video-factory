@@ -1,0 +1,16 @@
+# Contexte de build de Dockerfile.lody : jamais de secret ni de données.
+.git
+.github
+.gitignore
+config.toml
+storage
+data
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+docs
+README*.md
+uv.lock
+webui.bat
+webui.sh

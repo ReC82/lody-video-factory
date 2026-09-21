@@ -1,0 +1,4 @@
+# Dépendances de l'interface Lody Video Factory (image Dockerfile.lody).
+# Volontairement minimales : le moteur de génération (MoviePy, fournisseurs…)
+# sera ajouté quand il sera branché — voir requirements.txt pour la liste complète.
+streamlit==1.59.1
