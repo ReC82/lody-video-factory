@@ -20,6 +20,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from lody import settings
+from lody.generation import typography
 from lody.generation.engine_facts import PROBLEM_LABELS, EngineFacts, resolve
 from lody.generation.models import (
     Capability,
@@ -83,10 +85,10 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-# Préférences de sous-titres utilisées quand la configuration du moteur est inconnue
-# (polices fournies avec le moteur, compatibles caractères latins).
+# Préférences de sous-titres utilisées quand la configuration du moteur est inconnue (police latine fournie
+# avec le moteur : une police CJK dessine l'apostrophe ’ en pleine largeur, voir typography.py).
 _UI_FALLBACK: dict[str, Any] = {
-    "font_name": "MicrosoftYaHeiBold.ttc", "font_size": 58, "stroke_color": "#000000", "stroke_width": 1.8,
+    "font_name": typography.LATIN_SAFE_FONT, "font_size": 58, "stroke_color": "#000000", "stroke_width": 1.8,
     "text_fore_color": "#FFFFFF", "subtitle_position": "bottom",
 }
 # Fournisseur de texte du projet → identifiant du fournisseur de texte du moteur (llm_provider).
@@ -154,6 +156,10 @@ def build_payload(request: GenerationRequest, facts: EngineFacts) -> dict[str, A
         "subtitle_display_mode": "sentence",
         **(facts.ui if facts.known else _UI_FALLBACK),
     }
+    # Police de sous-titres : une langue latine ne doit pas hériter d'une police CJK à apostrophe pleine largeur.
+    font, _ = typography.pick_subtitle_font(str(payload.get("font_name", "")), request.language, settings.fonts_dir())
+    if font:
+        payload["font_name"] = font
     return payload
 
 

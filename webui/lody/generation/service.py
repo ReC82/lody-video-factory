@@ -22,6 +22,7 @@ from typing import Any, Protocol
 
 from lody import brief as brief_lib
 from lody import catalog
+from lody.generation import typography
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
 from lody.generation.models import (
     ACTIVE_STATUSES,
@@ -198,7 +199,7 @@ class ProductionService:
         l'écrase jamais) et repart d'une estimation et d'une confirmation neuves.
         """
         text = validate_subject(subject)
-        script_text = validate_script(script) if script.strip() else ""
+        script_text = typography.normalize_for_language(validate_script(script), project.language) if script.strip() else ""
         provider = self.provider(provider_id)
         request = build_request(project, text, script_text)
         _, cost = self._plan(provider, request)
@@ -248,8 +249,8 @@ class ProductionService:
         draft = self.repo.get(production_id)
         if draft.status not in EDITABLE_STATUSES or not draft.parent_production_id:
             raise LaunchError("Cette version ne peut plus être modifiée.")
-        text = validate_script(script)
         provider = self.provider(draft.provider)
+        text = typography.normalize_for_language(validate_script(script), request_of(draft).language)
         request = request_of(draft).with_updates(script=text, visual_prompts=())
         _, cost = self._plan(provider, request)
         parent = self.repo.get(draft.parent_production_id)
@@ -312,7 +313,7 @@ class ProductionService:
         try:
             request = request_of(production)
             if not request.script:
-                script = provider.write_script(request).strip()
+                script = typography.normalize_for_language(provider.write_script(request).strip(), request.language)
                 if not script:
                     raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script reçu est vide.", stage="script")
                 request = request.with_updates(script=script)
@@ -415,6 +416,13 @@ class ProductionService:
     def resume_active(self) -> list[Production]:
         """Au démarrage : redemande l'état de chaque production non terminée (jamais « perdue » d'office)."""
         return [self.refresh(production.id) for production in self.repo.list_by_status(ACTIVE_STATUSES)]
+
+    def resolve_asset(self, production: Production, ref: str):
+        """Chemin local validé d'un fichier de CETTE production (ex. rendu corrigé), sinon ``ValueError``."""
+        if not production.external_task_id:
+            raise ValueError("aucune tâche")
+        return self.provider(production.provider).resolve_asset(
+            ExternalTask(production.provider, production.external_task_id), ref)
 
     def resolve_video(self, production: Production):
         """Chemin local validé de la vidéo finale de CETTE production, sinon ``ValueError``."""

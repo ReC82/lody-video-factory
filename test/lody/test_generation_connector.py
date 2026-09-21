@@ -103,7 +103,8 @@ def test_lodycrypto_payload_carries_the_project_parameters(tmp_path):
     assert payload["video_terms"] == ["scène un", "scène deux"] and payload["video_script"].startswith("Une phrase")
     assert payload["video_concat_mode"] == "sequential" and payload["match_materials_to_script"] is True
     assert payload["bgm_type"] == "elevenlabs" and payload["bgm_volume"] > 0
-    assert payload["font_name"] == "MicrosoftYaHeiBold.ttc" and payload["font_size"] == 58
+    # la police CJK de la config (apostrophe ’ pleine largeur) n'est PAS transmise pour un projet français
+    assert payload["font_name"] == "BeVietnamPro-Bold.ttf" and payload["font_size"] == 58
     assert payload["text_background_color"] == "#000000"
     # aucune valeur de config.toml (clé ou autre) ne sort du connecteur
     assert "FAKE-" not in json.dumps(payload)
@@ -121,6 +122,23 @@ def test_script_prompt_respects_the_engine_limit_and_keeps_the_rules(tmp_path):
     assert len(prompt) <= 2000
     assert "45 à 60 secondes" in prompt and "Structure, dans cet ordre" in prompt and "Accroche" in prompt
     assert "Ne fais aucune promesse de gain" in prompt
+
+
+def test_subtitle_font_never_lets_a_cjk_apostrophe_font_reach_a_latin_video(tmp_path):
+    facts = resolve(_write(tmp_path, CONFIG), tmp_path / "none.json")
+    assert facts.ui["font_name"] == "MicrosoftYaHeiBold.ttc"                     # la config demande une police CJK…
+    request = _crypto_request(script="Une phrase.", visual_prompts=("a",))
+    assert mpt.build_payload(request, facts)["font_name"] == "BeVietnamPro-Bold.ttf"   # …le connecteur ne la transmet pas
+    latin = resolve(_write(tmp_path, CONFIG.replace("MicrosoftYaHeiBold.ttc", "BeVietnamPro-Medium.ttf")), tmp_path / "none.json")
+    assert mpt.build_payload(request, latin)["font_name"] == "BeVietnamPro-Medium.ttf"  # une bonne police reste choisie
+    chinese = mpt.build_payload(request.with_updates(language="zh-CN"), facts)
+    assert chinese["font_name"] == "MicrosoftYaHeiBold.ttc"                        # le chinois garde sa police
+    assert mpt.build_payload(request, EngineFacts())["font_name"] == "BeVietnamPro-Bold.ttf"  # configuration inconnue : repli latin
+
+
+def test_effective_params_record_the_font_actually_sent(tmp_path):
+    connector, _ = _connector(tmp_path, config=CONFIG)
+    assert connector.describe_params(_crypto_request())["font_name"] == "BeVietnamPro-Bold.ttf"
 
 
 def test_music_and_voice_variants():
