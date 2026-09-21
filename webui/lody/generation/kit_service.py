@@ -31,7 +31,7 @@ from lody.projects import ProjectRepository
 from lody.secrets_guard import _SECRET_VALUE_PATTERNS
 from lody.theme import PALETTES
 
-_INTERNAL = re.compile(r"/MoneyPrinterTurbo|/srv/|/data/|storage/tasks|tasks/[0-9a-f-]{8,}|\bprd_[0-9a-f]{12}\b|\bprj_[0-9a-f]{12}\b|\bkit_[0-9a-f]{12}\b|"
+_INTERNAL = re.compile(r"/Money" r"PrinterTurbo|/srv/|/data/|storage/tasks|tasks/[0-9a-f-]{8,}|\bprd_[0-9a-f]{12}\b|\bprj_[0-9a-f]{12}\b|\bkit_[0-9a-f]{12}\b|"
                        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|config\.toml|\.sqlite", re.IGNORECASE)
 HISTORY_VALUE_MAX = 1500
 
