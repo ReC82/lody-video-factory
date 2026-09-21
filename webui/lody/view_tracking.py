@@ -6,9 +6,10 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
-from lody import catalog, nav
+from lody import catalog, nav, view_kit
 from lody.components import format_datetime
 from lody.generation import costing
+from lody.generation.kit_service import KitService
 from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ProductionStatus as S
 from lody.generation.runtime import DEMO_PROVIDER
 from lody.generation.service import ProductionService, request_of
@@ -318,7 +319,7 @@ def _render_diagnostic(production: Production) -> None:
         st.markdown('<p class="muted-note">Aucune clé ni secret n’est jamais affiché ou enregistré ici.</p>', unsafe_allow_html=True)
 
 
-def render(service: ProductionService, project: Project, production_id: str) -> None:
+def render(service: ProductionService, project: Project, production_id: str, kits: KitService | None = None) -> None:
     try:
         production = service.repo.get(production_id)
         if production.project_id != project.id:
@@ -371,6 +372,8 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
     if latest.status is S.TERMINEE:
         _render_repair(service, project, latest)
         _render_result(service, project, latest)
+        if kits is not None:
+            view_kit.render(kits, project, latest)
     if latest.script or latest.storyboard:
         _render_details(latest)
     _render_diagnostic(latest)
