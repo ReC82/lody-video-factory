@@ -181,6 +181,7 @@ button[kind="tertiary"]:hover { color: var(--text) !important; background: rgba(
 .kv dd { margin: 0; color: var(--text); font-size: 0.95rem; line-height: 1.45; }
 .pill { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
 .pill-ok { color: var(--ok); background: rgba(110, 231, 183, 0.1); }
+.pill-muted { color: var(--muted); background: rgba(148, 163, 209, 0.1); }
 .pill-warn { color: var(--warn); background: rgba(252, 211, 77, 0.1); }
 
 /* ---- Confirmation d'archivage ----------------------------------------- */

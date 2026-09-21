@@ -81,10 +81,24 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-class EngineConfigFlags:
-    """Ce que Lody a le droit de savoir de config.toml : des booléens et des préférences non secrètes."""
+# Préférences de sous-titres utilisées quand la configuration du moteur n'est pas lisible
+# (polices fournies avec le moteur, compatibles caractères latins).
+_UI_FALLBACK: dict[str, Any] = {
+    "font_name": "MicrosoftYaHeiBold.ttc", "font_size": 58, "stroke_color": "#000000", "stroke_width": 1.8,
+    "text_fore_color": "#FFFFFF", "subtitle_position": "bottom",
+}
 
-    def __init__(self, raw: dict[str, Any]):
+
+class EngineConfigFlags:
+    """Ce que Lody a le droit de savoir de config.toml : des booléens et des préférences non secrètes.
+
+    ``readable`` est faux quand le fichier ne peut pas être lu (droits, absence, TOML invalide) : Lody ne
+    peut alors *rien affirmer* sur les clés et laisse le moteur juge.
+    """
+
+    def __init__(self, raw: dict[str, Any] | None):
+        self.readable = raw is not None
+        raw = raw or {}
         app = raw.get("app") if isinstance(raw.get("app"), dict) else {}
         eleven = raw.get("elevenlabs") if isinstance(raw.get("elevenlabs"), dict) else {}
         ui = raw.get("ui") if isinstance(raw.get("ui"), dict) else {}
@@ -103,7 +117,7 @@ class EngineConfigFlags:
         self.image_public_openai = "openai.com" in _text(app.get("openai_image_base_url"))
         self.elevenlabs_key_filled = filled(eleven.get("api_key")) or bool(os.environ.get("ELEVENLABS_API_KEY", "").strip())
         self.elevenlabs_model = _text(eleven.get("model_id"))
-        self.ui: dict[str, Any] = {}
+        self.ui: dict[str, Any] = {} if self.readable else dict(_UI_FALLBACK)
         for source, target in _UI_FIELDS.items():
             value = ui.get(source)
             if isinstance(value, (str, int, float, bool)):
@@ -118,7 +132,7 @@ def read_engine_flags(path: Path | None = None) -> EngineConfigFlags:
         with target.open("rb") as handle:
             return EngineConfigFlags(tomllib.load(handle))
     except (OSError, tomllib.TOMLDecodeError):
-        return EngineConfigFlags({})
+        return EngineConfigFlags(None)
 
 
 def script_prompt(request: GenerationRequest, limit: int = 2000) -> str:
@@ -264,6 +278,12 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         except ProviderError as error:
             return [ReadinessIssue("engine_unreachable", error.message + " Réessaie dans un instant ou contacte l’administrateur.")]
         flags = read_engine_flags(self.config_path)
+        if not flags.readable:
+            return [ReadinessIssue(
+                "config_unreadable",
+                "Lody ne peut pas lire la configuration du moteur : les clés ne sont pas vérifiées à l’avance. "
+                "Si l’une manque, la génération s’arrêtera dès l’étape concernée, avant tout appel payant.",
+                blocking=False)]
         issues: list[ReadinessIssue] = []
         if not request.script.strip() and request.text_provider != "manual":
             if request.text_provider == "openai" and flags.llm_provider != "openai":

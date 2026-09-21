@@ -19,13 +19,18 @@ def test_environment_variable_counts_as_configured(lody_env, monkeypatch):
     assert "valeur-de-test" not in repr(table)
 
 
-def test_missing_or_invalid_config_is_not_an_error(lody_env, monkeypatch, tmp_path):
+def test_unreadable_config_is_unverified_not_missing(lody_env, monkeypatch, tmp_path):
+    """Config absente, illisible (droits) ou invalide : jamais une erreur, jamais « clé manquante »."""
     monkeypatch.setenv("LODY_CONFIG_PATH", str(tmp_path / "absent.toml"))
-    assert provider_status.readiness()[("text", "openai")] is False
+    assert provider_status.readiness()[("text", "openai")] is None
     broken = tmp_path / "broken.toml"
     broken.write_text("= pas du toml", encoding="utf-8")
     monkeypatch.setenv("LODY_CONFIG_PATH", str(broken))
-    assert provider_status.readiness()[("text", "openai")] is False
+    table = provider_status.readiness()
+    assert table[("text", "openai")] is None
+    assert provider_status.is_unverified("text", "openai", table) and provider_status.is_ready("text", "openai", table)
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "valeur-de-test")  # l'environnement reste une source fiable
+    assert provider_status.readiness()[("voice", "elevenlabs")] is True
 
 
 def test_providers_without_key_are_always_ready(lody_env):
