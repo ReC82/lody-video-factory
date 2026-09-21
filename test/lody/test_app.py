@@ -312,3 +312,10 @@ def test_lody_modules_never_import_the_engine_or_providers():
                 names = [node.module]
             for name in names:
                 assert name.split(".")[0] not in forbidden, f"{source.name} importe {name}"
+
+
+def test_unreadable_config_shows_unverified_pills_not_missing_keys(monkeypatch, tmp_path):
+    monkeypatch.setenv("LODY_CONFIG_PATH", str(tmp_path / "absent" / "config.toml"))
+    project = next(p for p in _repo().list_projects() if p.name == "LodyCrypto")
+    text = _text(_run({"projet": project.id}))
+    assert "Non vérifiée" in text and "Clé à configurer" not in text

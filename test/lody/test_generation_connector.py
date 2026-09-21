@@ -280,6 +280,18 @@ def test_readiness_when_the_engine_is_down(tmp_path):
     assert [issue.code for issue in issues] == ["engine_unreachable"] and issues[0].blocking
 
 
+def test_unreadable_config_is_reported_as_unverified_never_as_missing_keys(tmp_path):
+    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=CONFIG)
+    (tmp_path / "config.toml").unlink()  # illisible / absent
+    issues = connector.check_ready(_crypto_request())
+    assert [(i.code, i.blocking) for i in issues] == [("config_unreadable", False)]
+    assert "avant tout appel payant" in issues[0].message
+    flags = mpt.read_engine_flags(tmp_path / "config.toml")
+    assert not flags.readable and flags.ui["font_name"] == "MicrosoftYaHeiBold.ttc"
+    payload = mpt.build_payload(_crypto_request(script="x", visual_prompts=("a",)), flags)
+    assert payload["font_name"] == "MicrosoftYaHeiBold.ttc" and payload["subtitle_display_mode"] == "sentence"
+
+
 def test_voice_model_difference_is_only_a_warning(tmp_path):
     changed = CONFIG.replace("eleven_multilingual_v2", "eleven_turbo_v2_5")
     connector, _ = _connector(tmp_path, (200, b'"pong"'), config=changed)

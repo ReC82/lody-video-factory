@@ -10,7 +10,7 @@ import streamlit as st
 from lody import nav
 from lody.catalog import PROVIDER_KIND_BY_FIELD, PROVIDER_REQUIREMENTS
 from lody.projects import Project
-from lody.provider_status import Readiness, is_ready
+from lody.provider_status import Readiness, is_ready, is_unverified
 from lody.theme import DEFAULT_ACCENT, PALETTES, esc
 
 _MONTHS = ("janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.")
@@ -69,6 +69,8 @@ def readiness_pill(project: Project, field: str, table: Readiness) -> str:
     value = getattr(project, field)
     if (kind, value) not in PROVIDER_REQUIREMENTS:
         return ""
+    if is_unverified(kind, value, table):
+        return '<span class="pill pill-muted" title="Lody ne peut pas lire la configuration du serveur">Non vérifiée</span>'
     if is_ready(kind, value, table):
         return '<span class="pill pill-ok">Prêt</span>'
     return '<span class="pill pill-warn">Clé à configurer</span>'

@@ -92,6 +92,16 @@ fournisseur** ; la production est marquée « Démonstration ».
   pas de lien symbolique sortant, extensions vidéo uniquement).
 - Vidéos de démonstration : `/data/demo/`.
 
+## Lecture de `config.toml` par Lody
+
+Lody n'y lit que des booléens (« cette clé est-elle renseignée ? ») et le `llm_provider` du moteur, pour
+prévenir *avant* de lancer. Le conteneur tourne en uid 10001 : si `config.toml` n'est pas lisible par cet
+utilisateur (ex. `0600` d'un autre propriétaire), Lody affiche **« Non vérifiée »** et un avertissement
+non bloquant — il n'affirme jamais qu'une clé manque. Le moteur reste juge : ses vérifications préalables
+échouent avant tout appel payant. Pour activer les vérifications, donner à cet uid un accès en lecture
+seule (à décider par l'administrateur, le fichier contient des secrets) :
+`sudo setfacl -m u:10001:r config.toml` (annulable : `sudo setfacl -x u:10001 config.toml`).
+
 ## Limitations connues
 
 - Une V2 **régénère tous les médias** (voix, images, musique) : aucune réutilisation.
