@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import tempfile
 import tomllib
 from dataclasses import asdict, dataclass, field
@@ -29,7 +30,7 @@ from typing import Any
 
 from lody import settings
 
-REPORT_VERSION = 1
+REPORT_VERSION = 2  # v2 : ajoute le gabarit d'images global du moteur (image_template)
 # Fournisseurs de texte du moteur qui n'exigent aucune clé (leurs champs *_api_key peuvent être vides).
 KEYLESS_LLM = frozenset({"ollama", "claude_code", "litellm", "pollinations"})
 
@@ -57,6 +58,8 @@ class EngineFacts:
     image_model: str = ""
     image_key: bool = False
     image_public_openai: bool = False
+    # Gabarit d'images GLOBAL du moteur (texte de prompt, pas un secret) : appliqué à chaque image de chaque projet.
+    image_template: str = ""
     eleven_key: bool = False
     eleven_model: str = ""
     ui: dict[str, Any] = field(default_factory=dict)
@@ -70,6 +73,13 @@ class EngineFacts:
         if provider in KEYLESS_LLM:
             return True
         return self.llm_key.get(provider)
+
+    @property
+    def image_template_neutral(self) -> bool:
+        """Vrai si le moteur n'ajoute rien au prompt d'image d'un projet : aucun gabarit, juste ``{term}``, ou un texte
+        sans ``{term}`` (le moteur l'ignore alors et garde le prompt du projet tel quel)."""
+        compact = re.sub(r"\s+", "", self.image_template)
+        return compact in ("", "{term}") or "{term}" not in self.image_template
 
     def to_report(self) -> dict[str, Any]:
         data = asdict(self)
@@ -104,6 +114,8 @@ def facts_from_config(raw: dict[str, Any], source: str = "config") -> EngineFact
         source=source, llm_provider=_name(app.get("llm_provider")).lower(), llm_key=llm_key, llm_model=llm_model,
         image_endpoint=bool(base and _name(app.get("openai_image_model"))), image_model=_name(app.get("openai_image_model")),
         image_key=_filled(app.get("openai_image_api_keys")), image_public_openai="openai.com" in base,
+        image_template=(app.get("openai_image_prompt_template") or "").strip()[:2000]
+        if isinstance(app.get("openai_image_prompt_template"), str) else "",
         eleven_key=_filled(eleven.get("api_key")), eleven_model=_name(eleven.get("model_id")), ui=prefs,
     )
 
@@ -117,6 +129,7 @@ def _facts_from_report(data: dict[str, Any]) -> EngineFacts:
         llm_model={str(k): _name(v) for k, v in dict(facts.get("llm_model", {})).items()},
         image_endpoint=bool(facts.get("image_endpoint")), image_model=_name(facts.get("image_model")),
         image_key=bool(facts.get("image_key")), image_public_openai=bool(facts.get("image_public_openai")),
+        image_template=str(facts.get("image_template", ""))[:2000],
         eleven_key=bool(facts.get("eleven_key")), eleven_model=_name(facts.get("eleven_model")),
         ui={k: v for k, v in dict(facts.get("ui", {})).items() if isinstance(v, (str, int, float, bool))},
     )
