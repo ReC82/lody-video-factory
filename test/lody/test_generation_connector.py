@@ -14,7 +14,6 @@ from lody.generation import mpt_connector as mpt
 from lody.generation.models import (
     ErrorKind,
     ExternalTask,
-    GenerationRequest,
     ProviderError,
     RemoteState,
     VoiceSpec,
