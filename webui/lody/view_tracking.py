@@ -252,18 +252,23 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
             if current.status is S.ECHEC:
                 st.markdown(f'<div class="banner banner-error" role="alert">{esc(current.error_message)}</div>',
                             unsafe_allow_html=True)
+            # Ces boutons changent de page : dans un fragment, un on_click ne relancerait que le fragment.
+            # On agit donc dans le corps du fragment puis on relance TOUTE l'application (st.rerun).
             with st.container(horizontal=True, key="run_actions"):
                 if current.is_active:
                     st.button("Actualiser", icon=":material/refresh:", key="refresh_run")
                 if current.status is S.ECHEC:
-                    st.button("Préparer à nouveau", type="primary", icon=":material/replay:", key="retry_run",
-                              on_click=_retry, args=(project, current))
-                    if current.script:
-                        st.button("Créer une V2 avec ce script", icon=":material/edit_note:", key="v2_from_failed",
-                                  on_click=_go_v2, args=(service, project, current))
+                    if st.button("Préparer à nouveau", type="primary", icon=":material/replay:", key="retry_run"):
+                        _retry(project, current)
+                        st.rerun()
+                    if current.script and st.button("Créer une V2 avec ce script", icon=":material/edit_note:",
+                                                    key="v2_from_failed"):
+                        _go_v2(service, project, current)
+                        st.rerun()
                 if current.status is not S.TERMINEE:  # le résultat a ses propres actions
-                    st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project_run",
-                              on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
+                    if st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project_run"):
+                        nav.go(nav.VIEW_PROJECT, project.id)
+                        st.rerun()
         if production.is_active and not current.is_active:
             st.rerun()  # la production vient de se terminer : recharger toute la page pour afficher le résultat
 
