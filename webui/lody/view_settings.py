@@ -40,6 +40,13 @@ def _submit(repo: ProjectRepository, project_id: str) -> None:
             "standing_instructions": ss.get(f"{p}_instructions"),
             "visual_rules": ss.get(f"{p}_visual_rules"),
             "visual_avoid": str(ss.get(f"{p}_visual_avoid") or "").splitlines(),
+            "publication": {
+                "playlist": ss.get(f"{p}_pub_playlist"), "category": ss.get(f"{p}_pub_category"),
+                "hashtags": ss.get(f"{p}_pub_hashtags"), "tags": ss.get(f"{p}_pub_tags"),
+                "disclaimer": ss.get(f"{p}_pub_disclaimer"), "series_blurb": ss.get(f"{p}_pub_blurb"),
+                "comment_prompt": ss.get(f"{p}_pub_comment"), "made_for_kids": bool(ss.get(f"{p}_pub_kids")),
+                "no_financial_claims": bool(ss.get(f"{p}_pub_nofin")),
+            },
         }
         updated = repo.update(
             project_id,
@@ -142,6 +149,20 @@ def render(repo: ProjectRepository, project: Project, states: States) -> None:
                              max_chars=brief_lib.INSTRUCTIONS_MAX, key=f"{p}_instructions",
                              help="Règles à respecter dans toutes les vidéos du projet (une par ligne).")
                 error_under("brief.standing_instructions")
+                pub = current["publication"]
+                with st.expander("Publication (YouTube, TikTok) — propre à ce projet"):
+                    st.text_input("Playlist suggérée", value=pub.get("playlist", ""), max_chars=100, key=f"{p}_pub_playlist")
+                    st.text_input("Catégorie suggérée", value=pub.get("category", ""), max_chars=60, key=f"{p}_pub_category")
+                    st.text_input("Hashtags du projet (séparés par des espaces)", value=" ".join(pub.get("hashtags", [])), key=f"{p}_pub_hashtags")
+                    error_under("brief.publication.hashtags")
+                    st.text_area("Mots-clés (tags) du projet, séparés par des virgules", value=", ".join(pub.get("tags", [])), height=80, key=f"{p}_pub_tags")
+                    error_under("brief.publication.tags")
+                    st.text_area("Mention à ajouter aux descriptions", value=pub.get("disclaimer", ""), height=80, max_chars=300, key=f"{p}_pub_disclaimer")
+                    st.text_area("Présentation de la série (descriptions)", value=pub.get("series_blurb", ""), height=80, max_chars=300, key=f"{p}_pub_blurb")
+                    st.text_input("Question du commentaire épinglé", value=pub.get("comment_prompt", ""), max_chars=300, key=f"{p}_pub_comment")
+                    st.checkbox("Vidéos destinées aux enfants", value=bool(pub.get("made_for_kids")), key=f"{p}_pub_kids")
+                    st.checkbox("Vérifier l’absence de promesse financière et de conseil d’investissement",
+                                value=bool(pub.get("no_financial_claims")), key=f"{p}_pub_nofin")
 
             with tab_visual:
                 st.text_area("Style visuel", value=project.visual_style, height=110, max_chars=200,

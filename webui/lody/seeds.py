@@ -31,9 +31,22 @@ _CRYPTO_VISUAL_AVOID = [
     "aucune caméra de plateau ni caméra PTZ",
     "aucun studio de télévision, sauf si le sujet le demande explicitement",
 ]
+# Profil de publication LodyCrypto — AUTONOME (playlist, hashtags, mention légale : rien n'est partagé avec un autre projet).
+_CRYPTO_PUBLICATION = {
+    "playlist": "LodyCrypto — Comprendre le Web3 gaming",
+    "category": "Éducation",
+    "hashtags": ["#LodyCrypto", "#Crypto", "#Web3Gaming"],
+    "tags": ["crypto pour débutants", "web3 gaming", "blockchain expliquée", "jeux web3", "vulgarisation crypto"],
+    "disclaimer": "Contenu pédagogique : ceci n’est pas un conseil d’investissement ni une recommandation d’achat.",
+    "series_blurb": "Cette série part des bases de la crypto pour aller, épisode après épisode, vers le Web3 gaming — sans promesse de gain.",
+    "comment_prompt": "Quel mot du Web3 te pose problème ? On l’explique dans un prochain épisode.",
+    "made_for_kids": False,
+    "no_financial_claims": True,
+}
+
 # Clés de brief ajoutées après la création des exemples : complétées sur un projet existant UNIQUEMENT si elles y sont
 # absentes (jamais d'écrasement d'une valeur saisie par l'utilisateur).
-ADDITIVE_BRIEF_KEYS = ("visual_rules", "visual_avoid")
+ADDITIVE_BRIEF_KEYS = ("visual_rules", "visual_avoid", "publication")
 
 SEED_PROJECTS: list[dict] = [
     {
@@ -101,6 +114,7 @@ SEED_PROJECTS: list[dict] = [
                 "standing_instructions": _CRYPTO_INSTRUCTIONS,
                 "visual_rules": _CRYPTO_VISUAL_RULES,
                 "visual_avoid": _CRYPTO_VISUAL_AVOID,
+                "publication": _CRYPTO_PUBLICATION,
             },
         },
         # Valeurs d'origine (version précédente de l'exemple) : elles ne sont remplacées

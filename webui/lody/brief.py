@@ -29,6 +29,9 @@ STRUCTURE_STEP_MAX = 120
 VISUAL_RULES_MAX = 800
 VISUAL_AVOID_MAX_ITEMS = 16
 VISUAL_AVOID_ITEM_MAX = 140
+PUBLICATION_TEXT_MAX = {"playlist": 100, "category": 60, "disclaimer": 300, "series_blurb": 300, "comment_prompt": 300}
+PUBLICATION_TAGS_MAX = 20
+PUBLICATION_HASHTAGS_MAX = 10
 
 NARRATION_PACES = (
     catalog.Option("calme", "Posée"),
@@ -54,6 +57,9 @@ DEFAULT_BRIEF: dict[str, Any] = {
     # la plateforme (un projet n'hérite jamais des règles d'un autre).
     "visual_rules": "",
     "visual_avoid": [],
+    # Profil de publication PROPRE au projet (playlist, catégorie, hashtags, mention légale…). Vide par défaut : la
+    # plateforme n'impose aucun vocabulaire métier ; le kit retombe sur des valeurs neutres.
+    "publication": {},
 }
 
 _VOICE_ID = re.compile(r"^[A-Za-z0-9_\-]{6,40}$")
@@ -175,6 +181,56 @@ def validate_brief(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]
     elif any(len(item) > VISUAL_AVOID_ITEM_MAX for item in avoid):
         errors[f"{BRIEF_KEY}.visual_avoid"] = f"Un élément est trop long ({VISUAL_AVOID_ITEM_MAX} caractères maximum)."
     clean["visual_avoid"] = avoid
+
+    publication, publication_errors = _validate_publication(source.get("publication"))
+    errors.update(publication_errors)
+    clean["publication"] = publication
+    return clean, errors
+
+
+def _validate_publication(raw: Any) -> tuple[dict[str, Any], dict[str, str]]:
+    """Profil de publication du projet : textes bornés, hashtags valides, deux cases à cocher."""
+    errors: dict[str, str] = {}
+    if raw in (None, ""):
+        return {}, errors
+    if not isinstance(raw, dict):
+        return {}, {f"{BRIEF_KEY}.publication": "Le profil de publication est invalide."}
+    clean: dict[str, Any] = {}
+    for key, maximum in PUBLICATION_TEXT_MAX.items():
+        value = " ".join(str(raw.get(key) or "").split())
+        if len(value) > maximum:
+            errors[f"{BRIEF_KEY}.publication.{key}"] = f"Ce champ est trop long ({maximum} caractères maximum)."
+        if value:
+            clean[key] = value
+    hashtags_raw = raw.get("hashtags") or []
+    if isinstance(hashtags_raw, str):
+        hashtags_raw = re.split(r"[\s,;]+", hashtags_raw)
+    hashtags = []
+    for item in hashtags_raw:
+        tag = str(item).strip()
+        if tag:
+            tag = tag if tag.startswith("#") else "#" + tag
+            if tag not in hashtags:
+                hashtags.append(tag)
+    if len(hashtags) > PUBLICATION_HASHTAGS_MAX or any(not re.fullmatch(r"#[^\s#]{1,29}", tag) for tag in hashtags):
+        errors[f"{BRIEF_KEY}.publication.hashtags"] = f"Hashtags : {PUBLICATION_HASHTAGS_MAX} au maximum, sans espace, 30 caractères chacun."
+    if hashtags:
+        clean["hashtags"] = hashtags
+    tags_raw = raw.get("tags") or []
+    if isinstance(tags_raw, str):
+        tags_raw = re.split(r"[,\n;]+", tags_raw)
+    tags = []
+    for item in tags_raw:
+        tag = " ".join(str(item).replace("#", "").split())
+        if tag and tag.lower() not in {t.lower() for t in tags}:
+            tags.append(tag)
+    if len(tags) > PUBLICATION_TAGS_MAX or sum(len(t) + 1 for t in tags) > 450:
+        errors[f"{BRIEF_KEY}.publication.tags"] = f"Tags : {PUBLICATION_TAGS_MAX} au maximum, 450 caractères au total."
+    if tags:
+        clean["tags"] = tags
+    for key in ("made_for_kids", "no_financial_claims"):
+        if key in raw:
+            clean[key] = bool(raw[key])
     return clean, errors
 
 
