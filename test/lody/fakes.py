@@ -7,7 +7,11 @@ from pathlib import Path
 from lody.generation.models import (
     ExternalTask,
     GenerationRequest,
+    Capability,
+    CapabilityState,
+    CapabilityStatus,
     GenerationResult,
+    PreflightReport,
     ProviderError,
     ReadinessIssue,
     RemoteState,
@@ -54,9 +58,14 @@ class ScriptedConnector(VideoGenerationProvider):
             ref, 52.4, assets=({"kind": "video", "ref": ref},), warnings=kwargs.get("warnings", ())))
 
     # -- interface ------------------------------------------------------------
-    def check_ready(self, request):
+    def preflight(self, request):
         self.calls.append("check_ready")
-        return list(self.issues)
+        items = {c: CapabilityStatus(c, CapabilityState.READY, message="Prêt.") for c in Capability}
+        for index, issue in enumerate(self.issues):  # chaque problème du scénario bloque (ou avertit) une capacité
+            capability = list(Capability)[index % len(Capability)]
+            state = CapabilityState.NOT_CONFIGURED if issue.blocking else CapabilityState.READY
+            items[capability] = CapabilityStatus(capability, state, message=issue.message, fix="platform")
+        return PreflightReport(tuple(items.values()))
 
     def write_script(self, request):
         self.calls.append("write_script")

@@ -95,19 +95,19 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
         if st.session_state.get(keys["error"]):
             st.markdown(f'<p class="field-error" role="alert">{esc(st.session_state[keys["error"]])}</p>',
                         unsafe_allow_html=True)
-        issues = service.readiness(production) if fresh else []
+        report = service.preflight(production) if fresh else None
         accepted = bool(st.session_state.get(keys["accept"])) or not production.cost_partial or demo
         with st.container(horizontal=True, vertical_alignment="center", key="composer_actions"):
             if fresh:
                 st.button("Confirmer et générer la V2", type="primary", icon=":material/rocket_launch:", key="confirm_v2",
                           on_click=_confirm, args=(service, project, production),
-                          disabled=any(issue.blocking for issue in issues) or not accepted)
+                          disabled=not report.ready or not accepted)
             else:
                 st.button("Recalculer la durée et le coût", type="primary", icon=":material/calculate:", key="recalculate_v2",
                           on_click=_recalculate, args=(service, production))
             st.button("Retour à la " + parent.label, type="tertiary", icon=":material/arrow_back:", key="back_parent",
                       on_click=nav.go, args=(nav.VIEW_TRACK, project.id, parent.id))
     if fresh:
-        view_estimate.render_panel(production, issues, demo=demo, key=production.id, v2=True)
+        view_estimate.render_panel(production, report, demo=demo, key=production.id, v2=True, project=project)
         with st.expander("Storyboard recalculé"):
             st.markdown(storyboard_html(production), unsafe_allow_html=True)

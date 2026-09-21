@@ -21,13 +21,17 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from lody import brief as brief_lib
+from lody import catalog
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
 from lody.generation.models import (
     ACTIVE_STATUSES,
+    Capability,
+    CapabilityState,
     ErrorKind,
     ExternalTask,
     GenerationRequest,
     GenerationResult,
+    PreflightReport,
     ProductionStatus,
     ProviderError,
     ReadinessIssue,
@@ -137,8 +141,41 @@ class ProductionService:
         except KeyError:
             raise LaunchError("Ce moteur de génération n’est pas disponible.") from None
 
+    def preflight(self, production: Production) -> PreflightReport:
+        """Contrôle complet (sans coût) de ce que cette production exige."""
+        return self.provider(production.provider).preflight(request_of(production))
+
+    def project_preflight(self, project: Project, provider_id: str, script: str = "") -> PreflightReport:
+        """Même contrôle, pour les paramètres du projet (avant tout sujet)."""
+        return self.provider(provider_id).preflight(build_request(project, "", script))
+
+    def option_states(self, project: Project | None, provider_id: str) -> dict[tuple[str, str], CapabilityState]:
+        """État réel de chaque fournisseur proposé (configuré / à configurer / indisponible / non vérifié).
+
+        Chaque option est contrôlée telle quelle, sans jamais en substituer une autre à l'utilisateur.
+        """
+        base = build_request(project, "", "") if project else GenerationRequest(
+            subject="", voice=VoiceSpec("elevenlabs", "probe", "probe", ""))
+        provider = self.provider(provider_id)
+        table: dict[tuple[str, str], CapabilityState] = {}
+        for kind, options, field, capability in (
+            ("text", catalog.TEXT_PROVIDERS, "text_provider", Capability.TEXT),
+            ("visual", catalog.VISUAL_PROVIDERS, "visual_provider", Capability.VISUAL),
+            ("voice", catalog.VOICE_PROVIDERS, "voice", Capability.VOICE),
+            ("music", catalog.MUSIC_PROVIDERS, "music_provider", Capability.MUSIC),
+        ):
+            for option in options:
+                if kind == "text" and option.value == "manual":
+                    table[(kind, option.value)] = CapabilityState.NOT_NEEDED  # « je fournis mon script » : toujours possible
+                    continue
+                voice = VoiceSpec(option.value, base.voice.voice_id or "probe", base.voice.name, base.voice.model)
+                request = base.with_updates(voice=voice) if kind == "voice" else base.with_updates(**{field: option.value})
+                item = provider.preflight(request).get(capability)
+                table[(kind, option.value)] = item.state if item else CapabilityState.UNVERIFIED
+        return table
+
     def readiness(self, production: Production) -> list[ReadinessIssue]:
-        return self.provider(production.provider).check_ready(request_of(production))
+        return self.preflight(production).to_issues()
 
     # -- préparation (aucun appel payant) -------------------------------------
     def _plan(self, provider: VideoGenerationProvider, request: GenerationRequest) -> tuple[CostEstimate, dict[str, Any]]:
@@ -154,8 +191,12 @@ class ProductionService:
         return max(1, min(MAX_SCENES, round((low + high) / 2)))
 
     def prepare(self, project: Project, subject: str, *, provider_id: str, script: str = "",
-                draft_id: str | None = None) -> Production:
-        """Crée (ou met à jour) un brouillon avec son estimation : EN_ATTENTE_CONFIRMATION."""
+                draft_id: str | None = None, retry_of: str | None = None) -> Production:
+        """Crée (ou met à jour) un brouillon avec son estimation : EN_ATTENTE_CONFIRMATION.
+
+        ``retry_of`` = une production échouée du même projet : la nouvelle tentative lui est *liée* (elle ne
+        l'écrase jamais) et repart d'une estimation et d'une confirmation neuves.
+        """
         text = validate_subject(subject)
         script_text = validate_script(script) if script.strip() else ""
         provider = self.provider(provider_id)
@@ -168,6 +209,10 @@ class ProductionService:
             "storyboard": [], "visual_prompts": [], "current_step": "En attente de confirmation",
             "error_code": "", "error_message": "", **cost,
         }
+        if retry_of:
+            failed = self.repo.get(retry_of)
+            if failed.project_id != project.id or failed.status is not ProductionStatus.ECHEC:
+                retry_of = None
         existing = None
         if draft_id:
             try:
@@ -175,12 +220,13 @@ class ProductionService:
             except LookupError:
                 existing = None
         if (existing and existing.project_id == project.id and existing.status in EDITABLE_STATUSES
-                and existing.parent_production_id is None and existing.provider == provider_id):
+                and existing.parent_production_id == retry_of and existing.provider == provider_id):
             if self.repo.transition(existing.id, EDITABLE_STATUSES, subject=text,
                                     status=ProductionStatus.EN_ATTENTE_CONFIRMATION, **fields):
                 return self.repo.get(existing.id)
         return self.repo.create(project_id=project.id, subject=text, provider=provider_id,
-                                status=ProductionStatus.EN_ATTENTE_CONFIRMATION, **fields)
+                                status=ProductionStatus.EN_ATTENTE_CONFIRMATION,
+                                parent_production_id=retry_of, **fields)
 
     # -- V2 ---------------------------------------------------------------------
     def create_v2(self, parent_id: str) -> Production:
@@ -229,9 +275,10 @@ class ProductionService:
         # Une simulation n'a aucun coût réel : l'avertissement de total partiel ne s'y applique pas.
         if production.cost_partial and not accept_partial and not self.provider(production.provider).is_demo:
             raise LaunchError("Le total est partiel (tarif non configuré) : confirme en acceptant explicitement cet avertissement.")
-        blocking = [issue for issue in self.readiness(production) if issue.blocking]
-        if blocking:
-            raise LaunchError("La génération ne peut pas partir pour le moment.", blocking)
+        report = self.preflight(production)
+        if not report.ready:  # rien n'est enregistré ni lancé : la production reste en attente de confirmation
+            raise LaunchError("La génération ne peut pas partir : la configuration de production est incomplète.",
+                              report.to_issues())
         for other in self.repo.active_for_project(production.project_id):
             if other.id != production.id:
                 raise AlreadyRunning("Une génération est déjà en cours pour ce projet : attends sa fin avant d’en lancer une autre.", other.id)

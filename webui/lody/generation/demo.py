@@ -18,8 +18,11 @@ from lody import settings
 from lody.generation.models import (
     ExternalTask,
     GenerationRequest,
+    Capability,
+    CapabilityState,
+    CapabilityStatus,
     GenerationResult,
-    ReadinessIssue,
+    PreflightReport,
     RemoteState,
     TaskSnapshot,
 )
@@ -79,8 +82,12 @@ class DemoConnector(VideoGenerationProvider):
     def _dir(self, task_id: str) -> Path:
         return self._root / "demo" / task_id
 
-    def check_ready(self, request: GenerationRequest) -> list[ReadinessIssue]:
-        return []
+    def preflight(self, request: GenerationRequest) -> PreflightReport:
+        """Une simulation n'a besoin d'aucun fournisseur : tout est « prêt »."""
+        return PreflightReport(tuple(
+            CapabilityStatus(capability, CapabilityState.READY, message="Simulation : aucun fournisseur n’est appelé.")
+            for capability in (Capability.TEXT, Capability.VISUAL, Capability.VOICE, Capability.MUSIC,
+                               Capability.ENGINE, Capability.STORAGE, Capability.SETTINGS)))
 
     def write_script(self, request: GenerationRequest) -> str:
         return demo_script(request.subject)

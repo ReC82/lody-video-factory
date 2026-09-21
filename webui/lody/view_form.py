@@ -7,7 +7,7 @@ import streamlit as st
 from lody import catalog, nav
 from lody.catalog import PROVIDER_KIND_BY_FIELD
 from lody.projects import ProjectValidationError, ProjectRepository
-from lody.provider_status import Readiness, is_ready
+from lody.generation.models import CapabilityState as CS
 from lody.theme import esc
 
 ERRORS_KEY = "form_errors"
@@ -61,15 +61,26 @@ def error_under(field: str) -> None:
         st.markdown(f'<p class="field-error" role="alert">{esc(message)}</p>', unsafe_allow_html=True)
 
 
-def provider_select(prefix: str, field: str, label: str, options, current: str, table: Readiness) -> None:
+_USABLE = (CS.READY, CS.NOT_NEEDED, CS.DISABLED)
+_SUFFIX = {CS.READY: " — configuré", CS.NOT_CONFIGURED: " — à configurer", CS.UNAVAILABLE: " — indisponible",
+           CS.UNVERIFIED: " — non vérifié"}
+States = dict[tuple[str, str], CS]
+
+
+def provider_select(prefix: str, field: str, label: str, options, current: str, states: States,
+                    *, new: bool = False) -> None:
+    """Liste de fournisseurs avec leur état réel.
+
+    Pour un nouveau projet, la valeur par défaut est le premier fournisseur réellement utilisable. Un choix
+    explicite n'est jamais remplacé en silence : s'il n'est pas utilisable, on le dit sous la liste.
+    """
     kind = PROVIDER_KIND_BY_FIELD[field]
     values = catalog.values(options)
+    if new and states.get((kind, current), CS.READY) not in _USABLE:
+        current = next((value for value in values if states.get((kind, value), CS.READY) in _USABLE), current)
 
     def display(value: str) -> str:
-        text = catalog.label(options, value)
-        if (kind, value) in catalog.PROVIDER_REQUIREMENTS and not is_ready(kind, value, table):
-            return f"{text} — clé à configurer"
-        return text
+        return catalog.label(options, value) + _SUFFIX.get(states.get((kind, value), CS.READY), "")
 
     st.selectbox(
         label,
@@ -78,10 +89,19 @@ def provider_select(prefix: str, field: str, label: str, options, current: str, 
         format_func=display,
         key=f"{prefix}_{field}",
     )
+    chosen = st.session_state.get(f"{prefix}_{field}", current)
+    state = states.get((kind, chosen), CS.READY)
+    if state not in _USABLE:
+        st.markdown(
+            f'<p class="field-warn" role="status">« {esc(catalog.label(options, chosen))} » n’est pas utilisable pour '
+            "l’instant (fournisseur non configuré ou indisponible sur le serveur). Aucun autre fournisseur n’est choisi "
+            "à ta place : choisis-en un qui est configuré, ou fais régler celui-ci.</p>",
+            unsafe_allow_html=True,
+        )
     error_under(field)
 
 
-def render(repo: ProjectRepository, table: Readiness) -> None:
+def render(repo: ProjectRepository, states: States) -> None:
     st.markdown(
         '<section class="hero"><p class="eyebrow">Création</p><h1 class="hero-title">Nouveau projet</h1>'
         '<p class="hero-sub">Quelques informations suffisent : tu pourras tout régler ensuite '
@@ -151,18 +171,18 @@ def render(repo: ProjectRepository, table: Readiness) -> None:
                 )
                 error_under("visual_style")
                 provider_select(PREFIX, "text_provider", "Rédaction du script", catalog.TEXT_PROVIDERS,
-                                _DEFAULTS["text_provider"], table)
+                                _DEFAULTS["text_provider"], states, new=True)
                 provider_select(PREFIX, "visual_provider", "Images et vidéos", catalog.VISUAL_PROVIDERS,
-                                _DEFAULTS["visual_provider"], table)
+                                _DEFAULTS["visual_provider"], states, new=True)
                 provider_select(PREFIX, "voice_provider", "Voix", catalog.VOICE_PROVIDERS,
-                                _DEFAULTS["voice_provider"], table)
+                                _DEFAULTS["voice_provider"], states, new=True)
                 st.text_input(
                     "Voix choisie", placeholder="Ex. Kev - Young, Dynamic and Bright",
                     max_chars=80, key=f"{PREFIX}_voice_name",
                 )
                 error_under("voice_name")
                 provider_select(PREFIX, "music_provider", "Musique", catalog.MUSIC_PROVIDERS,
-                                _DEFAULTS["music_provider"], table)
+                                _DEFAULTS["music_provider"], states, new=True)
                 st.caption("Les clés d’accès des fournisseurs ne se saisissent jamais ici : elles restent dans la configuration du serveur.")
                 error_under("settings")
 

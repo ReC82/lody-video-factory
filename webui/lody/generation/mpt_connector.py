@@ -13,7 +13,6 @@ import logging
 import os
 import socket
 import time
-import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,14 +20,17 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from lody import settings
+from lody.generation.engine_facts import PROBLEM_LABELS, EngineFacts, resolve
 from lody.generation.models import (
+    Capability,
+    CapabilityState,
+    CapabilityStatus,
     ErrorKind,
     ExternalTask,
     GenerationRequest,
     GenerationResult,
+    PreflightReport,
     ProviderError,
-    ReadinessIssue,
     RemoteState,
     TaskSnapshot,
 )
@@ -81,58 +83,23 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-# Préférences de sous-titres utilisées quand la configuration du moteur n'est pas lisible
+# Préférences de sous-titres utilisées quand la configuration du moteur est inconnue
 # (polices fournies avec le moteur, compatibles caractères latins).
 _UI_FALLBACK: dict[str, Any] = {
     "font_name": "MicrosoftYaHeiBold.ttc", "font_size": 58, "stroke_color": "#000000", "stroke_width": 1.8,
     "text_fore_color": "#FFFFFF", "subtitle_position": "bottom",
 }
+# Fournisseur de texte du projet → identifiant du fournisseur de texte du moteur (llm_provider).
+_ENGINE_TEXT_PROVIDER = {"openai": "openai"}
+_TEXT_LABELS = {"openai": "OpenAI", "moonshot": "Moonshot", "deepseek": "DeepSeek", "gemini": "Google Gemini",
+                "anthropic": "Anthropic", "azure": "Azure OpenAI", "qwen": "Qwen", "groq": "Groq",
+                "openrouter": "OpenRouter", "ollama": "Ollama", "grok": "Grok", "mistral": "Mistral"}
+_VOICE_LABELS = {"elevenlabs": "ElevenLabs", "edge": "Voix gratuite (Edge)"}
+_ASPECTS = ("9:16", "16:9", "1:1")
 
 
-class EngineConfigFlags:
-    """Ce que Lody a le droit de savoir de config.toml : des booléens et des préférences non secrètes.
-
-    ``readable`` est faux quand le fichier ne peut pas être lu (droits, absence, TOML invalide) : Lody ne
-    peut alors *rien affirmer* sur les clés et laisse le moteur juge.
-    """
-
-    def __init__(self, raw: dict[str, Any] | None):
-        self.readable = raw is not None
-        raw = raw or {}
-        app = raw.get("app") if isinstance(raw.get("app"), dict) else {}
-        eleven = raw.get("elevenlabs") if isinstance(raw.get("elevenlabs"), dict) else {}
-        ui = raw.get("ui") if isinstance(raw.get("ui"), dict) else {}
-
-        def filled(value: Any) -> bool:
-            if isinstance(value, str):
-                return bool(value.strip())
-            return isinstance(value, list) and any(isinstance(item, str) and item.strip() for item in value)
-
-        self.llm_provider = _text(app.get("llm_provider")).lower()
-        key_name = f"{self.llm_provider}_api_key"
-        self.llm_key_known = key_name in app or self.llm_provider in _KEYLESS_LLM
-        self.llm_key_filled = filled(app.get(key_name)) or self.llm_provider in _KEYLESS_LLM
-        self.image_endpoint_set = bool(_text(app.get("openai_image_base_url")) and _text(app.get("openai_image_model")))
-        self.image_key_filled = filled(app.get("openai_image_api_keys"))
-        self.image_public_openai = "openai.com" in _text(app.get("openai_image_base_url"))
-        self.elevenlabs_key_filled = filled(eleven.get("api_key")) or bool(os.environ.get("ELEVENLABS_API_KEY", "").strip())
-        self.elevenlabs_model = _text(eleven.get("model_id"))
-        self.ui: dict[str, Any] = {} if self.readable else dict(_UI_FALLBACK)
-        for source, target in _UI_FIELDS.items():
-            value = ui.get(source)
-            if isinstance(value, (str, int, float, bool)):
-                self.ui[target] = value
-        if ui.get("subtitle_background_enabled") is True and _text(ui.get("subtitle_background_color")):
-            self.ui["text_background_color"] = _text(ui.get("subtitle_background_color"))
-
-
-def read_engine_flags(path: Path | None = None) -> EngineConfigFlags:
-    target = path or settings.config_path()
-    try:
-        with target.open("rb") as handle:
-            return EngineConfigFlags(tomllib.load(handle))
-    except (OSError, tomllib.TOMLDecodeError):
-        return EngineConfigFlags(None)
+def _label(provider: str) -> str:
+    return _TEXT_LABELS.get(provider, provider or "aucun")
 
 
 def script_prompt(request: GenerationRequest, limit: int = 2000) -> str:
@@ -157,7 +124,7 @@ def script_prompt(request: GenerationRequest, limit: int = 2000) -> str:
     return text[:limit]
 
 
-def build_payload(request: GenerationRequest, flags: EngineConfigFlags) -> dict[str, Any]:
+def build_payload(request: GenerationRequest, facts: EngineFacts) -> dict[str, Any]:
     """Requête ``POST /api/v1/videos`` construite depuis les paramètres du projet."""
     scenes = max(len(request.visual_prompts), 1)
     clip = max(2, min(15, -(-int(request.duration_max * 1.15) // scenes)))  # couvre la voix, plafonné
@@ -185,7 +152,7 @@ def build_payload(request: GenerationRequest, flags: EngineConfigFlags) -> dict[
                                if music == "elevenlabs" else ""),
         "subtitle_enabled": True,
         "subtitle_display_mode": "sentence",
-        **flags.ui,
+        **(facts.ui if facts.known else _UI_FALLBACK),
     }
     return payload
 
@@ -196,11 +163,12 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
     supports_cancel = False  # aucun endpoint d'annulation dans le contrat
 
     def __init__(self, base_url: str = DEFAULT_URL, storage_root: str | Path = DEFAULT_STORAGE,
-                 config_path: Path | None = None, api_key: str = "", transport: Transport = urllib_transport,
+                 config_path: Path | None = None, report_path: Path | None = None, api_key: str = "", transport: Transport = urllib_transport,
                  clock: Callable[[], float] = time.monotonic):
         self.base_url = base_url.rstrip("/")
         self.storage_root = Path(storage_root)
         self.config_path = config_path
+        self.report_path = report_path
         self._api_key = api_key
         self._transport = transport
         self._clock = clock
@@ -252,7 +220,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
 
     # -- API du VideoGenerationProvider --------------------------------------
     def describe_params(self, request: GenerationRequest) -> dict[str, Any]:
-        payload = build_payload(request, read_engine_flags(self.config_path))
+        payload = build_payload(request, resolve(self.config_path, self.report_path))
         return {key: value for key, value in payload.items() if key not in ("video_script", "video_terms", "video_subject")}
 
     def _ping(self) -> None:
@@ -272,46 +240,144 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             raise ProviderError(ErrorKind.UNAVAILABLE, "Le moteur de génération est injoignable pour le moment.") from None
         return status, raw
 
-    def check_ready(self, request: GenerationRequest) -> list[ReadinessIssue]:
+    # -- preflight complet (aucun appel payant) ------------------------------------
+    def preflight(self, request: GenerationRequest) -> PreflightReport:
+        facts = resolve(self.config_path, self.report_path)
+        C = Capability
+        items = [self._engine_status(), self._storage_status(), self._settings_status(request)]
+        items.append(self._text_status(request, facts))
+        items.append(self._visual_status(request, facts))
+        items.append(self._voice_status(request, facts))
+        items.append(self._music_status(request, facts))
+        order = (C.TEXT, C.VISUAL, C.VOICE, C.MUSIC, C.ENGINE, C.STORAGE, C.SETTINGS)
+        items.sort(key=lambda item: order.index(item.capability))
+        return PreflightReport(tuple(items))
+
+    def _engine_status(self) -> CapabilityStatus:
         try:
             self._ping()
         except ProviderError as error:
-            return [ReadinessIssue("engine_unreachable", error.message + " Réessaie dans un instant ou contacte l’administrateur.")]
-        flags = read_engine_flags(self.config_path)
-        if not flags.readable:
-            return [ReadinessIssue(
-                "config_unreadable",
-                "Lody ne peut pas lire la configuration du moteur : les clés ne sont pas vérifiées à l’avance. "
-                "Si l’une manque, la génération s’arrêtera dès l’étape concernée, avant tout appel payant.",
-                blocking=False)]
-        issues: list[ReadinessIssue] = []
-        if not request.script.strip() and request.text_provider != "manual":
-            if request.text_provider == "openai" and flags.llm_provider != "openai":
-                issues.append(ReadinessIssue(
-                    "text_engine_mismatch",
-                    "Le moteur écrit ses scripts avec un autre fournisseur que celui du projet (OpenAI). "
-                    "L’administrateur doit régler `llm_provider = \"openai\"` dans la configuration du moteur, "
-                    "ou tu peux fournir ton propre script."))
-            elif flags.llm_key_known and not flags.llm_key_filled:
-                issues.append(ReadinessIssue("text_key_missing", "La clé du fournisseur de texte n’est pas configurée côté serveur."))
-        if request.visual_provider == "openai_image":
-            if not flags.image_endpoint_set:
-                issues.append(ReadinessIssue("image_endpoint_missing", "La génération d’images n’est pas configurée côté serveur."))
-            elif not flags.image_key_filled and flags.image_public_openai:
-                issues.append(ReadinessIssue("image_key_missing", "La clé du fournisseur d’images n’est pas configurée côté serveur."))
-        elif request.visual_provider not in _VIDEO_SOURCES:
-            issues.append(ReadinessIssue("visual_unsupported", "Ce type de visuels n’est pas encore pris en charge par le moteur."))
-        if request.voice.provider == "elevenlabs" and not flags.elevenlabs_key_filled:
-            issues.append(ReadinessIssue("voice_key_missing", "La clé du fournisseur de voix n’est pas configurée côté serveur."))
-        if request.music_provider == "elevenlabs" and not flags.elevenlabs_key_filled:
-            issues.append(ReadinessIssue("music_key_missing", "La clé du fournisseur de musique n’est pas configurée côté serveur."))
-        if (request.voice.provider == "elevenlabs" and request.voice.model and flags.elevenlabs_model
-                and request.voice.model != flags.elevenlabs_model):
-            issues.append(ReadinessIssue(
-                "voice_model_differs",
-                f"Le projet demande le modèle de voix « {request.voice.model} » mais le moteur utilisera "
-                f"« {flags.elevenlabs_model} » (configuration du serveur).", blocking=False))
-        return issues
+            return CapabilityStatus(Capability.ENGINE, CapabilityState.UNAVAILABLE, "moteur", "",
+                                    message=error.message + " Réessaie dans un instant.", fix="platform",
+                                    admin=f"GET /ping sur {self.base_url} : {error.kind.value}")
+        return CapabilityStatus(Capability.ENGINE, CapabilityState.READY, "moteur", "moteur", message="Le moteur répond.")
+
+    def _storage_status(self) -> CapabilityStatus:
+        root = self.storage_root
+        ok = root.is_dir() and os.access(root, os.R_OK | os.X_OK)
+        if ok:
+            return CapabilityStatus(Capability.STORAGE, CapabilityState.READY, message="Le stockage des vidéos est accessible.")
+        return CapabilityStatus(Capability.STORAGE, CapabilityState.UNAVAILABLE,
+                                message="Le stockage des vidéos n’est pas accessible.", fix="platform",
+                                admin=f"dossier de stockage {root} absent ou illisible dans le conteneur")
+
+    def _settings_status(self, request: GenerationRequest) -> CapabilityStatus:
+        missing = []
+        if request.aspect not in _ASPECTS:
+            missing.append("le format vidéo")
+        if not request.language:
+            missing.append("la langue")
+        if not (0 < request.duration_min <= request.duration_max):
+            missing.append("la durée cible")
+        if request.voice.provider == "elevenlabs" and not request.voice.voice_id:
+            missing.append("la voix (identifiant de voix)")
+        if missing:
+            return CapabilityStatus(Capability.SETTINGS, CapabilityState.NOT_CONFIGURED,
+                                    message="Paramètres du projet à compléter : " + ", ".join(missing) + ".", fix="project",
+                                    admin="paramètres obligatoires manquants ou invalides : " + ", ".join(missing))
+        return CapabilityStatus(Capability.SETTINGS, CapabilityState.READY, message="Les paramètres obligatoires sont présents.")
+
+    @staticmethod
+    def _unverified(capability: Capability, requested: str, facts: EngineFacts) -> CapabilityStatus:
+        reasons = " ; ".join(PROBLEM_LABELS.get(code, code) for code in facts.problems) or "configuration du moteur inconnue"
+        return CapabilityStatus(
+            capability, CapabilityState.UNVERIFIED, requested,
+            message="Impossible de vérifier ce fournisseur : la configuration du moteur n’est pas accessible à Lody.",
+            fix="platform", admin=reasons)
+
+    def _text_status(self, request: GenerationRequest, facts: EngineFacts) -> CapabilityStatus:
+        C, St = Capability.TEXT, CapabilityState
+        if request.script.strip():
+            return CapabilityStatus(C, St.NOT_NEEDED, request.text_provider, message="Script fourni : aucun appel texte.")
+        wanted = _ENGINE_TEXT_PROVIDER.get(request.text_provider)
+        if request.text_provider == "manual" or wanted is None:
+            return CapabilityStatus(C, St.NOT_CONFIGURED, request.text_provider,
+                                    message="Aucun fournisseur de texte utilisable : fournis ton script ou choisis un fournisseur dans les paramètres du projet.",
+                                    fix="project", admin=f"fournisseur de texte du projet « {request.text_provider} » sans équivalent côté moteur")
+        if not facts.known:
+            return self._unverified(C, request.text_provider, facts)
+        engine = facts.llm_provider
+        details = (f"projet={request.text_provider} ; moteur llm_provider={engine or '(vide)'} ; "
+                   f"clé {wanted}={'renseignée' if facts.key_present(wanted) else 'vide/absente'} ; "
+                   f"clé {engine or '?'}={'renseignée' if facts.key_present(engine) else 'vide/absente'} ; "
+                   f"modèle {wanted}={facts.llm_model.get(wanted) or 'défaut du moteur'} (source : {facts.source})")
+        if engine != wanted:
+            return CapabilityStatus(
+                C, St.NOT_CONFIGURED, request.text_provider, engine, facts.llm_model.get(engine, ""),
+                message=(f"Le moteur écrit ses scripts avec « {_label(engine)} », pas avec « {_label(wanted)} » choisi pour ce projet. "
+                         "Fournis ton script, ou demande à l’administrateur de régler le moteur sur ce fournisseur."),
+                fix="platform", admin=details)
+        if not facts.key_present(wanted):
+            return CapabilityStatus(C, St.NOT_CONFIGURED, request.text_provider, engine,
+                                    message=f"La clé du fournisseur de texte « {_label(wanted)} » n’est pas configurée côté serveur.",
+                                    fix="platform", admin=details)
+        model = facts.llm_model.get(wanted, "")
+        return CapabilityStatus(C, St.READY, request.text_provider, engine, model or "modèle par défaut du moteur",
+                                message=f"Script écrit par « {_label(engine)} »" + ("" if model else " (modèle par défaut du moteur)") + ".",
+                                admin=details)
+
+    def _visual_status(self, request: GenerationRequest, facts: EngineFacts) -> CapabilityStatus:
+        C, St = Capability.VISUAL, CapabilityState
+        if request.visual_provider not in _VIDEO_SOURCES:
+            return CapabilityStatus(C, St.UNAVAILABLE, request.visual_provider, message="Ce type de visuels n’est pas encore pris en charge par le moteur.",
+                                    fix="project", admin=f"source visuelle « {request.visual_provider} » non gérée par le connecteur")
+        if not facts.known:
+            return self._unverified(C, request.visual_provider, facts)
+        details = (f"endpoint+modèle d'images={'oui' if facts.image_endpoint else 'non'} ; clé images={'renseignée' if facts.image_key else 'vide'} ; "
+                   f"modèle={facts.image_model or '(vide)'} (source : {facts.source})")
+        if not facts.image_endpoint:
+            return CapabilityStatus(C, St.NOT_CONFIGURED, request.visual_provider, message="La génération d’images n’est pas configurée côté serveur.",
+                                    fix="platform", admin=details)
+        if not facts.image_key and facts.image_public_openai:
+            return CapabilityStatus(C, St.NOT_CONFIGURED, request.visual_provider, "openai_image", facts.image_model,
+                                    message="La clé du fournisseur d’images n’est pas configurée côté serveur.", fix="platform", admin=details)
+        return CapabilityStatus(C, St.READY, request.visual_provider, "openai_image", facts.image_model,
+                                message=f"Images générées avec « {facts.image_model} ».", admin=details)
+
+    def _voice_status(self, request: GenerationRequest, facts: EngineFacts) -> CapabilityStatus:
+        C, St, voice = Capability.VOICE, CapabilityState, request.voice
+        if voice.provider != "elevenlabs":
+            return CapabilityStatus(C, St.READY, voice.provider, voice.provider, message="Voix gratuite : aucune clé nécessaire.")
+        if not voice.voice_id:
+            return CapabilityStatus(C, St.NOT_CONFIGURED, voice.provider, message="Aucune voix n’est choisie pour ce projet.", fix="project",
+                                    admin="identifiant de voix ElevenLabs absent des paramètres du projet")
+        if not facts.known:
+            return self._unverified(C, voice.provider, facts)
+        details = (f"clé elevenlabs={'renseignée' if facts.eleven_key else 'vide'} ; modèle du moteur={facts.eleven_model or '(défaut)'} ; "
+                   f"modèle du projet={voice.model or '(non précisé)'} (source : {facts.source})")
+        if not facts.eleven_key:
+            return CapabilityStatus(C, St.NOT_CONFIGURED, voice.provider, message="La clé du fournisseur de voix n’est pas configurée côté serveur.",
+                                    fix="platform", admin=details)
+        note = ""
+        if voice.model and facts.eleven_model and voice.model != facts.eleven_model:
+            note = f" Le moteur utilisera le modèle « {facts.eleven_model} » (réglage serveur), pas « {voice.model} »."
+        return CapabilityStatus(C, St.READY, voice.provider, "elevenlabs", facts.eleven_model or voice.model,
+                                message=f"Voix « {voice.name or voice.voice_id} » sélectionnée (son existence chez le fournisseur ne peut pas être vérifiée sans appel).{note}",
+                                admin=details)
+
+    def _music_status(self, request: GenerationRequest, facts: EngineFacts) -> CapabilityStatus:
+        C, St, music = Capability.MUSIC, CapabilityState, request.music_provider
+        if music in ("none", ""):
+            return CapabilityStatus(C, St.DISABLED, music, message="Aucune musique de fond.")
+        if music == "library":
+            return CapabilityStatus(C, St.READY, music, "library", message="Musique de la bibliothèque du moteur.")
+        if not facts.known:
+            return self._unverified(C, music, facts)
+        details = f"clé elevenlabs (musique)={'renseignée' if facts.eleven_key else 'vide'} (source : {facts.source})"
+        if not facts.eleven_key:
+            return CapabilityStatus(C, St.NOT_CONFIGURED, music, message="La clé du fournisseur de musique n’est pas configurée côté serveur.",
+                                    fix="platform", admin=details)
+        return CapabilityStatus(C, St.READY, music, "elevenlabs", message="Musique générée par le fournisseur choisi.", admin=details)
 
     def write_script(self, request: GenerationRequest) -> str:
         payload = {
@@ -330,7 +396,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:
         # Le moteur n'a pas de clé d'idempotence : l'unicité est garantie en amont par Lody
         # (transition d'état atomique) et le lancement n'est jamais rejoué automatiquement.
-        payload = build_payload(request, read_engine_flags(self.config_path))
+        payload = build_payload(request, resolve(self.config_path, self.report_path))
         status, envelope = self._call("POST", "/api/v1/videos", payload, timeout=30.0)
         self._raise_for_status(status, envelope, "submit")
         data = envelope.get("data")

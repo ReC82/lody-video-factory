@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from lody.generation import mpt_connector as mpt
+from lody.generation.engine_facts import EngineFacts, resolve
 from lody.generation.models import (
     ErrorKind,
     ExternalTask,
@@ -46,8 +47,9 @@ def _connector(tmp_path, *responses, config: str = "", **kwargs):
     config_path = tmp_path / "config.toml"
     config_path.write_text(config, encoding="utf-8")
     transport = Recorder(*responses)
+    (tmp_path / "storage").mkdir(exist_ok=True)
     connector = mpt.MoneyPrinterTurboConnector("http://engine:8080", tmp_path / "storage", config_path,
-                                               transport=transport, **kwargs)
+                                               report_path=tmp_path / "no-report.json", transport=transport, **kwargs)
     return connector, transport
 
 
@@ -93,7 +95,7 @@ subtitle_background_color = "#000000"
 # -- payload ---------------------------------------------------------------------------
 def test_lodycrypto_payload_carries_the_project_parameters(tmp_path):
     request = _crypto_request(script="Une phrase. Une autre phrase.", visual_prompts=("scène un", "scène deux"))
-    payload = mpt.build_payload(request, mpt.read_engine_flags(_write(tmp_path, CONFIG)))
+    payload = mpt.build_payload(request, resolve(_write(tmp_path, CONFIG), tmp_path / 'none.json'))
     assert payload["video_language"] == "fr-FR" and payload["video_aspect"] == "9:16"
     assert payload["voice_name"] == "elevenlabs:jGpnMdbhtKgQbVrYezOx:Kev - Young, Dynamic and Bright"
     assert payload["subtitle_display_mode"] == "sentence" and payload["subtitle_enabled"] is True
@@ -122,7 +124,7 @@ def test_script_prompt_respects_the_engine_limit_and_keeps_the_rules(tmp_path):
 
 
 def test_music_and_voice_variants():
-    flags = mpt.EngineConfigFlags({})
+    flags = EngineFacts()
     edge = _crypto_request(voice=VoiceSpec("edge", "", "fr-FR-DeniseNeural", ""), music_provider="none")
     payload = mpt.build_payload(edge, flags)
     assert payload["voice_name"] == "fr-FR-DeniseNeural" and payload["bgm_type"] == "" and payload["bgm_volume"] == 0.0
@@ -248,55 +250,6 @@ def test_bad_responses_are_typed(tmp_path, response, kind):
     with pytest.raises(ProviderError) as error:
         connector.poll(ExternalTask(mpt.PROVIDER_ID, TASK))
     assert error.value.kind is kind
-
-
-# -- préparation : clés et cohérence ----------------------------------------------------------------
-def test_readiness_ok_when_engine_and_keys_are_in_place(tmp_path):
-    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=CONFIG)
-    assert connector.check_ready(_crypto_request()) == []
-
-
-def test_readiness_flags_an_engine_configured_for_another_text_provider(tmp_path):
-    other = CONFIG.replace('llm_provider = "openai"', 'llm_provider = "moonshot"')
-    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=other)
-    codes = [issue.code for issue in connector.check_ready(_crypto_request())]
-    assert codes == ["text_engine_mismatch"]
-    # avec un script fourni, aucun appel texte : plus de blocage
-    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=other)
-    assert connector.check_ready(_crypto_request(script="Un script fourni.")) == []
-
-
-def test_readiness_reports_missing_keys_without_revealing_anything(tmp_path):
-    empty = CONFIG.replace('api_key = "FAKE-ELEVEN-VALUE-NOT-A-KEY"', 'api_key = ""')
-    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=empty)
-    issues = connector.check_ready(_crypto_request())
-    assert {issue.code for issue in issues} == {"voice_key_missing", "music_key_missing"}
-    assert "FAKE-" not in " ".join(issue.message for issue in issues)
-
-
-def test_readiness_when_the_engine_is_down(tmp_path):
-    connector, _ = _connector(tmp_path, ConnectionRefusedError(), config=CONFIG)
-    issues = connector.check_ready(_crypto_request())
-    assert [issue.code for issue in issues] == ["engine_unreachable"] and issues[0].blocking
-
-
-def test_unreadable_config_is_reported_as_unverified_never_as_missing_keys(tmp_path):
-    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=CONFIG)
-    (tmp_path / "config.toml").unlink()  # illisible / absent
-    issues = connector.check_ready(_crypto_request())
-    assert [(i.code, i.blocking) for i in issues] == [("config_unreadable", False)]
-    assert "avant tout appel payant" in issues[0].message
-    flags = mpt.read_engine_flags(tmp_path / "config.toml")
-    assert not flags.readable and flags.ui["font_name"] == "MicrosoftYaHeiBold.ttc"
-    payload = mpt.build_payload(_crypto_request(script="x", visual_prompts=("a",)), flags)
-    assert payload["font_name"] == "MicrosoftYaHeiBold.ttc" and payload["subtitle_display_mode"] == "sentence"
-
-
-def test_voice_model_difference_is_only_a_warning(tmp_path):
-    changed = CONFIG.replace("eleven_multilingual_v2", "eleven_turbo_v2_5")
-    connector, _ = _connector(tmp_path, (200, b'"pong"'), config=changed)
-    issues = connector.check_ready(_crypto_request())
-    assert [(i.code, i.blocking) for i in issues] == [("voice_model_differs", False)]
 
 
 # -- script ---------------------------------------------------------------------------------------------

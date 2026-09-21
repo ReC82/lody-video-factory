@@ -92,22 +92,43 @@ fournisseur** ; la production est marquée « Démonstration ».
   pas de lien symbolique sortant, extensions vidéo uniquement).
 - Vidéos de démonstration : `/data/demo/`.
 
-## Lecture de `config.toml` par Lody
+## Configuration de production (preflight) et résolution de configuration
 
-Lody n'y lit que des booléens (« cette clé est-elle renseignée ? ») et le `llm_provider` du moteur, pour
-prévenir *avant* de lancer. Le conteneur tourne en uid 10001 : si `config.toml` n'est pas lisible par cet
-utilisateur (ex. `0600` d'un autre propriétaire), Lody affiche **« Non vérifiée »** et un avertissement
-non bloquant — il n'affirme jamais qu'une clé manque. Le moteur reste juge : ses vérifications préalables
-échouent avant tout appel payant. Pour activer les vérifications, donner à cet uid un accès en lecture
-seule (à décider par l'administrateur, le fichier contient des secrets) :
-`sudo setfacl -m u:10001:r config.toml` (annulable : `sudo setfacl -x u:10001 config.toml`).
+Avant « Confirmer et générer la vidéo », Lody effectue un **preflight complet, sans aucun coût** et affiche
+« Configuration de production » : Texte, Visuels, Voix, Musique, Moteur (Stockage et Paramètres apparaissent
+s'ils bloquent). Chaque ligne dit **ce que le projet demande**, **ce qui est réellement configuré** et si c'est
+prêt. Si une capacité obligatoire manque : bouton de confirmation désactivé, rien n'est confirmé ni lancé
+(`confirm()` refuse aussi côté service), le message nomme le fournisseur et où corriger (paramètres du projet ou
+serveur). Les noms de champs restent dans « Diagnostic administrateur » (jamais de valeur de clé).
+
+Le moteur choisit son fournisseur de texte via `llm_provider` (global, non surchargeable par requête). Un projet
+« OpenAI » sur un moteur réglé sur un autre fournisseur est donc **bloqué**, jamais basculé en silence.
+
+La couche `engine_facts` (indépendante des vues) fournit les « faits » de configuration : fournisseur de texte
+réel, clés *renseignées ou non*, noms de modèles, points d'accès d'images, préférences de sous-titres. Deux sources :
+
+1. `config.toml` lu directement, si le conteneur peut le lire ;
+2. sinon le **rapport de capacités** `engine-report/engine-capabilities.json`, généré par le propriétaire de
+   `config.toml` (`./scripts/lody-engine-report.sh`, à relancer après chaque changement de `config.toml`). Il ne
+   contient que des booléens et des noms de modèles. Il n'est cru que si `config.toml` (taille + date, lues par
+   `stat`) n'a pas changé depuis : sinon « rapport périmé » et la production réelle reste bloquée.
+
+Ainsi Lody n'a jamais accès aux clés (le conteneur ne peut pas lire `config.toml`, fichier `0600`), tout en
+sachant exactement ce qui est configuré. Sans aucune des deux sources, chaque fournisseur est « non vérifié » et
+la production réelle est bloquée (le mode démonstration reste possible).
+
+## Nouvelle tentative après un échec
+
+Une production échouée reste dans l'historique, avec sa cause. « Préparer à nouveau » ouvre la page de production
+avec le sujet (et le script déjà écrit, le cas échéant) conservés, et crée une **nouvelle tentative liée** (V2 du
+même sujet, « nouvelle tentative de V1 ») : nouvelle estimation, nouveau preflight, **nouvelle confirmation**.
+Rien de la confirmation ni du coût précédents n'est repris.
 
 ## Limitations connues
 
 - Une V2 **régénère tous les médias** (voix, images, musique) : aucune réutilisation.
 - Pas d'annulation d'une génération en cours (le moteur n'en offre pas).
-- Le fournisseur de texte est celui du moteur (`llm_provider` de son `config.toml`). Si le projet
-  demande OpenAI et que le moteur est réglé sur un autre fournisseur, Lody bloque avec un message
-  clair : régler `llm_provider = "openai"` côté moteur (et le redémarrer) ou fournir son script.
+- Le fournisseur de texte est celui du moteur (`llm_provider`) : si le projet en demande un autre, Lody bloque
+  (voir preflight) ; régler `llm_provider` côté moteur (et le redémarrer) ou fournir son script.
 - Visuels « fichiers locaux » non pris en charge par ce connecteur.
 - Le moteur ne renvoie pas le coût facturé.

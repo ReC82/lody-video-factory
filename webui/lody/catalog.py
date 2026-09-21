@@ -67,21 +67,6 @@ MUSIC_PROVIDERS = (
     Option("elevenlabs", "ElevenLabs Music"),
 )
 
-# Clés de config.toml nécessaires à chaque fournisseur : (section, clé).
-# Un fournisseur absent de ce tableau n'exige aucune clé. Seule la PRÉSENCE d'une
-# valeur est testée, jamais son contenu.
-PROVIDER_REQUIREMENTS: dict[tuple[str, str], tuple[tuple[str, str], ...]] = {
-    ("text", "openai"): (("app", "openai_api_key"),),
-    ("visual", "openai_image"): (("app", "openai_image_api_keys"),),
-    ("voice", "elevenlabs"): (("elevenlabs", "api_key"),),
-    ("music", "elevenlabs"): (("elevenlabs", "api_key"),),
-}
-# Variables d'environnement équivalentes (présence seulement).
-PROVIDER_ENV_ALTERNATIVES: dict[tuple[str, str], tuple[str, ...]] = {
-    ("voice", "elevenlabs"): ("ELEVENLABS_API_KEY",),
-    ("music", "elevenlabs"): ("ELEVENLABS_API_KEY",),
-}
-
 CATALOGS = {
     "content_type": CONTENT_TYPES,
     "language": LANGUAGES,

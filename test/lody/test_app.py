@@ -108,7 +108,8 @@ def test_project_page_shows_summary_and_readiness_without_key_values():
     assert not app.exception
     assert "LodyCrypto" in text and "Commencer une production" not in text  # bouton, pas markdown
     assert _button(app, "Commencer une production") and _button(app, "Paramètres") and _button(app, "Archiver")
-    assert "Prêt" in text and "Clé à configurer" in text
+    # config factice : ni fournisseur de texte du moteur, ni clés d'images/voix → états réels, jamais inventés
+    assert "À configurer" in text and "Production réelle impossible" in text
     assert "FAKE-CONFIG-VALUE-NOT-A-KEY" not in text
 
 
@@ -318,4 +319,4 @@ def test_unreadable_config_shows_unverified_pills_not_missing_keys(monkeypatch, 
     monkeypatch.setenv("LODY_CONFIG_PATH", str(tmp_path / "absent" / "config.toml"))
     project = next(p for p in _repo().list_projects() if p.name == "LodyCrypto")
     text = _text(_run({"projet": project.id}))
-    assert "Non vérifiée" in text and "Clé à configurer" not in text
+    assert "Non vérifié" in text and "Clé à configurer" not in text and "Production réelle impossible" in text

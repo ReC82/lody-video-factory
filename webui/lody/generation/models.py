@@ -133,6 +133,99 @@ class ReadinessIssue:
     blocking: bool = True
 
 
+class Capability(str, Enum):
+    TEXT = "text"
+    VISUAL = "visual"
+    VOICE = "voice"
+    MUSIC = "music"
+    ENGINE = "engine"
+    STORAGE = "storage"
+    SETTINGS = "settings"
+
+
+class CapabilityState(str, Enum):
+    READY = "ready"
+    NOT_NEEDED = "not_needed"        # ex. script fourni : aucun appel texte
+    DISABLED = "disabled"            # ex. musique désactivée par le projet
+    NOT_CONFIGURED = "not_configured"
+    UNAVAILABLE = "unavailable"      # configuré mais injoignable / non pris en charge
+    UNVERIFIED = "unverified"        # impossible à vérifier : on ne prétend rien
+
+
+BLOCKING_STATES = frozenset({CapabilityState.NOT_CONFIGURED, CapabilityState.UNAVAILABLE, CapabilityState.UNVERIFIED})
+CAPABILITY_LABELS = {
+    Capability.TEXT: "Texte", Capability.VISUAL: "Visuels", Capability.VOICE: "Voix", Capability.MUSIC: "Musique",
+    Capability.ENGINE: "Moteur", Capability.STORAGE: "Stockage", Capability.SETTINGS: "Paramètres",
+}
+# Libellés simples (accord compris) : « Texte : prêt », « Voix : prête », « Moteur : disponible »…
+_FEMININE = {Capability.VOICE, Capability.MUSIC}
+
+
+def state_label(capability: Capability, state: CapabilityState) -> str:
+    if capability is Capability.ENGINE:
+        return "disponible" if state is CapabilityState.READY else (
+            "non vérifié" if state is CapabilityState.UNVERIFIED else "indisponible")
+    ready = "prête" if capability in _FEMININE else "prêt"
+    return {
+        CapabilityState.READY: ready,
+        CapabilityState.NOT_NEEDED: "non nécessaire",
+        CapabilityState.DISABLED: "désactivée" if capability in _FEMININE else "désactivé",
+        CapabilityState.NOT_CONFIGURED: "à configurer",
+        CapabilityState.UNAVAILABLE: "indisponible",
+        CapabilityState.UNVERIFIED: "non vérifié" if capability not in _FEMININE else "non vérifiée",
+    }[state]
+
+
+@dataclass(frozen=True)
+class CapabilityStatus:
+    """État d'une capacité : ce qui est demandé, ce qui est réellement configuré, et pourquoi.
+
+    ``message`` est destiné à l'utilisateur (aucun nom technique) ; ``admin`` est le détail nettoyé pour
+    l'administrateur (noms de champs et de fournisseurs, jamais de valeur de clé).
+    """
+
+    capability: Capability
+    state: CapabilityState
+    requested: str = ""
+    configured: str = ""
+    model: str = ""
+    message: str = ""
+    fix: str = ""  # "project" (réglage du projet) | "platform" (administrateur) | ""
+    admin: str = ""
+
+    @property
+    def blocking(self) -> bool:
+        return self.state in BLOCKING_STATES
+
+    @property
+    def label(self) -> str:
+        return CAPABILITY_LABELS[self.capability]
+
+    @property
+    def state_text(self) -> str:
+        return state_label(self.capability, self.state)
+
+
+@dataclass(frozen=True)
+class PreflightReport:
+    items: tuple[CapabilityStatus, ...]
+
+    @property
+    def blocking(self) -> tuple[CapabilityStatus, ...]:
+        return tuple(item for item in self.items if item.blocking)
+
+    @property
+    def ready(self) -> bool:
+        return not self.blocking
+
+    def get(self, capability: Capability) -> CapabilityStatus | None:
+        return next((item for item in self.items if item.capability is capability), None)
+
+    def to_issues(self) -> list[ReadinessIssue]:
+        return [ReadinessIssue(f"{item.capability.value}_{item.state.value}", item.message or item.label, item.blocking)
+                for item in self.items if item.blocking]
+
+
 @dataclass(frozen=True)
 class ExternalTask:
     provider: str
