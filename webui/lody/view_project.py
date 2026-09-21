@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from lody import brief as brief_lib
 from lody import catalog, nav
 from lody.components import format_datetime, readiness_pill, status_badge
 from lody.projects import Project, ProjectNotFound, ProjectRepository
@@ -49,38 +50,57 @@ def _row(label: str, value: str, extra: str = "") -> str:
 
 
 def _summary_cards(project: Project, table: Readiness) -> str:
+    settings = brief_lib.brief_settings(project.settings)
     platforms = ", ".join(catalog.label(catalog.PLATFORMS, value) for value in project.platforms) or "Non précisées"
-    content = "".join(
-        [
-            _row("Type", catalog.label(catalog.CONTENT_TYPES, project.content_type)),
-            _row("Langue", catalog.label(catalog.LANGUAGES, project.language)),
-            _row("Format", catalog.label(catalog.FORMATS, project.format)),
-            _row("Plateformes", platforms),
-        ]
-    )
-    editorial = "".join(
-        [
-            _row("Ton", project.tone),
-            _row("Style visuel", project.visual_style),
-            _row("Durée visée", str(project.settings.get("target_duration", "")) or "Libre"),
-        ]
-    )
-    generation = "".join(
-        [
-            _row("Script", catalog.label(catalog.TEXT_PROVIDERS, project.text_provider),
-                 readiness_pill(project, "text_provider", table)),
-            _row("Images", catalog.label(catalog.VISUAL_PROVIDERS, project.visual_provider),
-                 readiness_pill(project, "visual_provider", table)),
-            _row("Voix", " · ".join(filter(None, [catalog.label(catalog.VOICE_PROVIDERS, project.voice_provider), project.voice_name])),
-                 readiness_pill(project, "voice_provider", table)),
-            _row("Musique", catalog.label(catalog.MUSIC_PROVIDERS, project.music_provider),
-                 readiness_pill(project, "music_provider", table)),
-        ]
-    )
+    duration = f"{settings['duration_min']} à {settings['duration_max']} secondes"
+    steps = settings["structure"]
+    content = "".join([
+        _row("Type", catalog.label(catalog.CONTENT_TYPES, project.content_type)),
+        _row("Langue", catalog.label(catalog.LANGUAGES, project.language)),
+        _row("Format", catalog.label(catalog.FORMATS, project.format)),
+        _row("Durée cible", duration),
+        _row("Plateformes", platforms),
+    ])
+    editorial = "".join([
+        _row("Public", settings["audience"]),
+        _row("Orientation", settings["orientation"]),
+        _row("Ton", project.tone),
+    ])
+    voice_label = " · ".join(filter(None, [catalog.label(catalog.VOICE_PROVIDERS, project.voice_provider),
+                                            project.voice_name]))
+    visuals = "".join([
+        _row("Style", project.visual_style),
+        _row("Rythme visuel", f"{settings['scenes_per_minute_min']} à {settings['scenes_per_minute_max']} scènes par minute"),
+        _row("Narration", catalog.label(brief_lib.NARRATION_PACES, settings["narration_pace"])),
+        _row("Voix", voice_label, readiness_pill(project, "voice_provider", table)),
+    ])
+    generation = "".join([
+        _row("Script", catalog.label(catalog.TEXT_PROVIDERS, project.text_provider),
+             readiness_pill(project, "text_provider", table)),
+        _row("Images", catalog.label(catalog.VISUAL_PROVIDERS, project.visual_provider),
+             readiness_pill(project, "visual_provider", table)),
+        _row("Musique", catalog.label(catalog.MUSIC_PROVIDERS, project.music_provider),
+             readiness_pill(project, "music_provider", table)),
+    ])
+    structure_card = ""
+    if steps:
+        structure_card = (
+            '<section class="card card-wide"><p class="card-eyebrow">Structure type d’une vidéo</p>'
+            '<ol class="timeline">' + "".join(f"<li>{esc(step)}</li>" for step in steps) + "</ol></section>"
+        )
+    instructions = ""
+    if settings["standing_instructions"]:
+        items = "".join(f"<li>{esc(line)}</li>" for line in settings["standing_instructions"].splitlines() if line.strip())
+        instructions = (
+            '<section class="card card-wide"><p class="card-eyebrow">Consignes permanentes</p>'
+            f'<ul class="rules">{items}</ul></section>'
+        )
     return (
         f'<section class="card"><p class="card-eyebrow">Contenu</p><dl class="kv">{content}</dl></section>'
-        f'<section class="card"><p class="card-eyebrow">Style éditorial</p><dl class="kv">{editorial}</dl></section>'
-        f'<section class="card"><p class="card-eyebrow">Génération</p><dl class="kv">{generation}</dl></section>'
+        f'<section class="card"><p class="card-eyebrow">Éditorial</p><dl class="kv">{editorial}</dl></section>'
+        f'<section class="card"><p class="card-eyebrow">Visuels et voix</p><dl class="kv">{visuals}</dl></section>'
+        f'<section class="card"><p class="card-eyebrow">Fournisseurs</p><dl class="kv">{generation}</dl></section>'
+        f"{structure_card}{instructions}"
     )
 
 
@@ -99,7 +119,7 @@ def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
     if project.is_archived:
         st.markdown(
             '<div class="banner banner-info" role="status">Ce projet est archivé. '
-            "Restaure-le pour démarrer une production ou le modifier.</div>",
+            "Restaure-le pour démarrer une production ou modifier ses paramètres.</div>",
             unsafe_allow_html=True,
         )
         with st.container(horizontal=True, key="project_actions"):
@@ -109,8 +129,8 @@ def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
         with st.container(horizontal=True, key="project_actions"):
             st.button("Commencer une production", type="primary", icon=":material/play_arrow:",
                       key="start_production", on_click=nav.go, args=(nav.VIEW_PRODUCTION, project.id))
-            st.button("Modifier", icon=":material/edit:", key="edit_project",
-                      on_click=nav.go, args=(nav.VIEW_EDIT, project.id))
+            st.button("Paramètres", icon=":material/tune:", key="settings_project",
+                      on_click=nav.go, args=(nav.VIEW_SETTINGS, project.id))
             st.button("Archiver", icon=":material/archive:", type="tertiary", key="archive_project",
                       on_click=_ask_archive, args=(project.id,))
 

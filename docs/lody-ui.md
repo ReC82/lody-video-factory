@@ -30,6 +30,23 @@ docker compose -f docker-compose.lody.yml down                     # arrêt (SAN
 `config.toml` doit exister à la racine (`cp config.example.toml config.toml` sur une
 installation neuve), sinon Docker crée un *dossier* de ce nom.
 
+## Paramètres d'un projet et brief
+
+Chaque projet a sa page **Paramètres** (`?projet=<id>&vue=parametres`) : nom, description, langue,
+format, durée cible, public, orientation, ton, style visuel, rythme de narration et rythme visuel
+(scènes par minute), voix ElevenLabs (nom + identifiant, saisis à la main : lister les voix
+appellerait le service), structure type et consignes permanentes.
+
+- Stockage : colonnes SQLite pour les champs communs, bloc JSON `settings["brief"]` (validé par
+  `webui/lody/brief.py`) pour le reste — **séparément pour chaque projet**, sans changement de schéma.
+- La page « Nouvelle production » assemble automatiquement le **brief final** (demande saisie +
+  paramètres du projet) et l'affiche avant toute génération, avec une version texte copiable.
+  Les repères « mots estimés » et « scènes estimées » sont calculés (débit 130/155/175 mots par
+  minute selon le rythme ; scènes = durée × scènes par minute) : ce sont des estimations.
+- Mise à niveau : au démarrage, `LodyCrypto` reçoit son bloc `brief` s'il n'en a pas encore ; un champ
+  n'est remplacé (ton, style visuel) que s'il porte encore sa valeur d'origine. `Audiovisuel` n'est
+  jamais modifié (ses anciennes valeurs sont lues telles quelles).
+
 ## Données et secrets
 
 - Les projets (nom, langue, format, ton, style, plateformes, **identifiants** de fournisseurs, voix)

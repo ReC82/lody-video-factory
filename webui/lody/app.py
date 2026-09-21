@@ -7,7 +7,7 @@ import logging
 import streamlit as st
 
 from lody import nav, settings
-from lody import view_form, view_home, view_production, view_project
+from lody import view_form, view_home, view_production, view_project, view_settings
 from lody.components import accent_for, render_flash, render_footer, render_header
 from lody.projects import ProjectNotFound, ProjectRepository
 from lody.provider_status import readiness
@@ -54,7 +54,7 @@ def render() -> None:
             nav.flash("error", "Ce projet est introuvable.")
             nav.go()
             route = nav.Route(nav.VIEW_HOME)
-    if project is not None and project.is_archived and route.view in (nav.VIEW_EDIT, nav.VIEW_PRODUCTION):
+    if project is not None and project.is_archived and route.view in (nav.VIEW_SETTINGS, nav.VIEW_PRODUCTION):
         nav.flash("info", "Ce projet est archivé : restaure-le pour continuer.")
         nav.go(nav.VIEW_PROJECT, project.id)
         route = nav.Route(nav.VIEW_PROJECT, project.id)
@@ -68,8 +68,8 @@ def render() -> None:
         view_home.render(repo)
     elif route.view == nav.VIEW_NEW:
         view_form.render(repo, table)
-    elif route.view == nav.VIEW_EDIT and project:
-        view_form.render(repo, table, project)
+    elif route.view == nav.VIEW_SETTINGS and project:
+        view_settings.render(repo, project, table)
     elif route.view == nav.VIEW_PRODUCTION and project:
         view_production.render(project)
     elif project:

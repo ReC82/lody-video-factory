@@ -3,7 +3,7 @@
   (aucun)                   → accueil
   ?vue=nouveau              → création
   ?projet=<id>              → page du projet
-  ?projet=<id>&vue=modifier → modification
+  ?projet=<id>&vue=parametres → paramètres du projet (« modifier » reste accepté)
   ?projet=<id>&vue=production → nouvelle production
 """
 
@@ -16,7 +16,7 @@ import streamlit as st
 VIEW_HOME = "home"
 VIEW_NEW = "nouveau"
 VIEW_PROJECT = "projet"
-VIEW_EDIT = "modifier"
+VIEW_SETTINGS = "parametres"
 VIEW_PRODUCTION = "production"
 
 
@@ -30,8 +30,8 @@ def current_route() -> Route:
     view = str(st.query_params.get("vue", "")).lower()
     project_id = str(st.query_params.get("projet", "")).strip() or None
     if project_id:
-        if view == VIEW_EDIT:
-            return Route(VIEW_EDIT, project_id)
+        if view in (VIEW_SETTINGS, "modifier"):
+            return Route(VIEW_SETTINGS, project_id)
         if view == VIEW_PRODUCTION:
             return Route(VIEW_PRODUCTION, project_id)
         return Route(VIEW_PROJECT, project_id)
@@ -43,9 +43,13 @@ def current_route() -> Route:
 def go(view: str = VIEW_HOME, project_id: str | None = None) -> None:
     """Change de page (utilisable comme ``on_click``)."""
     params: dict[str, str] = {}
+    # Une nouvelle page repart toujours des valeurs enregistrées : on oublie erreurs et saisies non validées.
+    st.session_state.pop("form_errors", None)
+    for key in [k for k in st.session_state if str(k).startswith(f"set_{project_id}_")] if project_id else []:
+        del st.session_state[key]
     if project_id:
         params["projet"] = project_id
-        if view in (VIEW_EDIT, VIEW_PRODUCTION):
+        if view in (VIEW_SETTINGS, VIEW_PRODUCTION):
             params["vue"] = view
     elif view == VIEW_NEW:
         params["vue"] = VIEW_NEW
