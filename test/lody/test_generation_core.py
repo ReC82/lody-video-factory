@@ -31,7 +31,7 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
     ProductionRepository(path)
     ProductionRepository(path)  # rejeu : sans effet
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 3
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 4
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions"} <= tables
     columns = {row[1] for row in connection.execute("PRAGMA table_info(productions)")}
@@ -56,7 +56,7 @@ def test_upgrade_from_schema_v1_keeps_existing_projects(tmp_path):
     connection.close()
     ProductionRepository(path)
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 4
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT COUNT(*) FROM productions").fetchone()[0] == 0
 
@@ -81,7 +81,7 @@ def test_upgrade_from_schema_v2_adds_snapshot_and_trace_without_touching_existin
     ProductionRepository(path)  # rejeu : sans effet, pas de colonne dupliquée
     old = repo.get("prd_old")
     assert (old.script, old.snapshot, old.trace) == ("Un script.", {}, {})
-    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 3
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 4
 
 
 def test_snapshot_is_immutable_after_confirmation(tmp_path):

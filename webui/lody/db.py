@@ -85,6 +85,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_productions_external
     ON productions (provider, external_task_id) WHERE external_task_id IS NOT NULL;
 """
 
+# Kit de publication : un par production (donc par version), avec ses propres métadonnées, choix de miniature et historique.
+KITS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS publication_kits (
+    id                TEXT PRIMARY KEY,
+    production_id     TEXT NOT NULL UNIQUE REFERENCES productions (id),
+    project_id        TEXT NOT NULL REFERENCES projects (id),
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL,
+    generated_with    TEXT NOT NULL DEFAULT 'local',
+    metadata          TEXT NOT NULL DEFAULT '{}',
+    initial_metadata  TEXT NOT NULL DEFAULT '{}',
+    thumbnail         TEXT NOT NULL DEFAULT '{}',
+    history           TEXT NOT NULL DEFAULT '[]',
+    background_job    TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_kits_project ON publication_kits (project_id);
+"""
+
+
 def _add_columns(connection: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
     """ALTER TABLE ... ADD COLUMN, seulement pour les colonnes absentes (SQLite n'a pas IF NOT EXISTS ici)."""
     existing = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
@@ -106,6 +125,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
     (3, _productions_isolation),
+    (4, KITS_SCHEMA),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
