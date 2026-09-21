@@ -5,6 +5,8 @@
   ?projet=<id>              → page du projet
   ?projet=<id>&vue=parametres → paramètres du projet (« modifier » reste accepté)
   ?projet=<id>&vue=production → nouvelle production
+  ?projet=<id>&vue=suivi&production=<id> → suivi et résultat d'une production
+  ?projet=<id>&vue=v2&production=<id>    → création d'une V2 (script modifiable)
 """
 
 from __future__ import annotations
@@ -18,18 +20,24 @@ VIEW_NEW = "nouveau"
 VIEW_PROJECT = "projet"
 VIEW_SETTINGS = "parametres"
 VIEW_PRODUCTION = "production"
+VIEW_TRACK = "suivi"
+VIEW_V2 = "v2"
 
 
 @dataclass(frozen=True)
 class Route:
     view: str
     project_id: str | None = None
+    production_id: str | None = None
 
 
 def current_route() -> Route:
     view = str(st.query_params.get("vue", "")).lower()
     project_id = str(st.query_params.get("projet", "")).strip() or None
+    production_id = str(st.query_params.get("production", "")).strip() or None
     if project_id:
+        if view in (VIEW_TRACK, VIEW_V2) and production_id:
+            return Route(view, project_id, production_id)
         if view in (VIEW_SETTINGS, "modifier"):
             return Route(VIEW_SETTINGS, project_id)
         if view == VIEW_PRODUCTION:
@@ -40,7 +48,7 @@ def current_route() -> Route:
     return Route(VIEW_HOME)
 
 
-def go(view: str = VIEW_HOME, project_id: str | None = None) -> None:
+def go(view: str = VIEW_HOME, project_id: str | None = None, production_id: str | None = None) -> None:
     """Change de page (utilisable comme ``on_click``)."""
     params: dict[str, str] = {}
     # Une nouvelle page repart toujours des valeurs enregistrées : on oublie erreurs et saisies non validées.
@@ -51,6 +59,9 @@ def go(view: str = VIEW_HOME, project_id: str | None = None) -> None:
         params["projet"] = project_id
         if view in (VIEW_SETTINGS, VIEW_PRODUCTION):
             params["vue"] = view
+        elif view in (VIEW_TRACK, VIEW_V2) and production_id:
+            params["vue"] = view
+            params["production"] = production_id
     elif view == VIEW_NEW:
         params["vue"] = VIEW_NEW
     st.query_params.clear()

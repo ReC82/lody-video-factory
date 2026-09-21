@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lody import catalog
+from lody import catalog, db
 from lody.brief import BRIEF_KEY, validate_brief
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
@@ -25,7 +25,7 @@ logger = logging.getLogger("lody.projects")
 
 STATUS_ACTIVE = "active"
 STATUS_ARCHIVED = "archived"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = db.SCHEMA_VERSION
 
 NAME_MIN, NAME_MAX = 2, 80
 DESCRIPTION_MAX = 500
@@ -108,32 +108,6 @@ class Project:
     @property
     def is_archived(self) -> bool:
         return self.status == STATUS_ARCHIVED
-
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS projects (
-    id              TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    description     TEXT NOT NULL DEFAULT '',
-    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL,
-    language        TEXT NOT NULL,
-    format          TEXT NOT NULL,
-    content_type    TEXT NOT NULL,
-    tone            TEXT NOT NULL DEFAULT '',
-    visual_style    TEXT NOT NULL DEFAULT '',
-    platforms       TEXT NOT NULL DEFAULT '[]',
-    text_provider   TEXT NOT NULL,
-    visual_provider TEXT NOT NULL,
-    voice_provider  TEXT NOT NULL,
-    voice_name      TEXT NOT NULL DEFAULT '',
-    music_provider  TEXT NOT NULL,
-    settings        TEXT NOT NULL DEFAULT '{}',
-    seed_key        TEXT UNIQUE
-);
-CREATE INDEX IF NOT EXISTS idx_projects_status_updated ON projects (status, updated_at DESC);
-"""
 
 
 def _utc_now() -> str:
@@ -244,11 +218,7 @@ class ProjectRepository:
 
     def _migrate(self) -> None:
         with self._connect() as connection:
-            version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version < 1:
-                connection.executescript(_SCHEMA)
-                connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-            connection.execute("PRAGMA journal_mode = WAL")
+            db.migrate(connection)
 
     # -- lecture ---------------------------------------------------------
     @staticmethod

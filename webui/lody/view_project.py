@@ -7,6 +7,9 @@ import streamlit as st
 from lody import brief as brief_lib
 from lody import catalog, nav
 from lody.components import format_datetime, readiness_pill, status_badge
+from lody.generation.models import ACTIVE_STATUSES
+from lody.generation.service import ProductionService
+from lody.view_tracking import status_pill
 from lody.projects import Project, ProjectNotFound, ProjectRepository
 from lody.provider_status import Readiness
 from lody.theme import esc
@@ -104,7 +107,32 @@ def _summary_cards(project: Project, table: Readiness) -> str:
     )
 
 
-def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
+def _render_productions(service: ProductionService, project: Project) -> None:
+    """Productions du projet (V1, V2…) : on retrouve toujours une génération en cours."""
+    productions = service.repo.list_for_project(project.id)
+    if not productions:
+        return
+    for production in productions:
+        if production.status in ACTIVE_STATUSES:
+            service.refresh(production.id)
+    productions = service.repo.list_for_project(project.id)
+    with st.container(key="productions"):
+        st.markdown('<p class="card-eyebrow">Productions</p><h2 class="brief-title">Tes vidéos</h2>', unsafe_allow_html=True)
+        for production in productions:
+            if production.status.value in ("BROUILLON", "EN_ATTENTE_CONFIRMATION"):
+                continue  # brouillons non lancés : pas de vidéo à suivre
+            with st.container(horizontal=True, vertical_alignment="center", key=f"prod_row_{production.id}"):
+                st.markdown(
+                    f'<div class="prod-info"><p class="prod-title">{esc(production.label)} · {esc(production.subject)}</p>'
+                    f'<p class="prod-meta">{status_pill(production)} '
+                    f'<span>{esc(format_datetime(production.created_at))}</span></p></div>',
+                    unsafe_allow_html=True,
+                )
+                st.button("Ouvrir", key=f"open_prod_{production.id}", icon=":material/open_in_new:",
+                          on_click=nav.go, args=(nav.VIEW_TRACK, project.id, production.id))
+
+
+def render(repo: ProjectRepository, project: Project, table: Readiness, service: ProductionService) -> None:
     description = (
         f'<p class="hero-sub">{esc(project.description)}</p>' if project.description else ""
     )
@@ -147,5 +175,6 @@ def render(repo: ProjectRepository, project: Project, table: Readiness) -> None:
                               on_click=_archive, args=(repo, project.id))
                     st.button("Annuler", key="cancel_archive", on_click=_cancel_archive)
 
+    _render_productions(service, project)
     with st.container(key="summary"):
         st.markdown(_summary_cards(project, table), unsafe_allow_html=True)

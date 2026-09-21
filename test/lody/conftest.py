@@ -24,5 +24,10 @@ def lody_env(tmp_path, monkeypatch):
     monkeypatch.setenv("LODY_DATA_DIR", str(data_dir))
     monkeypatch.setenv("LODY_CONFIG_PATH", str(config))
     monkeypatch.setenv("LODY_SEED_DEFAULTS", "1")
+    # Aucun test ne doit joindre un vrai moteur : port local fermé (refus immédiat) + stockage isolé.
+    monkeypatch.setenv("LODY_ENGINE_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("LODY_ENGINE_STORAGE", str(tmp_path / "engine-storage"))
+    monkeypatch.delenv("LODY_ENGINE_API_KEY", raising=False)
+    monkeypatch.setenv("LODY_PRICING_PATH", str(tmp_path / "pricing.toml"))
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
     return data_dir

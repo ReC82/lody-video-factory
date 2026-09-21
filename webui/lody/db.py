@@ -1,0 +1,102 @@
+"""Migrations SQLite de Lody : ordonnées, idempotentes, versionnées par ``PRAGMA user_version``.
+
+Une seule base (``lody.sqlite3``) sert les projets et les productions. Chaque migration n'utilise
+que ``IF NOT EXISTS`` : la rejouer (deux conteneurs qui démarrent, base copiée, redémarrage au
+milieu) est sans effet. Les migrations ne suppriment ni ne réécrivent jamais de données.
+
+Aucune colonne ne peut recevoir de clé API : ce sont des champs métier (voir ``secrets_guard``).
+"""
+
+from __future__ import annotations
+
+import sqlite3
+
+PROJECTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS projects (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    language        TEXT NOT NULL,
+    format          TEXT NOT NULL,
+    content_type    TEXT NOT NULL,
+    tone            TEXT NOT NULL DEFAULT '',
+    visual_style    TEXT NOT NULL DEFAULT '',
+    platforms       TEXT NOT NULL DEFAULT '[]',
+    text_provider   TEXT NOT NULL,
+    visual_provider TEXT NOT NULL,
+    voice_provider  TEXT NOT NULL,
+    voice_name      TEXT NOT NULL DEFAULT '',
+    music_provider  TEXT NOT NULL,
+    settings        TEXT NOT NULL DEFAULT '{}',
+    seed_key        TEXT UNIQUE
+);
+CREATE INDEX IF NOT EXISTS idx_projects_status_updated ON projects (status, updated_at DESC);
+"""
+
+# Statuts internes d'une production (voir generation.models.ProductionStatus).
+PRODUCTIONS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS productions (
+    id                   TEXT PRIMARY KEY,
+    project_id           TEXT NOT NULL REFERENCES projects (id),
+    root_production_id   TEXT NOT NULL,
+    parent_production_id TEXT REFERENCES productions (id),
+    version              INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    subject              TEXT NOT NULL,
+    brief                TEXT NOT NULL DEFAULT '{}',
+    script               TEXT NOT NULL DEFAULT '',
+    script_source        TEXT NOT NULL DEFAULT '',
+    storyboard           TEXT NOT NULL DEFAULT '[]',
+    visual_prompts       TEXT NOT NULL DEFAULT '[]',
+    params               TEXT NOT NULL DEFAULT '{}',
+    cost_currency        TEXT NOT NULL DEFAULT 'EUR',
+    cost_low             TEXT,
+    cost_high            TEXT,
+    cost_partial         INTEGER NOT NULL DEFAULT 1,
+    cost_detail          TEXT NOT NULL DEFAULT '{}',
+    confirmed_at         TEXT,
+    provider             TEXT NOT NULL,
+    external_task_id     TEXT,
+    idempotency_key      TEXT NOT NULL UNIQUE,
+    status               TEXT NOT NULL CHECK (status IN (
+        'BROUILLON', 'EN_ATTENTE_CONFIRMATION', 'CONFIRMEE', 'EN_FILE',
+        'EN_COURS', 'TERMINEE', 'ECHEC', 'ANNULEE')),
+    progress             INTEGER CHECK (progress IS NULL OR (progress BETWEEN 0 AND 100)),
+    current_step         TEXT NOT NULL DEFAULT '',
+    error_code           TEXT NOT NULL DEFAULT '',
+    error_message        TEXT NOT NULL DEFAULT '',
+    created_at           TEXT NOT NULL,
+    started_at           TEXT,
+    finished_at          TEXT,
+    updated_at           TEXT NOT NULL,
+    last_polled_at       TEXT,
+    video_ref            TEXT NOT NULL DEFAULT '',
+    video_duration       REAL,
+    assets               TEXT NOT NULL DEFAULT '[]',
+    warnings             TEXT NOT NULL DEFAULT '[]',
+    UNIQUE (root_production_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_productions_project ON productions (project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_productions_status ON productions (status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_productions_external
+    ON productions (provider, external_task_id) WHERE external_task_id IS NOT NULL;
+"""
+
+MIGRATIONS: tuple[tuple[int, str], ...] = (
+    (1, PROJECTS_SCHEMA),
+    (2, PRODUCTIONS_SCHEMA),
+)
+SCHEMA_VERSION = MIGRATIONS[-1][0]
+
+
+def migrate(connection: sqlite3.Connection) -> None:
+    """Applique les migrations manquantes, dans l'ordre. Sans effet si la base est à jour."""
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    for target, script in MIGRATIONS:
+        if version < target:
+            connection.executescript(script)
+            connection.execute(f"PRAGMA user_version = {target}")
+            version = target
+    connection.execute("PRAGMA journal_mode = WAL")

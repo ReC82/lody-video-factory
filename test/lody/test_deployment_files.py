@@ -57,6 +57,20 @@ def test_compose_file_is_isolated_and_keeps_existing_mounts():
     assert "8501" not in str(service["ports"]) and "8080" not in str(service["ports"])
 
 
+def test_compose_reaches_the_engine_without_exposing_more_or_holding_secrets():
+    yaml = pytest.importorskip("yaml")
+    compose = yaml.safe_load((ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8"))
+    service = compose["services"]["lody-ui"]
+    assert service["environment"]["LODY_ENGINE_URL"] == "http://moneyprinterturbo-api:8080"
+    assert service["environment"]["LODY_ENGINE_STORAGE"] == "/MoneyPrinterTurbo/storage"
+    assert set(service["networks"]) == {"default", "engine"}
+    assert compose["networks"]["engine"] == {"name": "moneyprinterturbo_default", "external": True}
+    assert service["ports"] == ["127.0.0.1:8601:8601"]  # l'API n'est pas republiée
+    raw = (ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8")
+    assert not re.search(r"(?i)(api_key|secret|token|password)\s*[:=]\s*\S", raw.replace("Aucune clé ici", ""))
+    assert "LODY_ENGINE_API_KEY" not in raw and "./config.toml:/MoneyPrinterTurbo/config.toml:ro" in raw
+
+
 def test_requirements_and_gitignore_protect_local_data():
     assert "streamlit" in (ROOT / "requirements.lody.txt").read_text(encoding="utf-8")
     assert re.search(r"^/data/$", (ROOT / ".gitignore").read_text(encoding="utf-8"), re.MULTILINE)

@@ -1,23 +1,43 @@
-"""Nouvelle production : demande + brief final (la génération n'est pas branchée)."""
+"""Nouvelle production : sujet → estimation → confirmation unique → suivi.
+
+Aucun appel payant n'a lieu ici avant le clic « Confirmer et générer la vidéo » : « Préparer la
+génération » ne crée qu'un brouillon local avec son estimation.
+"""
 
 from __future__ import annotations
 
 import streamlit as st
 
 from lody import brief as brief_lib
-from lody import nav
+from lody import nav, view_estimate
+from lody.generation.models import ReadinessIssue
+from lody.generation.runtime import DEFAULT_PROVIDER, DEMO_PROVIDER
+from lody.generation.service import (
+    AlreadyRunning,
+    LaunchError,
+    ProductionService,
+    build_request,
+    request_of,
+)
+from lody.generation.store import Production
 from lody.projects import Project
 from lody.theme import esc
 
 MIN_REQUEST_LENGTH = 8
 _GENERIC_EXAMPLE = "Explique simplement un sujet de ton domaine en moins d’une minute."
+LABEL_PREPARE = "Préparer la génération"
+LABEL_CONFIRM = "Confirmer et générer la vidéo"
 
 
 def _keys(project: Project) -> dict[str, str]:
     return {
         "request": f"request_{project.id}",
+        "script": f"script_{project.id}",
+        "demo": f"demo_{project.id}",
         "draft": f"draft_{project.id}",
         "error": f"request_error_{project.id}",
+        "accept": f"accept_partial_{project.id}",
+        "running": f"running_{project.id}",
     }
 
 
@@ -29,19 +49,54 @@ def example_for(project: Project) -> str:
 def _use_example(project: Project) -> None:
     keys = _keys(project)
     st.session_state[keys["request"]] = example_for(project)
-    st.session_state[keys["error"]] = False
+    st.session_state[keys["error"]] = ""
 
 
-def _prepare_draft(project: Project) -> None:
-    """Fige le brief en mémoire de session. N'appelle AUCUN fournisseur."""
+def _provider_id(project: Project) -> str:
+    return DEMO_PROVIDER if st.session_state.get(_keys(project)["demo"]) else DEFAULT_PROVIDER
+
+
+def fresh_draft(service: ProductionService, project: Project) -> Production | None:
+    """Le brouillon enregistré, seulement s'il correspond EXACTEMENT à ce qui est à l'écran et au projet."""
     keys = _keys(project)
-    request = str(st.session_state.get(keys["request"], "")).strip()
-    if len(request) < MIN_REQUEST_LENGTH:
-        st.session_state[keys["error"]] = True
-        st.session_state[keys["draft"]] = None
-        return
-    st.session_state[keys["error"]] = False
-    st.session_state[keys["draft"]] = {**brief_lib.build_brief(project, request), "fournisseurs_appeles": []}
+    draft_id = st.session_state.get(keys["draft"])
+    if not draft_id:
+        return None
+    try:
+        draft = service.repo.get(draft_id)
+    except LookupError:
+        return None
+    text = " ".join(str(st.session_state.get(keys["request"], "")).split())
+    script = str(st.session_state.get(keys["script"], "")).strip()
+    if draft.status.value != "EN_ATTENTE_CONFIRMATION" or draft.provider != _provider_id(project):
+        return None
+    if draft.subject != text or request_of(draft) != build_request(project, text, script):
+        return None
+    return draft
+
+
+def _primary(project: Project, service: ProductionService) -> None:
+    """Un seul bouton : prépare l'estimation, puis (brouillon à jour) confirme et lance."""
+    keys = _keys(project)
+    st.session_state[keys["error"]] = ""
+    st.session_state.pop(keys["running"], None)
+    text = str(st.session_state.get(keys["request"], ""))
+    script = str(st.session_state.get(keys["script"], ""))
+    try:
+        draft = fresh_draft(service, project)
+        if draft is None:
+            prepared = service.prepare(project, text, provider_id=_provider_id(project), script=script,
+                                       draft_id=st.session_state.get(keys["draft"]))
+            st.session_state[keys["draft"]] = prepared.id
+            return
+        launched = service.confirm(draft.id, accept_partial=bool(st.session_state.get(keys["accept"])))
+        st.session_state.pop(keys["draft"], None)
+        nav.go(nav.VIEW_TRACK, project.id, launched.id)
+    except AlreadyRunning as error:
+        st.session_state[keys["error"]] = error.message
+        st.session_state[keys["running"]] = error.production_id
+    except LaunchError as error:
+        st.session_state[keys["error"]] = error.message
 
 
 def _rows(pairs: list[tuple[str, str]]) -> str:
@@ -93,7 +148,7 @@ def brief_html(brief: dict) -> str:
     )
 
 
-def render(project: Project) -> None:
+def render(project: Project, service: ProductionService) -> None:
     keys = _keys(project)
     st.markdown(
         f'<section class="hero"><p class="eyebrow">{esc(project.name)}</p>'
@@ -101,6 +156,16 @@ def render(project: Project) -> None:
         '<p class="hero-sub">Décris la vidéo que tu veux : les réglages du projet sont ajoutés automatiquement.</p></section>',
         unsafe_allow_html=True,
     )
+    active = service.repo.active_for_project(project.id)
+    for running in active:
+        service.refresh(running.id)
+    active = service.repo.active_for_project(project.id)
+
+    draft = fresh_draft(service, project)
+    issues: list[ReadinessIssue] = service.readiness(draft) if draft else []
+    partial_ok = bool(st.session_state.get(keys["accept"])) or not (draft and draft.cost_partial and draft.provider != DEMO_PROVIDER)
+    blocked = bool(active) or (draft is not None and (any(i.blocking for i in issues) or not partial_ok))
+
     with st.container(key="composer"):
         st.markdown('<h2 class="composer-title">Que veux-tu créer ?</h2>', unsafe_allow_html=True)
         st.text_area(
@@ -113,9 +178,13 @@ def render(project: Project) -> None:
         )
         if st.session_state.get(keys["error"]):
             st.markdown(
-                '<p class="field-error" role="alert">Décris d’abord ta vidéo en quelques mots.</p>',
+                f'<p class="field-error" role="alert">{esc(st.session_state[keys["error"]])}</p>',
                 unsafe_allow_html=True,
             )
+        with st.expander("J’ai déjà mon script (optionnel)"):
+            st.text_area("Script à utiliser", key=keys["script"], height=150, max_chars=8000,
+                         placeholder="Colle ici ton texte : aucun script ne sera écrit par un fournisseur.")
+        st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"])
         with st.container(horizontal=True, vertical_alignment="center", key="composer_actions"):
             st.markdown(
                 f'<p class="example"><span>Exemple</span> {esc(example_for(project))}</p>',
@@ -123,20 +192,24 @@ def render(project: Project) -> None:
             )
             st.button("Utiliser l’exemple", type="tertiary", key="use_example",
                       on_click=_use_example, args=(project,))
-            st.button("Générer la vidéo", type="primary", icon=":material/auto_awesome:", key="generate",
-                      on_click=_prepare_draft, args=(project,))
+            st.button(LABEL_PREPARE if draft is None else LABEL_CONFIRM, type="primary",
+                      icon=":material/auto_awesome:" if draft is None else ":material/rocket_launch:",
+                      key="generate", on_click=_primary, args=(project, service), disabled=blocked)
 
-    draft = st.session_state.get(keys["draft"])
-    if draft:
-        with st.container(key="draft"):
-            st.markdown(
-                '<span class="badge badge-accent">Bêta</span>'
-                '<h3 class="draft-title">Brief prêt — aucune génération lancée</h3>'
-                '<p class="draft-text">La génération de vidéos n’est pas encore branchée : rien n’a été envoyé '
-                "à un fournisseur (texte, voix, image, musique) et rien n’a été facturé. "
-                "Le brief ci-dessous est celui qui sera transmis au moteur.</p>",
-                unsafe_allow_html=True,
-            )
+    for running in active:
+        st.markdown(
+            f'<div class="banner banner-info" role="status">Une génération est déjà en cours pour ce projet '
+            f"({esc(running.label)}). Attends sa fin avant d’en lancer une autre.</div>",
+            unsafe_allow_html=True,
+        )
+        st.button("Voir le suivi", key=f"see_running_{running.id}", icon=":material/monitoring:",
+                  on_click=nav.go, args=(nav.VIEW_TRACK, project.id, running.id))
+    running_id = st.session_state.get(keys["running"])
+    if running_id and not active:
+        st.session_state.pop(keys["running"], None)
+
+    if draft is not None:
+        view_estimate.render_panel(draft, issues, demo=draft.provider == DEMO_PROVIDER, key=project.id)
 
     # Aperçu vivant : la demande saisie + les paramètres enregistrés du projet.
     live_request = str(st.session_state.get(keys["request"], ""))
@@ -144,13 +217,14 @@ def render(project: Project) -> None:
     with st.container(key="brief_preview"):
         with st.container(horizontal=True, vertical_alignment="center", key="brief_head"):
             st.markdown(
-                '<div><p class="card-eyebrow">Aperçu avant génération</p>'
+                '<div><p class="card-eyebrow">Réglages du projet</p>'
                 '<h2 class="brief-title">Brief final</h2></div>',
                 unsafe_allow_html=True,
             )
             st.button("Ajuster les paramètres", icon=":material/tune:", key="adjust_settings",
                       on_click=nav.go, args=(nav.VIEW_SETTINGS, project.id))
-        st.markdown(f'<div class="brief-grid">{brief_html(brief)}</div>', unsafe_allow_html=True)
+        with st.expander("Voir le brief transmis à la génération", expanded=draft is None):
+            st.markdown(f'<div class="brief-grid">{brief_html(brief)}</div>', unsafe_allow_html=True)
         with st.expander("Version texte à copier"):
             st.code(brief_lib.brief_to_text(brief), language=None)
 

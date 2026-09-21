@@ -7,7 +7,9 @@ import logging
 import streamlit as st
 
 from lody import nav, settings
-from lody import view_form, view_home, view_production, view_project, view_settings
+from lody import view_form, view_home, view_production, view_project, view_settings, view_tracking, view_v2
+from lody.generation.runtime import build_service
+from lody.generation.service import ProductionService
 from lody.components import accent_for, render_flash, render_footer, render_header
 from lody.projects import ProjectNotFound, ProjectRepository
 from lody.provider_status import readiness
@@ -26,6 +28,12 @@ def get_repository() -> ProjectRepository:
     return repo
 
 
+@st.cache_resource(show_spinner=False)
+def get_production_service() -> ProductionService:
+    """Service de production partagé (threads de génération, reprise des productions non terminées)."""
+    return build_service()
+
+
 def _render_storage_error() -> None:
     inject_theme(DEFAULT_ACCENT)
     render_header(False)
@@ -40,6 +48,7 @@ def _render_storage_error() -> None:
 def render() -> None:
     try:
         repo = get_repository()
+        service = get_production_service()
     except Exception as error:  # base illisible ou volume non inscriptible
         logger.error("ouverture de la base impossible : %s", type(error).__name__)
         _render_storage_error()
@@ -54,7 +63,7 @@ def render() -> None:
             nav.flash("error", "Ce projet est introuvable.")
             nav.go()
             route = nav.Route(nav.VIEW_HOME)
-    if project is not None and project.is_archived and route.view in (nav.VIEW_SETTINGS, nav.VIEW_PRODUCTION):
+    if project is not None and project.is_archived and route.view in (nav.VIEW_SETTINGS, nav.VIEW_PRODUCTION, nav.VIEW_V2):
         nav.flash("info", "Ce projet est archivé : restaure-le pour continuer.")
         nav.go(nav.VIEW_PROJECT, project.id)
         route = nav.Route(nav.VIEW_PROJECT, project.id)
@@ -71,7 +80,11 @@ def render() -> None:
     elif route.view == nav.VIEW_SETTINGS and project:
         view_settings.render(repo, project, table)
     elif route.view == nav.VIEW_PRODUCTION and project:
-        view_production.render(project)
+        view_production.render(project, service)
+    elif route.view == nav.VIEW_TRACK and project and route.production_id:
+        view_tracking.render(service, project, route.production_id)
+    elif route.view == nav.VIEW_V2 and project and route.production_id:
+        view_v2.render(service, project, route.production_id)
     elif project:
-        view_project.render(repo, project, table)
+        view_project.render(repo, project, table, service)
     render_footer()
