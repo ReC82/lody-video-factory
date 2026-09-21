@@ -30,4 +30,5 @@ trap '$DOCKER exec "$ENGINE" rm -rf /tmp/lody-repair' EXIT
 REPORT="$($DOCKER exec -w /MoneyPrinterTurbo -e PYTHONPATH=/tmp/lody-repair:/MoneyPrinterTurbo "$ENGINE" \
   python3 /tmp/lody-repair/repair_render.py run --task-dir "/MoneyPrinterTurbo/storage/tasks/$TASK" | tail -n 1)"
 echo "$REPORT" | python3 -c "import json,sys; r=json.load(sys.stdin); print('Rendu corrigé :', r['repaired']['file'], '| appels fournisseur :', r['provider_calls'], '| police :', r['font']['before'], '->', r['font']['after'], '| original intact :', r['original']['untouched'])"
-echo "$REPORT" | $DOCKER exec -i "$LODY" python3 -m lody.generation.repair_render register --production "$PROD"
+# Dans l'image de Lody, le paquet « lody » vit sous /MoneyPrinterTurbo/webui.
+echo "$REPORT" | $DOCKER exec -i -e PYTHONPATH=/MoneyPrinterTurbo/webui "$LODY" python3 -m lody.generation.repair_render register --production "$PROD"
