@@ -38,6 +38,8 @@ def _submit(repo: ProjectRepository, project_id: str) -> None:
             "voice_model": ss.get(f"{p}_voice_model"),
             "structure": str(ss.get(f"{p}_structure") or "").splitlines(),
             "standing_instructions": ss.get(f"{p}_instructions"),
+            "visual_rules": ss.get(f"{p}_visual_rules"),
+            "visual_avoid": str(ss.get(f"{p}_visual_avoid") or "").splitlines(),
         }
         updated = repo.update(
             project_id,
@@ -145,6 +147,14 @@ def render(repo: ProjectRepository, project: Project, states: States) -> None:
                 st.text_area("Style visuel", value=project.visual_style, height=110, max_chars=200,
                              key=f"{p}_visual_style", placeholder="Ex. Univers sombre et moderne, sans texte")
                 error_under("visual_style")
+                st.text_area("Consignes visuelles du projet", value=current["visual_rules"], height=110,
+                             max_chars=brief_lib.VISUAL_RULES_MAX, key=f"{p}_visual_rules",
+                             help="Univers, ambiance, type de scènes. Propre à ce projet : jamais partagé avec un autre.")
+                error_under("brief.visual_rules")
+                st.text_area("À ne jamais montrer (un élément par ligne)", value="\n".join(current["visual_avoid"]), height=130,
+                             key=f"{p}_visual_avoid",
+                             help="Liste négative propre à ce projet, ajoutée à chaque prompt d'image de ce projet uniquement.")
+                error_under("brief.visual_avoid")
                 st.slider(
                     "Rythme visuel (scènes par minute)", min_value=1, max_value=20,
                     value=(min(current["scenes_per_minute_min"], 20), min(current["scenes_per_minute_max"], 20)),

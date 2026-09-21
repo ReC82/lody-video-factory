@@ -58,6 +58,9 @@ class ScriptedConnector(VideoGenerationProvider):
             ref, 52.4, assets=({"kind": "video", "ref": ref},), warnings=kwargs.get("warnings", ())))
 
     # -- interface ------------------------------------------------------------
+    def describe_params(self, request):
+        return {"video_aspect": request.aspect, "video_language": request.language, "subtitle_display_mode": "sentence"}
+
     def preflight(self, request):
         self.calls.append("check_ready")
         items = {c: CapabilityStatus(c, CapabilityState.READY, message="Prêt.") for c in Capability}

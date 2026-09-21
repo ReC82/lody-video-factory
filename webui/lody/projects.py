@@ -6,6 +6,7 @@ référence un fournisseur que par son identifiant (voir ``secrets_guard``).
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import sqlite3
@@ -19,6 +20,7 @@ from typing import Any
 
 from lody import catalog, db
 from lody.brief import BRIEF_KEY, validate_brief
+from lody.seeds import ADDITIVE_BRIEF_KEYS
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
 logger = logging.getLogger("lody.projects")
@@ -147,14 +149,14 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
         "music_provider": "Choisis une option de musique dans la liste.",
     }
     for key, message in choice_messages.items():
-        value = fields.get(key, DEFAULTS[key])
+        value = fields.get(key, copy.deepcopy(DEFAULTS[key]))
         if value in catalog.values(catalog.CATALOGS[key]):
             clean[key] = value
         else:
             errors[key] = message
             clean[key] = value
 
-    raw_platforms = fields.get("platforms", DEFAULTS["platforms"]) or []
+    raw_platforms = fields.get("platforms", copy.deepcopy(DEFAULTS["platforms"])) or []
     allowed = catalog.values(catalog.PLATFORMS)
     if isinstance(raw_platforms, (list, tuple)) and all(item in allowed for item in raw_platforms):
         clean["platforms"] = [item for item in allowed if item in raw_platforms]
@@ -162,7 +164,7 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
         errors["platforms"] = "Une plateforme choisie n’est pas reconnue."
         clean["platforms"] = []
 
-    raw_settings = fields.get("settings", DEFAULTS["settings"]) or {}
+    raw_settings = fields.get("settings", copy.deepcopy(DEFAULTS["settings"])) or {}
     if not isinstance(raw_settings, dict):
         errors["settings"] = "Les réglages avancés sont invalides."
         clean["settings"] = {}
@@ -175,7 +177,7 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
         else:
             if too_big:
                 errors["settings"] = "Les réglages avancés sont trop volumineux."
-        clean["settings"] = raw_settings
+        clean["settings"] = raw_settings = copy.deepcopy(raw_settings)  # validation sans muter l'objet de l'appelant
         if BRIEF_KEY in raw_settings:
             raw_brief = raw_settings[BRIEF_KEY]
             if isinstance(raw_brief, dict):
@@ -327,9 +329,9 @@ class ProjectRepository:
         """
         added = 0
         for seed in seeds:
-            seed = dict(seed)
+            seed = copy.deepcopy(seed)  # jamais d'alias avec la définition partagée des exemples
             seed_key = seed.pop("seed_key")
-            clean = validate_fields({**DEFAULTS, **seed})
+            clean = validate_fields({**copy.deepcopy(DEFAULTS), **seed})
             values = self._values(clean)
             now = self._clock()
             with self._connect() as connection:
@@ -367,6 +369,18 @@ class ProjectRepository:
                     continue
                 project = self._from_row(row)
                 if BRIEF_KEY in project.settings:
+                    # Brief déjà présent : jamais réécrit, sauf ajout des clés ULTÉRIEURES absentes (profil visuel).
+                    stored = project.settings[BRIEF_KEY]
+                    missing = {key: seed_brief[key] for key in ADDITIVE_BRIEF_KEYS if key in seed_brief and key not in stored}
+                    if missing:
+                        merged = {key: getattr(project, key) for key in EDITABLE_FIELDS}
+                        merged["settings"] = {**project.settings, BRIEF_KEY: {**stored, **copy.deepcopy(missing)}}
+                        values = self._values(validate_fields(merged))
+                        connection.execute(
+                            "UPDATE projects SET " + ", ".join(f"{key} = ?" for key in EDITABLE_FIELDS)
+                            + ", updated_at = ? WHERE id = ?",
+                            (*(values[key] for key in EDITABLE_FIELDS), self._clock(), project.id))
+                        upgraded += 1
                     continue
                 merged = {key: getattr(project, key) for key in EDITABLE_FIELDS}
                 for field, legacy_value in seed.get("legacy_values", {}).items():

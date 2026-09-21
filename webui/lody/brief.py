@@ -7,6 +7,7 @@ avant toute génération.
 
 from __future__ import annotations
 
+import copy
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -25,6 +26,9 @@ ORIENTATION_MAX = 200
 INSTRUCTIONS_MAX = 2000
 STRUCTURE_MAX_STEPS = 12
 STRUCTURE_STEP_MAX = 120
+VISUAL_RULES_MAX = 800
+VISUAL_AVOID_MAX_ITEMS = 16
+VISUAL_AVOID_ITEM_MAX = 140
 
 NARRATION_PACES = (
     catalog.Option("calme", "Posée"),
@@ -46,6 +50,10 @@ DEFAULT_BRIEF: dict[str, Any] = {
     "voice_model": "eleven_multilingual_v2",
     "structure": [],
     "standing_instructions": "",
+    # Profil visuel PROPRE au projet. Neutre par défaut : aucune règle, aucun vocabulaire métier n'est fourni par
+    # la plateforme (un projet n'hérite jamais des règles d'un autre).
+    "visual_rules": "",
+    "visual_avoid": [],
 }
 
 _VOICE_ID = re.compile(r"^[A-Za-z0-9_\-]{6,40}$")
@@ -60,11 +68,10 @@ def brief_settings(settings: dict[str, Any]) -> dict[str, Any]:
     ``brief`` : on retombe sur leurs anciens champs (``target_duration``, ``voice_id``…)
     sans rien réécrire en base.
     """
-    merged = dict(DEFAULT_BRIEF)
-    merged["structure"] = []
+    merged = copy.deepcopy(DEFAULT_BRIEF)  # copie profonde : jamais d'objet mutable partagé entre projets
     stored = settings.get(BRIEF_KEY)
     if isinstance(stored, dict):
-        merged.update({key: stored[key] for key in DEFAULT_BRIEF if key in stored})
+        merged.update({key: copy.deepcopy(stored[key]) for key in DEFAULT_BRIEF if key in stored})
         return merged
     legacy_duration = _LEGACY_DURATION.search(str(settings.get("target_duration", "")))
     if legacy_duration:
@@ -149,6 +156,25 @@ def validate_brief(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]
             f"Les consignes sont trop longues ({INSTRUCTIONS_MAX} caractères maximum)."
         )
     clean["standing_instructions"] = instructions
+
+    rules = " ".join(str(source.get("visual_rules") or "").split())
+    if len(rules) > VISUAL_RULES_MAX:
+        errors[f"{BRIEF_KEY}.visual_rules"] = f"Les consignes visuelles sont trop longues ({VISUAL_RULES_MAX} caractères maximum)."
+    clean["visual_rules"] = rules
+
+    avoid_raw = source.get("visual_avoid") or []
+    if isinstance(avoid_raw, str):
+        avoid_raw = avoid_raw.splitlines()
+    if not isinstance(avoid_raw, (list, tuple)):
+        errors[f"{BRIEF_KEY}.visual_avoid"] = "La liste « à ne jamais montrer » est invalide."
+        avoid_raw = []
+    avoid = [" ".join(str(item).split()) for item in avoid_raw]
+    avoid = [item for item in avoid if item]
+    if len(avoid) > VISUAL_AVOID_MAX_ITEMS:
+        errors[f"{BRIEF_KEY}.visual_avoid"] = f"{VISUAL_AVOID_MAX_ITEMS} éléments maximum."
+    elif any(len(item) > VISUAL_AVOID_ITEM_MAX for item in avoid):
+        errors[f"{BRIEF_KEY}.visual_avoid"] = f"Un élément est trop long ({VISUAL_AVOID_ITEM_MAX} caractères maximum)."
+    clean["visual_avoid"] = avoid
     return clean, errors
 
 
@@ -192,6 +218,8 @@ def build_brief(project: Project, request: str = "") -> dict[str, Any]:
         "visuels": {
             "style": project.visual_style,
             "rythme": _span(settings["scenes_per_minute_min"], settings["scenes_per_minute_max"], "scènes par minute"),
+            "regles": settings["visual_rules"],
+            "a_eviter": list(settings["visual_avoid"]),
         },
         "structure": list(settings["structure"]),
         "consignes_permanentes": settings["standing_instructions"],
@@ -232,6 +260,8 @@ def brief_to_text(brief: dict[str, Any]) -> str:
     section("Visuels", [
         f"- Style : {brief['visuels']['style']}" if brief["visuels"]["style"] else "",
         f"- Rythme : {brief['visuels']['rythme']} ({brief['reperes']['scenes']} pour cette vidéo)",
+        f"- Consignes : {brief['visuels']['regles']}" if brief["visuels"]["regles"] else "",
+        "- À ne jamais montrer : " + " ; ".join(brief["visuels"]["a_eviter"]) if brief["visuels"]["a_eviter"] else "",
     ])
     voice = brief["voix"]
     section("Voix", [f"- {voice['fournisseur']} · {voice['nom']}" if voice["nom"] else f"- {voice['fournisseur']}"])

@@ -89,6 +89,9 @@ class DemoConnector(VideoGenerationProvider):
             for capability in (Capability.TEXT, Capability.VISUAL, Capability.VOICE, Capability.MUSIC,
                                Capability.ENGINE, Capability.STORAGE, Capability.SETTINGS)))
 
+    def describe_script_request(self, request: GenerationRequest) -> dict:
+        return {"video_subject": request.subject, "video_language": request.language, "note": "simulation : aucun appel"}
+
     def write_script(self, request: GenerationRequest) -> str:
         return demo_script(request.subject)
 

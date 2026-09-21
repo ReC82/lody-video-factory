@@ -12,6 +12,7 @@ from lody.generation import costing
 from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ProductionStatus as S
 from lody.generation.runtime import DEMO_PROVIDER
 from lody.generation.service import ProductionService, request_of
+from lody.generation.safety import redact
 from lody.generation.store import Production
 from lody.projects import Project
 from lody.theme import esc
@@ -254,6 +255,69 @@ def _render_details(production: Production) -> None:
                          ("Ton", production.brief.get("ton", ""))]), unsafe_allow_html=True)
 
 
+def _table(pairs: list[tuple[str, object]]) -> str:
+    return _kv([(label, redact(value)) for label, value in pairs])
+
+
+def _render_diagnostic(production: Production) -> None:
+    """Traçabilité complète d'une production : d'où vient chaque prompt. Aucune clé n'est jamais affichée."""
+    snapshot, trace = production.snapshot, production.trace
+    with st.expander("Diagnostic administrateur — traçabilité de la production"):
+        if not snapshot:
+            st.markdown('<div class="banner banner-info" role="note">Production antérieure à la traçabilité : aucun instantané ni '
+                        "prompt final n’a été enregistré. Le storyboard ci-dessous est ce que Lody a envoyé ; le moteur a pu y ajouter "
+                        "son propre gabarit d’images (non enregistré à l’époque).</div>", unsafe_allow_html=True)
+        project = snapshot.get("project", {})
+        st.markdown('<p class="card-eyebrow">Projet source et instantané</p>' + _table([
+            ("Projet", f"{project.get('name', '—')} ({project.get('id', production.project_id)})"),
+            ("Production", f"{production.id} · {production.label} · {production.provider}"),
+            ("Version des paramètres", snapshot.get("version", "—")),
+            ("Instantané créé le", format_datetime(snapshot["captured_at"]) if snapshot.get("captured_at") else "—"),
+            ("Hérité de", snapshot.get("inherited_from") or "— (paramètres du projet à la préparation)"),
+            ("Paramètres du projet modifiés le", format_datetime(project["updated_at"]) if project.get("updated_at") else "—"),
+        ]), unsafe_allow_html=True)
+        brief = production.brief or {}
+        st.markdown('<p class="card-eyebrow">Brief utilisé</p>' + _table([
+            ("Demande", brief.get("demande", production.subject)), ("Public", brief.get("public", "")),
+            ("Orientation", brief.get("orientation", "")), ("Ton", brief.get("ton", "")),
+            ("Style visuel", (brief.get("visuels") or {}).get("style", "")),
+            ("Consignes visuelles", (brief.get("visuels") or {}).get("regles", "")),
+            ("À ne jamais montrer", " ; ".join((brief.get("visuels") or {}).get("a_eviter", []))),
+            ("Structure", " → ".join(brief.get("structure", []))),
+        ]), unsafe_allow_html=True)
+        script_request = trace.get("script_request")
+        st.markdown('<p class="card-eyebrow">Prompts du script</p>', unsafe_allow_html=True)
+        if script_request:
+            st.markdown("**Prompt éditorial envoyé** (langue : " + esc(script_request.get("video_language", "")) + ")")
+            st.code(redact(script_request.get("video_script_prompt", "")), language=None)
+            st.markdown("**Prompt système final** : " + esc(redact(script_request.get("custom_system_prompt", "défaut du moteur"))))
+        else:
+            st.markdown('<p class="muted-note">Script fourni ou repris : aucun prompt de script envoyé.</p>', unsafe_allow_html=True)
+        template = trace.get("image_template", {})
+        if template.get("applied"):
+            st.markdown('<div class="banner banner-error" role="alert"><strong>Gabarit d’images global du moteur appliqué.</strong> '
+                        "Il est ajouté par le moteur à chaque image de chaque projet (origine : "
+                        + esc(template.get("origin", "")) + ").</div>", unsafe_allow_html=True)
+            st.code(redact(template.get("text", "")), language=None)
+        scenes = trace.get("scenes") or [{"index": scene["index"], "prompt_sent": scene["prompt"], "final_prompt": "",
+                                          "engine_template_applied": False} for scene in production.storyboard]
+        st.markdown('<p class="card-eyebrow">Storyboard : prompt exact de chaque scène</p>', unsafe_allow_html=True)
+        narrations = {scene["index"]: scene["narration"] for scene in production.storyboard}
+        for scene in scenes:
+            st.markdown(f"**Scène {int(scene['index'])}** — {esc(redact(narrations.get(scene['index'], '')))}")
+            st.code(redact(scene["prompt_sent"]), language=None)
+            if scene.get("engine_template_applied"):
+                st.markdown("_Prompt final réellement envoyé au modèle d’images (après ajout du gabarit du moteur) :_")
+                st.code(redact(scene["final_prompt"]), language=None)
+        if trace.get("engine_params"):
+            st.markdown('<p class="card-eyebrow">Paramètres transmis au moteur</p>' + _table(
+                [(str(key), value) for key, value in trace["engine_params"].items()]), unsafe_allow_html=True)
+        if trace.get("origins"):
+            st.markdown('<p class="card-eyebrow">Origine de chaque valeur</p>' + _table(
+                [(item["item"], item["origin"]) for item in trace["origins"]]), unsafe_allow_html=True)
+        st.markdown('<p class="muted-note">Aucune clé ni secret n’est jamais affiché ou enregistré ici.</p>', unsafe_allow_html=True)
+
+
 def render(service: ProductionService, project: Project, production_id: str) -> None:
     try:
         production = service.repo.get(production_id)
@@ -309,3 +373,4 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
         _render_result(service, project, latest)
     if latest.script or latest.storyboard:
         _render_details(latest)
+    _render_diagnostic(latest)

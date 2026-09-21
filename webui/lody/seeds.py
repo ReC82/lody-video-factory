@@ -15,6 +15,26 @@ _CRYPTO_INSTRUCTIONS = "\n".join([
     "Aucun texte, logo ou marque dans les images.",
 ])
 
+# Profil visuel LodyCrypto — AUTONOME : ces règles n'appartiennent qu'à ce projet (jamais à la plateforme ni à un autre projet).
+_CRYPTO_VISUAL_RULES = (
+    "Univers crypto et Web3 gaming ; rendu moderne, clair et pédagogique ; ambiance technologique sombre avec nuances cyan et bleu ; "
+    "format vertical 9:16 ; scènes concrètes qui illustrent directement la narration ; aucune promesse financière suggérée par l’image ; "
+    "éviter les clichés financiers (pièces d’or, courbes boursières, billets, costumes) quand le sujet ne les justifie pas."
+)
+_CRYPTO_VISUAL_AVOID = [
+    "aucune régie de télévision",
+    "aucune table de mixage audio ou vidéo",
+    "aucun pupitre de production broadcast",
+    "aucun mur de multiview",
+    "aucun équipement SDI",
+    "aucun schéma FILL/KEY",
+    "aucune caméra de plateau ni caméra PTZ",
+    "aucun studio de télévision, sauf si le sujet le demande explicitement",
+]
+# Clés de brief ajoutées après la création des exemples : complétées sur un projet existant UNIQUEMENT si elles y sont
+# absentes (jamais d'écrasement d'une valeur saisie par l'utilisateur).
+ADDITIVE_BRIEF_KEYS = ("visual_rules", "visual_avoid")
+
 SEED_PROJECTS: list[dict] = [
     {
         "seed_key": "audiovisuel",
@@ -79,6 +99,8 @@ SEED_PROJECTS: list[dict] = [
                     "Annonce de l’épisode suivant",
                 ],
                 "standing_instructions": _CRYPTO_INSTRUCTIONS,
+                "visual_rules": _CRYPTO_VISUAL_RULES,
+                "visual_avoid": _CRYPTO_VISUAL_AVOID,
             },
         },
         # Valeurs d'origine (version précédente de l'exemple) : elles ne sont remplacées

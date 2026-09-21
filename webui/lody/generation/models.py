@@ -90,6 +90,9 @@ class GenerationRequest:
     structure: tuple[str, ...] = ()
     instructions: str = ""
     visual_style: str = ""
+    # Profil visuel du PROJET (jamais de valeur par défaut métier) : consignes et éléments à ne jamais montrer.
+    visual_rules: str = ""
+    visual_avoid: tuple[str, ...] = ()
     scenes_per_minute_min: int = 6
     scenes_per_minute_max: int = 8
     voice: VoiceSpec = field(default_factory=VoiceSpec)
@@ -104,6 +107,7 @@ class GenerationRequest:
         data = asdict(self)
         data["structure"] = list(self.structure)
         data["visual_prompts"] = list(self.visual_prompts)
+        data["visual_avoid"] = list(self.visual_avoid)
         return data
 
     @classmethod
@@ -116,6 +120,7 @@ class GenerationRequest:
         values["voice"] = voice
         values["structure"] = tuple(data.get("structure") or ())
         values["visual_prompts"] = tuple(data.get("visual_prompts") or ())
+        values["visual_avoid"] = tuple(data.get("visual_avoid") or ())
         return cls(**values)
 
     def with_updates(self, **changes: Any) -> GenerationRequest:

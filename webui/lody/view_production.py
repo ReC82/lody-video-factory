@@ -75,6 +75,8 @@ def fresh_draft(service: ProductionService, project: Project) -> Production | No
         return None
     if draft.parent_production_id != (st.session_state.get(keys["retry"]) or None):
         return None
+    if not draft.snapshot or draft.snapshot.get("project", {}).get("id") != project.id:
+        return None  # estimation sans instantané (ou d'un autre projet) : à préparer à nouveau
     return draft
 
 
@@ -147,7 +149,7 @@ def brief_html(brief: dict) -> str:
         f'<div class="brief-block"><p class="card-eyebrow">Format</p>'
         f'{_rows([("Format", brief["format"]), ("Langue", brief["langue"]), ("Narration", brief["narration"])])}</div>'
         f'<div class="brief-block brief-wide"><p class="card-eyebrow">Visuels et voix</p>'
-        f'{_rows([("Style", brief["visuels"]["style"]), ("Rythme", brief["visuels"]["rythme"]), ("Voix", voice_label)])}</div>'
+        f'{_rows([("Style", brief["visuels"]["style"]), ("Consignes visuelles", brief["visuels"]["regles"]), ("À ne jamais montrer", " ; ".join(brief["visuels"]["a_eviter"])), ("Rythme", brief["visuels"]["rythme"]), ("Voix", voice_label)])}</div>'
         f'<div class="brief-block brief-wide"><p class="card-eyebrow">Structure de la vidéo</p>{steps}</div>'
         f'<div class="brief-block brief-wide"><p class="card-eyebrow">Consignes permanentes</p>{rules}</div>'
     )

@@ -24,6 +24,15 @@ def sanitize(text: object, limit: int = MAX_MESSAGE) -> str:
     return cleaned if len(cleaned) <= limit else cleaned[: limit - 1] + "…"
 
 
+def redact(text: object) -> str:
+    """Masque tout motif de secret SANS toucher aux retours à la ligne ni tronquer (affichage d'un prompt complet)."""
+    cleaned = str(text if text is not None else "")
+    cleaned = _AUTH_HEADER.sub(lambda match: f"{match.group(1)}: {MASK}", cleaned)
+    for pattern in _SECRET_VALUE_PATTERNS:
+        cleaned = pattern.sub(MASK, cleaned)
+    return cleaned
+
+
 _STAGE_LABELS = {
     "preflight": "les vérifications préalables",
     "script": "l’écriture du script",
