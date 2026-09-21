@@ -275,3 +275,4 @@ class SceneUnits:
     characters: tuple[int, int]
     music_tracks: int
     audio_seconds: tuple[int, int]
+    thumbnails: int = 0  # fonds de miniature dédiés (payants) inclus dans l'estimation initiale

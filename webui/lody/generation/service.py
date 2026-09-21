@@ -22,7 +22,7 @@ from typing import Any, Protocol
 
 from lody import brief as brief_lib
 from lody import catalog
-from lody.generation import typography
+from lody.generation import kit_files, publication, thumbnail, typography
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
 from lody.generation.models import (
     ACTIVE_STATUSES,
@@ -394,11 +394,36 @@ class ProductionService:
             task = provider.submit(request, production.idempotency_key)
             self.repo.update(production_id, external_task_id=task.task_id, status=ProductionStatus.EN_FILE,
                              current_step="Dans la file du moteur", progress=0, last_polled_at=self._clock())
+            self._initial_thumbnail_background(production_id, provider, request)
         except ProviderError as error:
             self._fail(production_id, error.kind, error.message)
         except Exception as error:  # jamais de trace brute vers l'utilisateur ; détail nettoyé dans les logs
             logger.error("production %s : erreur inattendue (%s) %s", production_id, type(error).__name__, sanitize(error))
             self._fail(production_id, ErrorKind.PROVIDER, "Une erreur inattendue est survenue pendant la préparation.")
+
+    def _initial_thumbnail_background(self, production_id: str, provider: VideoGenerationProvider, request: GenerationRequest) -> None:
+        """Fond de miniature dédié : un appel d'image, INCLUS dans l'estimation initiale et la confirmation unique.
+
+        Uniquement pour un moteur qui sait générer une image seule. Un échec n'arrête jamais la vidéo : la miniature
+        retombe sur une image de scène (gratuite) et l'avertissement l'explique.
+        """
+        if not provider.supports_thumbnail_background:
+            return
+        production = self.repo.get(production_id)
+        try:
+            topic = publication.generate_metadata(publication.PublicationInput(
+                project_name=production.snapshot.get("project", {}).get("name", ""), subject=request.subject,
+                script=request.script, language=request.language))["title"]
+            prompt = thumbnail.background_prompt(topic=topic, visual_style=request.visual_style, visual_rules=request.visual_rules,
+                                                 visual_avoid=request.visual_avoid, aspect=request.aspect)
+            ref = kit_files.save_background(production_id, provider.generate_thumbnail_background(request, prompt))
+        except (ProviderError, ValueError, OSError) as error:
+            message = error.message if isinstance(error, ProviderError) else "image de fond invalide"
+            self.repo.update(production_id, warnings=[*production.warnings,
+                                                      "Fond de miniature non généré (" + sanitize(message, 120) + ") : une image de scène sera utilisée."])
+            return
+        self.repo.update(production_id, assets=[*production.assets, {"kind": "thumbnail_background", "ref": ref, "root": "data"}],
+                         trace={**production.trace, "thumbnail_background": {"prompt": prompt, "ref": ref}})
 
     def _trace(self, production: Production, provider: VideoGenerationProvider, request: GenerationRequest,
                script_request: dict[str, Any] | None) -> dict[str, Any]:
@@ -474,7 +499,7 @@ class ProductionService:
             status = ProductionStatus.EN_FILE if snapshot.state is RemoteState.QUEUED else ProductionStatus.EN_COURS
             self.repo.transition(production.id, ACTIVE_STATUSES, status=status, progress=snapshot.progress,
                                  current_step=snapshot.step or production.current_step,
-                                 warnings=list(snapshot.warnings), **common)
+                                 warnings=list(dict.fromkeys([*production.warnings, *snapshot.warnings])), **common)
         return self.repo.get(production.id)
 
     def _complete(self, production: Production, provider: VideoGenerationProvider, task: ExternalTask,
@@ -490,7 +515,9 @@ class ProductionService:
             production.id, ACTIVE_STATUSES, status=ProductionStatus.TERMINEE, progress=100, current_step="Terminée",
             finished_at=self._clock(), last_polled_at=self._clock(), error_code="", error_message="",
             video_ref=result.video_ref, video_duration=result.duration_seconds,
-            assets=[dict(asset) for asset in result.assets], warnings=list(dict.fromkeys(warnings)))
+            assets=[*(dict(asset) for asset in production.assets if asset.get("kind") == "thumbnail_background"),
+                    *(dict(asset) for asset in result.assets)],
+            warnings=list(dict.fromkeys([*production.warnings, *warnings])))
         return self.repo.get(production.id)
 
     def resume_active(self) -> list[Production]:

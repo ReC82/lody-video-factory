@@ -8,6 +8,7 @@ conteneur. La vidéo est une mire synthétique produite localement par ffmpeg (a
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import subprocess
 import time
@@ -71,6 +72,7 @@ class DemoConnector(VideoGenerationProvider):
     id = PROVIDER_ID
     display_name = "Démonstration (simulation)"
     is_demo = True
+    supports_thumbnail_background = True  # simulé : montre le parcours estimation → confirmation, sans coût réel
 
     def __init__(self, root: Path | None = None, clock: Callable[[], float] = time.time, step_seconds: float = 3.0,
                  make_video: Callable[[Path], None] = default_video_maker):
@@ -101,7 +103,8 @@ class DemoConnector(VideoGenerationProvider):
         directory.mkdir(parents=True, exist_ok=True)
         meta = directory / "meta.json"
         if not meta.exists():  # même clé → même tâche : jamais deux simulations
-            meta.write_text(json.dumps({"started": self._clock(), "scenes": len(request.visual_prompts)}), encoding="utf-8")
+            meta.write_text(json.dumps({"started": self._clock(), "scenes": len(request.visual_prompts), "script": request.script[:8000]},
+                                       ensure_ascii=False), encoding="utf-8")
         return ExternalTask(PROVIDER_ID, task_id)
 
     def _started(self, task: ExternalTask) -> float | None:
@@ -123,6 +126,45 @@ class DemoConnector(VideoGenerationProvider):
                                 result=GenerationResult(ref, DEMO_VIDEO_SECONDS, assets=({"kind": "video", "ref": ref},)))
         _, progress, label = [entry for entry in _TIMELINE if steps >= entry[0]][-1]
         return TaskSnapshot(RemoteState.QUEUED if progress == 0 else RemoteState.RUNNING, progress, label)
+
+    def list_scene_images(self, task: ExternalTask) -> list[dict[str, str]]:
+        """Trois fonds de démonstration synthétiques (jamais de texte), créés localement."""
+        if self._started(task) is None:
+            return []
+        from lody.generation.thumbnail import placeholder_background
+
+        images = []
+        for number in (1, 2, 3):
+            target = self._dir(task.task_id) / f"scene-{number}.png"
+            if not target.exists():
+                buffer = io.BytesIO()
+                placeholder_background(f"{task.task_id}-{number}", (512, 768)).save(buffer, format="PNG")
+                target.write_bytes(buffer.getvalue())
+            images.append({"ref": f"demo/{task.task_id}/{target.name}", "name": target.name})
+        return images
+
+    def read_subtitles(self, task: ExternalTask) -> str | None:
+        """SRT de démonstration : le script réparti régulièrement sur la durée simulée."""
+        if self._started(task) is None:
+            return None
+        try:
+            script = json.loads((self._dir(task.task_id) / "meta.json").read_text(encoding="utf-8")).get("script", "")
+        except (OSError, ValueError):
+            return None
+        from lody.generation import subtitles
+        from lody.generation.storyboard import split_sentences
+
+        sentences = split_sentences(script) or ["Vidéo de démonstration"]
+        step = int(DEMO_VIDEO_SECONDS * 1000 / len(sentences))
+        cues = [subtitles.Cue(i + 1, i * step, (i + 1) * step - 40, sentence) for i, sentence in enumerate(sentences)]
+        return subtitles.to_srt(cues)
+
+    def generate_thumbnail_background(self, request: GenerationRequest, prompt: str) -> bytes:
+        from lody.generation.thumbnail import placeholder_background
+
+        buffer = io.BytesIO()
+        placeholder_background(prompt, (1024, 1536)).save(buffer, format="PNG")
+        return buffer.getvalue()
 
     def _ensure_video(self, task: ExternalTask) -> str:
         ref = f"demo/{task.task_id}/final-1.mp4"

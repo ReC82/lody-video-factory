@@ -8,13 +8,16 @@ implémentant ces méthodes, sans toucher au reste.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import replace
 from pathlib import Path
 
 from lody.generation.models import (
+    ErrorKind,
     ExternalTask,
     GenerationRequest,
     GenerationResult,
     PreflightReport,
+    ProviderError,
     ReadinessIssue,
     SceneUnits,
     TaskSnapshot,
@@ -59,9 +62,25 @@ class VideoGenerationProvider(ABC):
     supports_cancel: bool = False
     #: vrai pour une simulation : aucun fournisseur payant n'est appelé
     is_demo: bool = False
+    #: vrai si le moteur sait générer UNE image seule (fond de miniature dédié, payant). Faux pour le moteur historique
+    #: (son API n'expose aucune génération d'image isolée) : la miniature utilise alors une image de scène existante.
+    supports_thumbnail_background: bool = False
 
     def plan_units(self, request: GenerationRequest) -> SceneUnits:
-        return estimate_units(request)
+        units = estimate_units(request)
+        return replace(units, thumbnails=1) if self.supports_thumbnail_background else units
+
+    def list_scene_images(self, task: ExternalTask) -> list[dict[str, str]]:
+        """Images de scène déjà générées pour la tâche (fonds de miniature GRATUITS) : [{"ref": …, "name": …}], dans l'ordre."""
+        return []
+
+    def read_subtitles(self, task: ExternalTask) -> str | None:
+        """Contenu (SRT) des sous-titres déjà produits par le moteur, ou ``None`` : jamais d'appel payant pour l'obtenir."""
+        return None
+
+    def generate_thumbnail_background(self, request: GenerationRequest, prompt: str) -> bytes:
+        """Génère UNE image de fond sans texte (payant). Lève ``ProviderError`` si le moteur ne le permet pas."""
+        raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer une image de fond de miniature.")
 
     def describe_script_request(self, request: GenerationRequest) -> dict:
         """Ce qui est envoyé au fournisseur pour ÉCRIRE le script (sujet, langue, prompt éditorial) — pour archivage."""

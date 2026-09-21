@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -33,7 +33,8 @@ FREE_PROVIDERS = frozenset({
     ("text", "manual"), ("voice", "edge"), ("music", "none"), ("music", "library"), ("visual", "local"),
 })
 COMPONENT_LABELS = {"text": "Script", "visual": "Images", "voice": "Voix", "music": "Musique"}
-UNIT_LABELS = {"text": "par script", "visual": "par image", "voice": "par 1 000 caractères", "music": "par morceau"}
+UNIT_LABELS = {"text": "par script", "visual": "par image", "voice": "par 1 000 caractères", "music": "par morceau",
+               "thumbnail": "par image"}
 CURRENCY_SYMBOLS = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}
 DEFAULT_CURRENCY = "EUR"
 
@@ -131,6 +132,7 @@ class CostEstimate:
             "scenes": list(self.units.scenes),
             "audio_seconds": list(self.units.audio_seconds),
             "characters": list(self.units.characters),
+            "thumbnails": self.units.thumbnails,
         }
 
 
@@ -156,6 +158,9 @@ def estimate_cost(request: GenerationRequest, units: SceneUnits, book: PriceBook
         _line("voice", request.voice.provider or "elevenlabs", units.characters, 1000, book),
         _line("music", request.music_provider, (units.music_tracks, units.music_tracks), 1, book),
     ]
+    if units.thumbnails:  # fond de miniature dédié : même tarif que les images, ligne distincte et visible
+        base = _line("visual", request.visual_provider, (units.thumbnails, units.thumbnails), 1, book)
+        lines.append(replace(base, component="thumbnail", label="Miniature (fond d’image)"))
     priced = [line for line in lines if line.low is not None and line.high is not None]
     partial = any(line.status == "unpriced" for line in lines)
     total_low = sum((line.low for line in priced), Decimal(0)) if priced else None

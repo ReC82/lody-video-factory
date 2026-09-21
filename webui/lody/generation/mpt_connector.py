@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import socket
 import time
 import urllib.error
@@ -504,6 +505,35 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             assets=tuple(assets[:40]),
             warnings=tuple(sanitize(item, 120) for item in (data.get("warnings") or []) if isinstance(item, (str, int)))[:10],
         )
+
+    def list_scene_images(self, task: ExternalTask) -> list[dict[str, str]]:
+        """Images de scène (PNG) de la tâche, dans l'ordre de génération : fonds de miniature gratuits, déjà payés avec la vidéo."""
+        if not is_safe_task_id(task.task_id):
+            return []
+        folder = self.storage_root / "tasks" / task.task_id
+        try:
+            entries = [entry for entry in os.scandir(folder) if entry.is_file() and re.fullmatch(r"openai-image-[0-9a-f]+\.png", entry.name)]
+        except OSError:
+            return []
+        images = []
+        for entry in sorted(entries, key=lambda item: (item.stat().st_mtime_ns, item.name)):
+            ref = f"tasks/{task.task_id}/{entry.name}"
+            try:
+                self.resolve_asset(task, ref, suffixes=(".png",))
+            except ValueError:
+                continue
+            images.append({"ref": ref, "name": entry.name})
+        return images[:40]
+
+    def read_subtitles(self, task: ExternalTask) -> str | None:
+        """SRT déjà produit par le moteur (aucun appel) ; ``None`` s'il est absent ou illisible."""
+        if not is_safe_task_id(task.task_id):
+            return None
+        try:
+            path = self.resolve_asset(task, f"tasks/{task.task_id}/subtitle.srt", suffixes=(".srt",))
+            return path.read_text(encoding="utf-8")[:1_000_000]
+        except (ValueError, OSError, UnicodeDecodeError):
+            return None
 
     def recover(self, task: ExternalTask) -> GenerationResult | None:
         """Après un redémarrage du moteur (état en mémoire perdu) : la vidéo est peut-être sur disque."""

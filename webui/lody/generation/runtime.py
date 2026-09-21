@@ -7,8 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 from lody import settings
 from lody.generation import demo, mpt_connector
+from lody.generation.kit_service import KitService
+from lody.generation.kit_store import KitRepository
 from lody.generation.service import ProductionService
 from lody.generation.store import ProductionRepository
+from lody.projects import ProjectRepository
 
 logger = logging.getLogger("lody.runtime")
 
@@ -32,3 +35,9 @@ def build_service() -> ProductionService:
     except Exception as error:  # le démarrage de l'interface ne doit jamais dépendre du moteur
         logger.warning("reprise des productions impossible pour l'instant (%s)", type(error).__name__)
     return service
+
+
+def build_kit_service(service: ProductionService) -> KitService:
+    """Service des kits de publication (local et gratuit ; un seul fond payant à la fois, après confirmation)."""
+    return KitService(KitRepository(settings.db_path()), service, ProjectRepository(settings.db_path()),
+                      ThreadPoolExecutor(max_workers=1, thread_name_prefix="lody-kit"))
