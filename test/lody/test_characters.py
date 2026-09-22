@@ -388,12 +388,14 @@ def test_generation_request_payload_is_identical_with_or_without_characters_in_t
     assert before == after
 
 
-def test_no_generation_module_imports_the_new_repositories_or_tables_yet():
-    """Preuve statique que le câblage (sélection dans une production, #34+) n'existe pas encore : aucun
-    module du pipeline de génération n'importe ``lody.characters``/``lody.locations``, ni ne référence les
-    tables SQL ``characters``/``locations``. (Le mot anglais « characters » existe déjà ailleurs dans ce
-    pipeline pour le décompte de caractères de texte facturés — voir ``costing.py`` — donc ce test cherche
-    des motifs précis, pas le simple mot.)"""
+def test_only_the_snapshot_wiring_references_characters_or_locations_not_the_script_voice_image_pipeline():
+    """Preuve statique de la frontière du ticket #35 : la résolution de la sélection en instantané
+    (``narrative_context.py``, câblée par ``service.py``/``runtime.py``) peut référencer
+    ``lody.characters``/``lody.locations``, mais aucun module qui construit ce qui est réellement envoyé au
+    moteur (script, storyboard, prompts de voix ou d'image) ne le fait — ni #34 (aucune UI de sélection) ni
+    aucune injection dans le script, la voix ou les prompts d'images à ce stade. (Le mot anglais « characters »
+    existe déjà ailleurs dans ce pipeline pour le décompte de caractères de texte facturés — voir
+    ``costing.py`` — donc ce test cherche des motifs précis, pas le simple mot.)"""
     import pathlib
     import re
 
@@ -404,9 +406,12 @@ def test_no_generation_module_imports_the_new_repositories_or_tables_yet():
         re.compile(r"\bCharacterRepository\b"), re.compile(r"\bLocationRepository\b"),
         re.compile(r"FROM\s+characters\b", re.IGNORECASE), re.compile(r"FROM\s+locations\b", re.IGNORECASE),
     ]
+    # Seul le contrat de résolution du snapshot (#35) : jamais le script, le storyboard, la voix ou les
+    # prompts d'image réellement envoyés (storyboard.py, mpt_connector.py, safety.py, typography.py, ...).
+    allowed = {"narrative_context.py", "service.py", "runtime.py"}
     generation_dir = pathlib.Path(__file__).resolve().parents[2] / "webui" / "lody" / "generation"
     offenders = [
         path.name for path in generation_dir.glob("*.py")
-        if any(pattern.search(path.read_text(encoding="utf-8")) for pattern in patterns)
+        if path.name not in allowed and any(pattern.search(path.read_text(encoding="utf-8")) for pattern in patterns)
     ]
     assert offenders == []
