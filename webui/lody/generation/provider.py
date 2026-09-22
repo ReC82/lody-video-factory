@@ -82,8 +82,12 @@ class VideoGenerationProvider(ABC):
         """Génère UNE image de fond sans texte (payant). Lève ``ProviderError`` si le moteur ne le permet pas."""
         raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer une image de fond de miniature.")
 
-    def describe_script_request(self, request: GenerationRequest) -> dict:
-        """Ce qui est envoyé au fournisseur pour ÉCRIRE le script (sujet, langue, prompt éditorial) — pour archivage."""
+    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "") -> dict:
+        """Ce qui est envoyé au fournisseur pour ÉCRIRE le script (sujet, langue, prompt éditorial) — pour archivage.
+
+        ``narrative_block`` (#36) : contexte narratif déjà rendu (voir ``narrative_context.render_prompt_block``),
+        ou chaîne vide sans sélection — auquel cas le comportement est strictement celui d'avant #36.
+        """
         return {}
 
     def trace_prompts(self, request: GenerationRequest) -> dict:
@@ -109,8 +113,11 @@ class VideoGenerationProvider(ABC):
         return self.preflight(request).to_issues()
 
     @abstractmethod
-    def write_script(self, request: GenerationRequest) -> str:
-        """Écrit le script (appel texte). Lève ``ProviderError``."""
+    def write_script(self, request: GenerationRequest, narrative_block: str = "") -> str:
+        """Écrit le script (appel texte). Lève ``ProviderError``.
+
+        ``narrative_block`` (#36) : voir ``describe_script_request``. Un connecteur qui ignore ce paramètre
+        se comporte exactement comme avant #36 (aucune obligation de l'utiliser)."""
 
     @abstractmethod
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:
