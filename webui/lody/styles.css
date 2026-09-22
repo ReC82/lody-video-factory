@@ -467,11 +467,23 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 .st-key-kit [data-testid="stRadio"] label p, .st-key-kit [data-testid="stCheckbox"] label p { color: var(--text); }
 
 /* ---- Paramètres système (clés du moteur) -------------------------------------------------------------- */
-.st-key-sys_settings { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.6rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.st-key-sys_settings, .st-key-sys_locked { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.6rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.st-key-sys_head { justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.st-key-sys_head > div:first-child { flex: 1 1 20rem; min-width: 0; }
 .sys-field { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem 0.4rem; margin-top: 0.6rem; }
-.sys-field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.sys-field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem 0.75rem; flex-wrap: wrap; }
 .sys-field-label { font-weight: 600; color: var(--text); }
 .sys-field-provider { font-size: 0.8rem; color: var(--faint); }
+.sys-field-capability { font-size: 0.72rem; color: var(--accent-1); background: color-mix(in srgb, var(--accent-1) 12%, transparent); border-radius: 999px; padding: 0.05rem 0.55rem; margin-right: auto; }
+.sys-field-dates { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--faint); }
+.sys-other-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.sys-other-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.sys-other-row:last-child { border-bottom: 0; }
+.sys-logout-btn { font: 600 0.85rem var(--font); color: var(--muted); background: rgba(148, 163, 209, 0.08); border: 1px solid var(--border-strong); border-radius: 999px; padding: 0.5rem 1.1rem; cursor: pointer; white-space: nowrap; }
+.sys-logout-btn:hover { color: var(--text); background: rgba(148, 163, 209, 0.16); }
+.sys-login-link { display: inline-block; font-weight: 650; color: #06101c; background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3)); border-radius: 14px; padding: 0.7rem 1.5rem; text-decoration: none; }
 @media (max-width: 640px) {
-  .st-key-sys_settings { padding: 1.15rem 1rem; }
+  .st-key-sys_settings, .st-key-sys_locked { padding: 1.15rem 1rem; }
+  .st-key-sys_head { flex-direction: column; align-items: stretch; }
+  .sys-logout-btn { width: 100%; }
 }

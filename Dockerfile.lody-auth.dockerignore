@@ -1,0 +1,19 @@
+# Contexte de build de Dockerfile.lody-auth : jamais de secret ni de données.
+.git
+.github
+.gitignore
+config.toml
+config.toml.rollback
+secrets
+storage
+data
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+docs
+README*.md
+uv.lock
+webui
+app
+test

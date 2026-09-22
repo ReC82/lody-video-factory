@@ -235,6 +235,99 @@ def test_build_report_reflects_the_restored_configuration_after_rollback(env):
     assert facts["llm_key"]["openai"] is True  # l'ancienne clé (sk-old-1234) est bien revenue
 
 
+# -- clé expirée (distincte d'une clé simplement invalide) ---------------------------------------------------------
+def test_expired_key_is_reported_distinctly_and_still_rolls_back(env):
+    _set(env, "app.openai_api_key", "sk-expired-9999")
+    result, calls = _run(env, verify_key=lambda f, v, c: ProviderCheck("expired", "clé expirée (401)"))
+    assert result["state"] == "expired"
+    assert calls == ["restart", "restart"]
+    assert env["config"].read_text() == CONFIG
+    field = result["fields"]["app.openai_api_key"]
+    assert field["state"] == "expired" and "expiré" in field["message"].lower()
+
+
+def test_expired_and_rejected_produce_different_messages(env):
+    _set(env, "app.openai_api_key", "sk-a")
+    expired, _ = _run(env, verify_key=lambda f, v, c: ProviderCheck("expired", "x"))
+    _set(env, "app.openai_api_key", "sk-b")
+    rejected, _ = _run(env, verify_key=lambda f, v, c: ProviderCheck("rejected", "x"))
+    assert expired["fields"]["app.openai_api_key"]["message"] != rejected["fields"]["app.openai_api_key"]["message"]
+
+
+def test_http_check_recognises_the_expired_secret_key_error_code(local_server):
+    body = json.dumps({"error": {"code": "expired_secret_key",
+                                 "message": "Incorrect API key provided: sk-proj-XXXXFAKE"}}).encode()
+    url, _ = local_server(status=401, body=body)
+    result = apply_secrets._http_check(url, {"Authorization": "Bearer x"}, 3)
+    assert result.outcome == "expired"
+    assert "sk-proj-XXXXFAKE" not in result.detail
+
+
+def test_http_check_never_reads_the_error_message_field_only_the_code(local_server):
+    """Même avec un fragment de clé dans error.message, seul error.code (jamais error.message) est lu."""
+    body = json.dumps({"error": {"code": "invalid_api_key", "message": "sk-proj-should-never-appear-anywhere"}}).encode()
+    url, _ = local_server(status=401, body=body)
+    result = apply_secrets._http_check(url, {"Authorization": "Bearer x"}, 3)
+    assert result.outcome == "rejected"
+    assert "sk-proj-should-never-appear-anywhere" not in result.detail
+
+
+def test_http_check_treats_a_plain_401_without_a_recognised_code_as_rejected_not_expired(local_server):
+    url, _ = local_server(status=401)
+    result = apply_secrets._http_check(url, {"Authorization": "Bearer x"}, 3)
+    assert result.outcome == "rejected"
+
+
+# -- historique persistant : modified_at / checked_at --------------------------------------------------------------
+def test_a_successful_change_stamps_both_modified_at_and_checked_at(env):
+    _set(env, "app.openai_api_key", "sk-new-9999")
+    result, _ = _run(env)
+    field = result["fields"]["app.openai_api_key"]
+    assert field["modified_at"] and field["checked_at"] and field["modified_at"] == field["checked_at"]
+
+
+def test_an_invalid_shape_stamps_checked_at_but_never_modified_at(env):
+    env["secrets"].write_text('[app]\nopenai_api_key = "has space"\n', encoding="utf-8")
+    result, _ = _run(env)
+    field = result["fields"]["app.openai_api_key"]
+    assert field["checked_at"] and field["modified_at"] is None
+
+
+def test_a_rolled_back_change_does_not_update_modified_at(env):
+    _set(env, "app.openai_api_key", "sk-new-9999")
+    result, _ = _run(env, healthy=False)
+    field = result["fields"]["app.openai_api_key"]
+    assert field["checked_at"] and field["modified_at"] is None  # jamais devenue la valeur active
+
+
+def test_an_unverified_change_still_updates_modified_at_the_value_is_live(env):
+    _set(env, "app.openai_api_key", "sk-new-9999")
+    result, _ = _run(env, verify_key=lambda f, v, c: ProviderCheck("timeout"))
+    field = result["fields"]["app.openai_api_key"]
+    assert field["modified_at"] is not None  # la clé EST appliquée, seule sa vérification est incertaine
+
+
+def test_history_of_untouched_fields_is_preserved_across_runs(env):
+    _set(env, "app.openai_api_key", "sk-first")
+    first, _ = _run(env)
+    first_modified = first["fields"]["app.openai_api_key"]["modified_at"]
+
+    _set(env, "elevenlabs.api_key", "voice-secret")
+    second, _ = _run(env)
+    assert "app.openai_api_key" in second["fields"]  # toujours là, pas effacé
+    assert second["fields"]["app.openai_api_key"]["modified_at"] == first_modified  # inchangé : pas touché cette fois
+    assert second["fields"]["elevenlabs.api_key"]["modified_at"] is not None
+
+
+def test_checked_at_advances_on_a_second_run_of_the_same_field(env):
+    _set(env, "app.openai_api_key", "sk-first")
+    first, _ = _run(env)
+    _set(env, "app.openai_api_key", "sk-second")
+    second, _ = _run(env)
+    assert second["fields"]["app.openai_api_key"]["checked_at"] >= first["fields"]["app.openai_api_key"]["checked_at"]
+    assert second["fields"]["app.openai_api_key"]["modified_at"] >= first["fields"]["app.openai_api_key"]["modified_at"]
+
+
 # -- vérification réelle auprès du fournisseur (forme OK + moteur sain ne suffit pas) -------------------------------
 def test_engine_healthy_but_key_rejected_still_triggers_automatic_rollback(env):
     """Une clé expirée ou inventée ne fait PAS planter le démarrage du moteur : la validation fournisseur est ce
@@ -411,10 +504,11 @@ def test_provider_check_exception_never_leaks_into_the_status_or_result(env):
 class _Handler:
     """Fabrique un gestionnaire http.server.BaseHTTPRequestHandler paramétrable (statut, délai, en-têtes vus)."""
 
-    def __init__(self, status=200, delay=0.0, redirect_to=None):
+    def __init__(self, status=200, delay=0.0, redirect_to=None, body=None):
         self.status = status
         self.delay = delay
         self.redirect_to = redirect_to
+        self.body = body
         self.seen_headers = []
 
     def build(self):
@@ -434,7 +528,11 @@ class _Handler:
                     self.end_headers()
                     return
                 self.send_response(outer.status)
+                if outer.body is not None:
+                    self.send_header("Content-Length", str(len(outer.body)))
                 self.end_headers()
+                if outer.body is not None:
+                    self.wfile.write(outer.body)
 
             def log_message(self, *a):  # tait les journaux du serveur de test
                 pass
@@ -449,8 +547,8 @@ def local_server():
 
     servers = []
 
-    def start(status=200, delay=0.0, redirect_to=None):
-        handler_factory = _Handler(status=status, delay=delay, redirect_to=redirect_to)
+    def start(status=200, delay=0.0, redirect_to=None, body=None):
+        handler_factory = _Handler(status=status, delay=delay, redirect_to=redirect_to, body=body)
         server = HTTPServer(("127.0.0.1", 0), handler_factory.build())
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()

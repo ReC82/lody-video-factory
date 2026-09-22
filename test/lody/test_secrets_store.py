@@ -135,3 +135,54 @@ def test_field_status_reads_the_per_field_entry(paths):
 
 def test_field_status_defaults_to_idle_for_an_unknown_field(paths):
     assert secrets_store.field_status("app.openai_api_key", status_path=paths["status"])["state"] == "idle"
+
+
+def test_field_status_includes_modified_and_checked_dates(paths):
+    import json
+
+    paths["status"].write_text(json.dumps({"state": "ready", "fields": {
+        "app.openai_api_key": {"state": "ok", "message": "", "modified_at": "2026-01-01T00:00:00+00:00",
+                               "checked_at": "2026-01-02T00:00:00+00:00"},
+    }}), encoding="utf-8")
+    entry = secrets_store.field_status("app.openai_api_key", status_path=paths["status"])
+    assert entry["modified_at"] == "2026-01-01T00:00:00+00:00" and entry["checked_at"] == "2026-01-02T00:00:00+00:00"
+
+
+# -- key_blocked : source pour le préflight, jamais de nouvel appel fournisseur -------------------------------------
+def test_key_blocked_is_none_when_the_key_is_fine(paths):
+    import json
+
+    paths["status"].write_text(json.dumps({"state": "ready", "fields": {
+        "app.openai_api_key": {"state": "ok", "message": ""}}}), encoding="utf-8")
+    assert secrets_store.key_blocked("app.openai_api_key", status_path=paths["status"]) is None
+
+
+def test_key_blocked_is_none_when_never_checked(paths):
+    assert secrets_store.key_blocked("app.openai_api_key", status_path=paths["status"]) is None
+
+
+def test_key_blocked_reports_an_expired_key_distinctly(paths):
+    import json
+
+    paths["status"].write_text(json.dumps({"state": "expired", "fields": {
+        "app.openai_api_key": {"state": "expired", "message": "..."}}}), encoding="utf-8")
+    message = secrets_store.key_blocked("app.openai_api_key", status_path=paths["status"])
+    assert message is not None and "expiré" in message
+
+
+def test_key_blocked_reports_a_rejected_key_distinctly(paths):
+    import json
+
+    paths["status"].write_text(json.dumps({"state": "rejected", "fields": {
+        "elevenlabs.api_key": {"state": "rejected", "message": "..."}}}), encoding="utf-8")
+    message = secrets_store.key_blocked("elevenlabs.api_key", status_path=paths["status"])
+    assert message is not None and "invalide" in message
+
+
+def test_key_blocked_messages_never_contain_a_secret_only_the_field_label(paths):
+    import json
+
+    paths["status"].write_text(json.dumps({"state": "expired", "fields": {
+        "app.openai_api_key": {"state": "expired", "message": "sk-should-never-leak-here-9999"}}}), encoding="utf-8")
+    message = secrets_store.key_blocked("app.openai_api_key", status_path=paths["status"])
+    assert "sk-should-never-leak-here-9999" not in message

@@ -39,6 +39,7 @@ from lody.generation.models import (
 )
 from lody.generation.provider import WORDS_PER_MINUTE, VideoGenerationProvider
 from lody.generation.safety import ALLOWED_VIDEO_SUFFIXES, classify_engine_error, is_safe_task_id, resolve_within, sanitize
+from lody.generation.secrets_store import key_blocked
 
 logger = logging.getLogger("lody.connector")
 
@@ -179,11 +180,14 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
 
     def __init__(self, base_url: str = DEFAULT_URL, storage_root: str | Path = DEFAULT_STORAGE,
                  config_path: Path | None = None, report_path: Path | None = None, api_key: str = "", transport: Transport = urllib_transport,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, secrets_status_path: Path | None = None):
         self.base_url = base_url.rstrip("/")
         self.storage_root = Path(storage_root)
         self.config_path = config_path
         self.report_path = report_path
+        # Explicite plutôt que la valeur par défaut de settings.secrets_status_path() : mêmes garanties d'isolation
+        # en test que config_path/report_path (voir docs/lody-secrets.md et l'historique de ce fichier).
+        self.secrets_status_path = secrets_status_path
         self._api_key = api_key
         self._transport = transport
         self._clock = clock
@@ -336,6 +340,11 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             return CapabilityStatus(C, St.NOT_CONFIGURED, request.text_provider, engine,
                                     message=f"La clé du fournisseur de texte « {_label(wanted)} » n’est pas configurée côté serveur.",
                                     fix="platform", admin=details)
+        if wanted == "openai" and (blocked := key_blocked("app.openai_api_key", status_path=self.secrets_status_path)):
+            # Un redémarrage sain ne prouve pas qu'une clé fonctionne : voir apply_secrets.py. Relit un fichier
+            # de statut déjà écrit, aucun nouvel appel au fournisseur ici.
+            return CapabilityStatus(C, St.UNAVAILABLE, request.text_provider, engine, message=blocked,
+                                    fix="platform", admin=details)
         model = facts.llm_model.get(wanted, "")
         return CapabilityStatus(C, St.READY, request.text_provider, engine, model or "modèle par défaut du moteur",
                                 message=f"Script écrit par « {_label(engine)} »" + ("" if model else " (modèle par défaut du moteur)") + ".",
@@ -365,6 +374,9 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         if not facts.image_key and facts.image_public_openai:
             return CapabilityStatus(C, St.NOT_CONFIGURED, request.visual_provider, "openai_image", facts.image_model,
                                     message="La clé du fournisseur d’images n’est pas configurée côté serveur.", fix="platform", admin=details)
+        if facts.image_public_openai and (blocked := key_blocked("app.openai_image_api_keys", status_path=self.secrets_status_path)):
+            return CapabilityStatus(C, St.UNAVAILABLE, request.visual_provider, "openai_image", facts.image_model,
+                                    message=blocked, fix="platform", admin=details)
         return CapabilityStatus(C, St.READY, request.visual_provider, "openai_image", facts.image_model,
                                 message=f"Images générées avec « {facts.image_model} ».", admin=details)
 
@@ -382,6 +394,8 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         if not facts.eleven_key:
             return CapabilityStatus(C, St.NOT_CONFIGURED, voice.provider, message="La clé du fournisseur de voix n’est pas configurée côté serveur.",
                                     fix="platform", admin=details)
+        if blocked := key_blocked("elevenlabs.api_key", status_path=self.secrets_status_path):
+            return CapabilityStatus(C, St.UNAVAILABLE, voice.provider, "elevenlabs", message=blocked, fix="platform", admin=details)
         note = ""
         if voice.model and facts.eleven_model and voice.model != facts.eleven_model:
             note = f" Le moteur utilisera le modèle « {facts.eleven_model} » (réglage serveur), pas « {voice.model} »."
@@ -401,6 +415,8 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         if not facts.eleven_key:
             return CapabilityStatus(C, St.NOT_CONFIGURED, music, message="La clé du fournisseur de musique n’est pas configurée côté serveur.",
                                     fix="platform", admin=details)
+        if blocked := key_blocked("elevenlabs.api_key", status_path=self.secrets_status_path):
+            return CapabilityStatus(C, St.UNAVAILABLE, music, "elevenlabs", message=blocked, fix="platform", admin=details)
         return CapabilityStatus(C, St.READY, music, "elevenlabs", message="Musique générée par le fournisseur choisi.", admin=details)
 
     def describe_script_request(self, request: GenerationRequest) -> dict[str, Any]:

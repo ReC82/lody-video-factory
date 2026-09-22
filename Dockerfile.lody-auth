@@ -1,0 +1,20 @@
+# Service d'authentification administrateur pour « Paramètres système » (voir docs/lody-auth.md).
+#
+# Volontairement minimal : bibliothèque standard uniquement (aucune dépendance tierce), aucune donnée persistée
+# dans l'image. Le fichier d'identifiant (secrets/admin-auth.json) est monté depuis l'hôte, jamais copié ici.
+FROM python:3.12-slim-trixie
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+COPY lody_auth ./lody_auth
+
+RUN useradd --create-home --uid 10002 lody-auth
+USER lody-auth
+
+EXPOSE 8602
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD python3 -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8602/healthz', timeout=3)"
+
+CMD ["python3", "-m", "lody_auth"]

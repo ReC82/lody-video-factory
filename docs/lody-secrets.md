@@ -27,7 +27,13 @@ C'est pourquoi la fonctionnalité est **désactivée par défaut** et gardée à
    connaissant l'URL exacte.
 
 **Ne mets `LODY_ENABLE_SYSTEM_SETTINGS: "1"` dans `docker-compose.lody.yml` qu'après avoir ajouté une
-authentification devant `video.lodylands.com`** (ex. `auth_basic` nginx, ou une protection équivalente).
+authentification devant cette page.**
+
+**Mise à jour (ticket #28)** : cette authentification est désormais implémentée — voir
+[`docs/lody-auth.md`](lody-auth.md) (service dédié `lody-auth`, session admin, procédure d'activation et
+procédure exacte pour remplacer une clé). Ce document (`lody-secrets.md`) reste la référence pour le stockage,
+le modèle de permissions et le pipeline d'application ; `lody-auth.md` couvre tout ce qui est spécifique à
+l'authentification elle-même.
 
 ## Architecture
 

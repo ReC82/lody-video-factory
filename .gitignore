@@ -3,6 +3,9 @@
 /config.toml.bak
 /config.toml.bak*
 /config.toml.rollback
+# N'importe quelle sauvegarde de config.toml, quel que soit son suffixe (ex. une sauvegarde manuelle avant de
+# changer une clé) : jamais suivie par Git, même si son nom ne correspond pas aux motifs ci-dessus.
+/config.toml.*
 /secrets/
 /storage/
 /engine-report/

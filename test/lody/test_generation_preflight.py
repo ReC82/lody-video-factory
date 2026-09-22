@@ -36,7 +36,8 @@ def _connector(tmp_path, config=CONFIG, responses=(PONG,), *, storage=True, repo
         (tmp_path / "storage").mkdir(exist_ok=True)
     transport = Recorder(*responses)
     connector = mpt.MoneyPrinterTurboConnector("http://engine:8080", tmp_path / "storage", config_path,
-                                               report_path=report or tmp_path / "engine-report.json", transport=transport)
+                                               report_path=report or tmp_path / "engine-report.json", transport=transport,
+                                               secrets_status_path=tmp_path / "secrets-status.json")
     return connector, transport
 
 
@@ -156,6 +157,63 @@ def test_full_preflight_succeeds_and_shows_requested_vs_configured(tmp_path):
     assert [s.state for s in (report.get(Cap.ENGINE), report.get(Cap.STORAGE), report.get(Cap.SETTINGS))] == [CS.READY] * 3
     assert [(m, u.split("8080")[1]) for m, u, *_ in transport.requests] == [("GET", "/ping")]  # seul appel : santé, gratuit
     _no_secret(report)
+
+
+def _seed_key_status(tmp_path, field_path, state, message="clé refusée par le fournisseur"):
+    (tmp_path / "secrets-status.json").write_text(json.dumps(
+        {"state": state, "fields": {field_path: {"state": state, "message": message}}}), encoding="utf-8")
+
+
+def test_an_expired_openai_key_blocks_the_text_capability_with_a_clear_message(tmp_path):
+    _seed_key_status(tmp_path, "app.openai_api_key", "expired")
+    connector, _ = _connector(tmp_path)
+    report = connector.preflight(_crypto_request())
+    text = _status(report, Cap.TEXT)
+    assert text.state is CS.UNAVAILABLE and text in report.blocking
+    assert "OpenAI" in text.message and "expiré" in text.message
+    assert "Paramètres système" in text.message
+    _no_secret(report)
+
+
+def test_a_rejected_openai_key_blocks_the_text_capability_distinctly_from_expired(tmp_path):
+    _seed_key_status(tmp_path, "app.openai_api_key", "rejected")
+    connector, _ = _connector(tmp_path)
+    text = _status(connector.preflight(_crypto_request()), Cap.TEXT)
+    assert text.state is CS.UNAVAILABLE and "invalide" in text.message and "expiré" not in text.message
+
+
+def test_a_healthy_key_history_does_not_block_the_text_capability(tmp_path):
+    _seed_key_status(tmp_path, "app.openai_api_key", "ok", message="")
+    connector, _ = _connector(tmp_path)
+    assert _status(connector.preflight(_crypto_request()), Cap.TEXT).state is CS.READY
+
+
+def test_no_key_history_at_all_does_not_block_the_text_capability(tmp_path):
+    connector, _ = _connector(tmp_path)  # aucun secrets-status.json écrit
+    assert _status(connector.preflight(_crypto_request()), Cap.TEXT).state is CS.READY
+
+
+def test_an_expired_image_key_blocks_only_the_visual_capability(tmp_path):
+    _seed_key_status(tmp_path, "app.openai_image_api_keys", "expired")
+    connector, _ = _connector(tmp_path)
+    report = connector.preflight(_crypto_request())
+    assert _status(report, Cap.VISUAL).state is CS.UNAVAILABLE
+    assert _status(report, Cap.TEXT).state is CS.READY  # non affecté
+
+
+def test_a_rejected_elevenlabs_key_blocks_both_voice_and_music(tmp_path):
+    _seed_key_status(tmp_path, "elevenlabs.api_key", "rejected")
+    connector, _ = _connector(tmp_path)
+    report = connector.preflight(_crypto_request())
+    assert _status(report, Cap.VOICE).state is CS.UNAVAILABLE
+    assert _status(report, Cap.MUSIC).state is CS.UNAVAILABLE
+
+
+def test_key_blocked_check_never_makes_a_new_network_call(tmp_path):
+    _seed_key_status(tmp_path, "app.openai_api_key", "expired")
+    connector, transport = _connector(tmp_path)
+    connector.preflight(_crypto_request())
+    assert [m for m, *_ in transport.requests] == ["GET"]  # seul /ping : rien de plus qu'un préflight normal
 
 
 def test_wrong_text_provider_blocks_without_silent_fallback_and_explains_both_sides(tmp_path):

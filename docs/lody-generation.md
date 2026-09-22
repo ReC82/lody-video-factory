@@ -224,10 +224,11 @@ Rien de la confirmation ni du coût précédents n'est repris.
 
 ## Paramètres système (clés d'API du moteur)
 
-Voir [`docs/lody-secrets.md`](lody-secrets.md) : page dédiée (désactivée par défaut, verrouillée derrière
-`LODY_ENABLE_SYSTEM_SETTINGS`) pour saisir/remplacer les clés du moteur depuis Lody, sans jamais les afficher, et
-avec retour arrière automatique si une clé empêche le moteur de redémarrer sainement. **Ne pas activer tant que
-le site n'est pas protégé par une authentification.**
+Voir [`docs/lody-secrets.md`](lody-secrets.md) (stockage, permissions, pipeline d'application) et
+[`docs/lody-auth.md`](lody-auth.md) (authentification admin, procédure de remplacement d'une clé) : page dédiée,
+verrouillée derrière `LODY_ENABLE_SYSTEM_SETTINGS` **et** une session administrateur réelle, pour
+saisir/remplacer les clés du moteur depuis Lody sans jamais les afficher, avec vérification réelle auprès du
+fournisseur et retour arrière automatique si une clé est refusée ou empêche le moteur de redémarrer sainement.
 
 ## Limitations connues
 
