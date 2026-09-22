@@ -232,6 +232,16 @@ def test_engine_errors_are_classified_and_never_echoed(raw, kind):
     assert "sk-" not in message and raw not in message and "images" in message
 
 
+def test_sk_proj_key_format_observed_in_production_is_fully_masked():
+    """Non-régression : le format réel rencontré (`sk-proj-...`, clés OpenAI par projet) diffère du format
+    `sk-` classique testé ci-dessus (préfixe supplémentaire, tirets). Valeur ici fictive, jamais la vraie."""
+    raw = "Incorrect API key provided: sk-proj-HCsAbndKvW3xzFAKE1234567890abcdefFAKE. You can find your API key at..."
+    kind, message = classify_engine_error("script", raw)
+    assert kind is ErrorKind.AUTH
+    assert "sk-proj" not in message and "HCsAbndKvW3xzFAKE" not in message
+    assert message == "Le fournisseur refuse la clé d’API configurée. (échec pendant l’écriture du script)."
+
+
 def test_failed_task_keeps_the_stage_and_hides_the_raw_error(tmp_path):
     data = {"task_id": TASK, "state": -1, "progress": 40, "failed_stage": "materials",
             "error": "Incorrect API key provided: sk-abcdefghijklmnopqrstuvwxyz123456"}

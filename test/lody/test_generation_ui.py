@@ -200,6 +200,35 @@ def test_failure_is_readable_and_keeps_script_and_storyboard(engine):
     assert "Prompt visuel" in text
 
 
+def test_retry_after_an_invalid_key_failure_preserves_subject_needs_a_fresh_confirmation_and_keeps_history(engine):
+    """Cas réel (Short #4, clé OpenAI invalide/expirée) : « Préparer à nouveau » ne relance rien tout seul, garde
+    le sujet, exige une nouvelle estimation et une nouvelle confirmation, et ne touche jamais à la tentative
+    échouée déjà dans l'historique — voir CHANTIER CORRECTIF PRIORITAIRE, section 7."""
+    project, app = _launch(engine)
+    error = ProviderError(ErrorKind.AUTH, "Le fournisseur refuse la clé d’API configurée. (échec pendant l’écriture du script).")
+    engine.queue(TaskSnapshot(RemoteState.FAILED, 0, error=error))
+    app = _button(app, "Actualiser").click().run()
+    failed = _repo().list_for_project(project.id)[0]
+    assert failed.status.value == "ECHEC" and failed.error_code == "auth"
+
+    app = _button(app, "Préparer à nouveau").click().run()
+    assert not app.exception
+    # Reste sur le formulaire de préparation : aucune génération n'a été relancée automatiquement.
+    assert "Confirmer et générer la vidéo" not in _labels(app)
+    assert SUBJECT in _text(app) or SUBJECT[:40] in _text(app)  # sujet repris
+
+    engine.queue(TaskSnapshot(RemoteState.QUEUED, 0, "Dans la file du moteur"))
+    app = _prepare(app, project)
+    assert "Confirmer et générer la vidéo" in _labels(app)  # nouvelle estimation à confirmer, rien d'automatique
+    app = _button(app, "Confirmer et générer la vidéo").click().run()
+
+    productions = {p.id: p for p in _repo().list_for_project(project.id)}
+    assert failed.id in productions and productions[failed.id].status.value == "ECHEC"  # jamais écrasée
+    assert len(productions) == 2  # une tentative DISTINCTE, pas une reprise de l'ancienne
+    new_id = next(pid for pid in productions if pid != failed.id)
+    assert productions[new_id].id != failed.id
+
+
 def test_engine_down_does_not_break_the_page_or_lose_the_production(engine):
     project, app = _launch(engine)
     engine.queue(ProviderError(ErrorKind.UNAVAILABLE, "Le moteur de génération est injoignable pour le moment."))
