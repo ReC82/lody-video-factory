@@ -45,3 +45,28 @@ def fonts_dir() -> Path:
     """Polices de sous-titres fournies avec le moteur (resource/fonts) ; LODY_FONTS_DIR pour les tests."""
     raw = os.environ.get("LODY_FONTS_DIR", "").strip()
     return Path(raw) if raw else _REPO_ROOT / "resource" / "fonts"
+
+
+def secrets_dir() -> Path:
+    """Dossier des clés en attente d'application (``secrets.toml``, signal, statut) : monté en écriture pour Lody
+    UNIQUEMENT sur ce dossier — jamais sur config.toml. LODY_SECRETS_DIR pour les tests/conteneur."""
+    raw = os.environ.get("LODY_SECRETS_DIR", "").strip()
+    return Path(raw) if raw else _REPO_ROOT / "secrets"
+
+
+def secrets_path() -> Path:
+    return secrets_dir() / "secrets.toml"
+
+
+def secrets_reload_path() -> Path:
+    return secrets_dir() / "secrets.reload"
+
+
+def secrets_status_path() -> Path:
+    return secrets_dir() / "secrets-status.json"
+
+
+def system_settings_enabled() -> bool:
+    """Verrou de mise en ligne : désactivé par défaut. Ne doit être activé qu'une fois le site protégé par une
+    authentification — voir docs/lody-secrets.md."""
+    return os.environ.get("LODY_ENABLE_SYSTEM_SETTINGS", "").strip().lower() in {"1", "true", "yes"}

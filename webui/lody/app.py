@@ -7,7 +7,7 @@ import logging
 import streamlit as st
 
 from lody import nav, settings
-from lody import view_form, view_home, view_production, view_project, view_settings, view_tracking, view_v2
+from lody import view_form, view_home, view_production, view_project, view_settings, view_system_settings, view_tracking, view_v2
 from lody.generation.kit_service import KitService
 from lody.generation.runtime import DEFAULT_PROVIDER, build_kit_service, build_service
 from lody.generation.service import ProductionService
@@ -61,6 +61,11 @@ def render() -> None:
         return
 
     route = nav.current_route()
+    if route.view == nav.VIEW_SYSTEM_SETTINGS and not settings.system_settings_enabled():
+        # Verrou de mise en ligne : cette page n'existe pas tant qu'elle n'est pas explicitement activée
+        # (elle ne doit jamais être accessible avant que le site ait une authentification).
+        nav.go()
+        route = nav.Route(nav.VIEW_HOME)
     project = None
     if route.project_id:
         try:
@@ -90,6 +95,8 @@ def render() -> None:
         view_tracking.render(service, project, route.production_id, get_kit_service())
     elif route.view == nav.VIEW_V2 and project and route.production_id:
         view_v2.render(service, project, route.production_id)
+    elif route.view == nav.VIEW_SYSTEM_SETTINGS:
+        view_system_settings.render()
     elif project:
         view_project.render(repo, project, service)
     render_footer()
