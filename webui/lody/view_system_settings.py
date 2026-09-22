@@ -21,9 +21,14 @@ from lody.generation import engine_facts, secrets_store
 from lody.generation.secrets_fields import FIELD_ORDER, FIELDS
 from lody.theme import esc
 
-_IN_FLIGHT_LABEL = {"applying": "Enregistrement…", "restarting": "Redémarrage du moteur…", "restoring": "Restauration de la configuration précédente…"}
+_IN_FLIGHT_LABEL = {
+    "applying": "Enregistrement…", "restarting": "Redémarrage du moteur…",
+    "verifying": "Vérification auprès du fournisseur…", "restoring": "Restauration de la configuration précédente…",
+}
 _TERMINAL_LABEL = {
     "ok": ("ok", "Configurée"), "invalid": ("fail", "Invalide"),
+    "unverified": ("warn", "Configurée (non vérifiée auprès du fournisseur)"),
+    "rejected": ("fail", "Refusée par le fournisseur — ancienne configuration restaurée"),
     "rolled_back": ("warn", "Invalide — ancienne configuration restaurée"), "critical": ("fail", "Erreur critique"),
 }
 _POLL_SECONDS = 90  # au-delà, l'utilisateur peut toujours revenir sur la page : pas d'attente indéfinie
