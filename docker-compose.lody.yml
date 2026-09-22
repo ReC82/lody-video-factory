@@ -51,6 +51,12 @@ services:
       # Rapport de capacités du moteur (booléens et noms de modèles, aucun secret), généré sur l'hôte par
       # scripts/lody-engine-report.sh : c'est ce que Lody lit quand config.toml ne lui est pas lisible.
       LODY_ENGINE_REPORT: /engine-report/engine-capabilities.json
+      # Clés en attente d'application (secrets.toml, signal, statut) : le SEUL dossier où Lody écrit un secret ;
+      # jamais dans config.toml lui-même (voir docs/lody-secrets.md et le script hôte lody-apply-secrets.sh).
+      LODY_SECRETS_DIR: /secrets
+      # Verrou de mise en ligne (ticket #25) : NE PAS activer tant que le site public n'est pas protégé par une
+      # authentification. Désactivé par défaut ; décommenter uniquement après avoir ajouté cette protection.
+      # LODY_ENABLE_SYSTEM_SETTINGS: "1"
     ports:
       # Local uniquement (8501 = ancienne WebUI, 8080 = API : non touchés).
       - "127.0.0.1:8601:8601"
@@ -60,8 +66,16 @@ services:
       - ./config.toml:/MoneyPrinterTurbo/config.toml:ro
       - ./storage:/MoneyPrinterTurbo/storage:ro
       - ./engine-report:/engine-report:ro
+      # Écriture UNIQUEMENT sur ce petit dossier — jamais sur config.toml lui-même (qui reste :ro ci-dessus).
+      # Mis en place une fois par ./scripts/lody-setup-secrets-group.sh (groupe dédié lody-secrets, setgid,
+      # 2770) ; voir docs/lody-secrets.md.
+      - ./secrets:/secrets:rw
       # Base SQLite des projets. NE PAS supprimer ce volume (docker compose down -v).
       - lody_data:/data
+    # GID du groupe hôte lody-secrets (voir lody-setup-secrets-group.sh), placé dans .env, jamais dans ce
+    # fichier versionné (dépend de l'hôte). Requis : sans lui, Lody ne peut ni écrire ni lire secrets/.
+    group_add:
+      - "${LODY_SECRETS_GID:?exécute ./scripts/lody-setup-secrets-group.sh puis mets LODY_SECRETS_GID dans .env}"
     networks:
       - default
       - engine

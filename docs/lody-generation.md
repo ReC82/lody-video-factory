@@ -222,6 +222,13 @@ avec le sujet (et le script déjà écrit, le cas échéant) conservés, et cré
 même sujet, « nouvelle tentative de V1 ») : nouvelle estimation, nouveau preflight, **nouvelle confirmation**.
 Rien de la confirmation ni du coût précédents n'est repris.
 
+## Paramètres système (clés d'API du moteur)
+
+Voir [`docs/lody-secrets.md`](lody-secrets.md) : page dédiée (désactivée par défaut, verrouillée derrière
+`LODY_ENABLE_SYSTEM_SETTINGS`) pour saisir/remplacer les clés du moteur depuis Lody, sans jamais les afficher, et
+avec retour arrière automatique si une clé empêche le moteur de redémarrer sainement. **Ne pas activer tant que
+le site n'est pas protégé par une authentification.**
+
 ## Limitations connues
 
 - Une V2 **régénère tous les médias** (voix, images, musique) : aucune réutilisation.

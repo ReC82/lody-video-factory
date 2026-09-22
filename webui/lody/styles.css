@@ -183,6 +183,7 @@ button[kind="tertiary"]:hover { color: var(--text) !important; background: rgba(
 .pill-ok { color: var(--ok); background: rgba(110, 231, 183, 0.1); }
 .pill-muted { color: var(--muted); background: rgba(148, 163, 209, 0.1); }
 .pill-warn { color: var(--warn); background: rgba(252, 211, 77, 0.1); }
+.pill-fail { color: var(--danger); background: rgba(253, 164, 175, 0.1); }
 
 /* ---- Confirmation d'archivage ----------------------------------------- */
 .st-key-confirm_archive_box {
@@ -464,3 +465,13 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 [data-testid="stTab"], [data-testid="stTab"] * { color: var(--muted) !important; }
 [data-testid="stTab"]:hover, [data-testid="stTab"]:hover *, [data-testid="stTab"][aria-selected="true"], [data-testid="stTab"][aria-selected="true"] * { color: var(--text) !important; }
 .st-key-kit [data-testid="stRadio"] label p, .st-key-kit [data-testid="stCheckbox"] label p { color: var(--text); }
+
+/* ---- Paramètres système (clés du moteur) -------------------------------------------------------------- */
+.st-key-sys_settings { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.6rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.sys-field { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem 0.4rem; margin-top: 0.6rem; }
+.sys-field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.sys-field-label { font-weight: 600; color: var(--text); }
+.sys-field-provider { font-size: 0.8rem; color: var(--faint); }
+@media (max-width: 640px) {
+  .st-key-sys_settings { padding: 1.15rem 1rem; }
+}

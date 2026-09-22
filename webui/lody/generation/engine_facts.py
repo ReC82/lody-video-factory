@@ -53,14 +53,19 @@ class EngineFacts:
     generated_at: str = ""
     llm_provider: str = ""
     llm_key: dict[str, bool] = field(default_factory=dict)      # fournisseur → clé renseignée
+    # 4 derniers caractères de la clé, UNIQUEMENT pour l'affichage de « Paramètres système » (jamais journalisés :
+    # ce champ ne passe par aucun appel logger/print, ici ni chez l'appelant). Absent (chaîne vide) si non renseignée.
+    llm_key_last4: dict[str, str] = field(default_factory=dict)
     llm_model: dict[str, str] = field(default_factory=dict)     # fournisseur → nom de modèle configuré
     image_endpoint: bool = False
     image_model: str = ""
     image_key: bool = False
+    image_key_last4: str = ""
     image_public_openai: bool = False
     # Gabarit d'images GLOBAL du moteur (texte de prompt, pas un secret) : appliqué à chaque image de chaque projet.
     image_template: str = ""
     eleven_key: bool = False
+    eleven_key_last4: str = ""
     eleven_model: str = ""
     ui: dict[str, Any] = field(default_factory=dict)
 
@@ -98,12 +103,24 @@ def _name(value: Any) -> str:
     return value.strip()[:80] if isinstance(value, str) else ""
 
 
+def _last4(value: Any) -> str:
+    """4 derniers caractères, pour l'affichage seul (voir le commentaire sur ``llm_key_last4``). Chaîne vide si la
+    valeur est absente ou trop courte pour qu'un indice de 4 caractères ait un sens."""
+    if isinstance(value, list):
+        value = next((item for item in value if isinstance(item, str) and item.strip()), "")
+    if not isinstance(value, str):
+        return ""
+    stripped = value.strip()
+    return stripped[-4:] if len(stripped) >= 4 else ""
+
+
 def facts_from_config(raw: dict[str, Any], source: str = "config") -> EngineFacts:
     """Extrait les faits. Aucune valeur de clé n'est conservée (seulement « renseignée ou non »)."""
     app = raw.get("app") if isinstance(raw.get("app"), dict) else {}
     eleven = raw.get("elevenlabs") if isinstance(raw.get("elevenlabs"), dict) else {}
     ui = raw.get("ui") if isinstance(raw.get("ui"), dict) else {}
     llm_key = {key[: -len("_api_key")]: _filled(value) for key, value in app.items() if key.endswith("_api_key")}
+    llm_key_last4 = {key[: -len("_api_key")]: _last4(value) for key, value in app.items() if key.endswith("_api_key")}
     llm_model = {key[: -len("_model_name")]: _name(value) for key, value in app.items()
                  if key.endswith("_model_name") and _name(value)}
     base = _name(app.get("openai_image_base_url"))
@@ -111,12 +128,15 @@ def facts_from_config(raw: dict[str, Any], source: str = "config") -> EngineFact
     if ui.get("subtitle_background_enabled") is True and _name(ui.get("subtitle_background_color")):
         prefs["text_background_color"] = _name(ui.get("subtitle_background_color"))
     return EngineFacts(
-        source=source, llm_provider=_name(app.get("llm_provider")).lower(), llm_key=llm_key, llm_model=llm_model,
+        source=source, llm_provider=_name(app.get("llm_provider")).lower(), llm_key=llm_key,
+        llm_key_last4={k: v for k, v in llm_key_last4.items() if v}, llm_model=llm_model,
         image_endpoint=bool(base and _name(app.get("openai_image_model"))), image_model=_name(app.get("openai_image_model")),
-        image_key=_filled(app.get("openai_image_api_keys")), image_public_openai="openai.com" in base,
+        image_key=_filled(app.get("openai_image_api_keys")), image_key_last4=_last4(app.get("openai_image_api_keys")),
+        image_public_openai="openai.com" in base,
         image_template=(app.get("openai_image_prompt_template") or "").strip()[:2000]
         if isinstance(app.get("openai_image_prompt_template"), str) else "",
-        eleven_key=_filled(eleven.get("api_key")), eleven_model=_name(eleven.get("model_id")), ui=prefs,
+        eleven_key=_filled(eleven.get("api_key")), eleven_key_last4=_last4(eleven.get("api_key")),
+        eleven_model=_name(eleven.get("model_id")), ui=prefs,
     )
 
 
@@ -126,11 +146,14 @@ def _facts_from_report(data: dict[str, Any]) -> EngineFacts:
         source="report", generated_at=str(data.get("generated_at", "")),
         llm_provider=str(facts.get("llm_provider", "")),
         llm_key={str(k): bool(v) for k, v in dict(facts.get("llm_key", {})).items()},
+        llm_key_last4={str(k): str(v)[:4] for k, v in dict(facts.get("llm_key_last4", {})).items()},
         llm_model={str(k): _name(v) for k, v in dict(facts.get("llm_model", {})).items()},
         image_endpoint=bool(facts.get("image_endpoint")), image_model=_name(facts.get("image_model")),
-        image_key=bool(facts.get("image_key")), image_public_openai=bool(facts.get("image_public_openai")),
+        image_key=bool(facts.get("image_key")), image_key_last4=str(facts.get("image_key_last4", ""))[:4],
+        image_public_openai=bool(facts.get("image_public_openai")),
         image_template=str(facts.get("image_template", ""))[:2000],
-        eleven_key=bool(facts.get("eleven_key")), eleven_model=_name(facts.get("eleven_model")),
+        eleven_key=bool(facts.get("eleven_key")), eleven_key_last4=str(facts.get("eleven_key_last4", ""))[:4],
+        eleven_model=_name(facts.get("eleven_model")),
         ui={k: v for k, v in dict(facts.get("ui", {})).items() if isinstance(v, (str, int, float, bool))},
     )
 
@@ -187,6 +210,14 @@ def _write_atomic(target: Path, payload: dict[str, Any]) -> None:
         temp = Path(handle.name)
     os.chmod(temp, 0o644)  # lisible par le conteneur : le rapport ne contient aucun secret
     os.replace(temp, target)
+
+
+def write_report(config_path: Path, out_path: Path) -> dict[str, Any]:
+    """Génère ET écrit le rapport (atomique). Réutilisé par ``apply_secrets`` juste après avoir changé
+    ``config.toml``, pour éviter un aller-retour par un sous-processus séparé."""
+    report = build_report(config_path)
+    _write_atomic(out_path, report)
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:

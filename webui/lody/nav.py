@@ -22,6 +22,9 @@ VIEW_SETTINGS = "parametres"
 VIEW_PRODUCTION = "production"
 VIEW_TRACK = "suivi"
 VIEW_V2 = "v2"
+# Accessible uniquement en connaissant ce paramètre : aucun bouton ni lien n'y mène nulle part dans l'interface
+# (verrouillée en plus par settings.system_settings_enabled(), désactivée par défaut — voir docs/lody-secrets.md).
+VIEW_SYSTEM_SETTINGS = "systeme"
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,8 @@ def current_route() -> Route:
         return Route(VIEW_PROJECT, project_id)
     if view == VIEW_NEW:
         return Route(VIEW_NEW)
+    if view == VIEW_SYSTEM_SETTINGS:
+        return Route(VIEW_SYSTEM_SETTINGS)
     return Route(VIEW_HOME)
 
 
