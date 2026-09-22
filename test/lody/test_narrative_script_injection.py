@@ -84,14 +84,15 @@ def test_location_only_without_any_character():
 
 
 def test_block_is_bounded_and_never_truncates_a_field_in_the_middle():
-    long_field = "x" * 400
+    marker = "PERSONNALITEMARQUEUR"  # motif distinctif (jamais un sous-mot du français) pour détecter une coupe partielle
+    long_field = marker * 20  # 400 caractères
     narrative = {"version": 1, "characters": [
         {"id": str(i), "name": f"Perso{i}", "role": "Rôle", "personality": long_field} for i in range(6)
     ], "location": None}
     block = render_prompt_block(narrative)
     assert len(block) <= NARRATIVE_BLOCK_MAX + 100  # marge d'en-tête/pied ; jamais illimité malgré 6 personnages
-    # aucune ligne ne contient une occurrence PARTIELLE du champ long (0 = absent, 400 = entier, rien entre les deux)
-    assert all(line.count("x") in (0, 400) for line in block.splitlines())
+    # aucune ligne ne contient une occurrence PARTIELLE du champ long (0 = absent, 20 = entier, rien entre les deux)
+    assert all(line.count(marker) in (0, 20) for line in block.splitlines())
 
 
 def test_no_secret_or_technical_field_ever_appears_even_if_present_in_the_snapshot_dict():
