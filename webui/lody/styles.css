@@ -185,10 +185,11 @@ button[kind="tertiary"]:hover { color: var(--text) !important; background: rgba(
 .pill-warn { color: var(--warn); background: rgba(252, 211, 77, 0.1); }
 .pill-fail { color: var(--danger); background: rgba(253, 164, 175, 0.1); }
 
-/* ---- Confirmation d'archivage ----------------------------------------- */
-.st-key-confirm_archive_box {
+/* ---- Confirmation d'archivage / désactivation (personnages, lieux) ---- */
+.st-key-confirm_archive_box, [class*="st-key-confirm_deactivate_"] {
   border: 1px solid rgba(252, 211, 77, 0.35); background: rgba(252, 211, 77, 0.05);
   border-radius: var(--radius); padding: 1.2rem 1.4rem; gap: 0.6rem; animation: rise 0.3s ease both;
+  margin-bottom: 0.75rem;
 }
 .stApp .confirm-title { margin: 0; font-weight: 650; font-size: 1.05rem; color: var(--text); }
 .stApp .confirm-text { margin: 0.2rem 0 0.4rem; color: var(--muted); line-height: 1.55; }
@@ -403,8 +404,21 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
 [class*="st-key-prod_row_"] { gap: 0.75rem 1rem; flex-wrap: wrap; padding: 0.75rem 0; border-top: 1px solid var(--border); align-items: center; }
 [class*="st-key-prod_row_"] > div:first-child { flex: 1 1 14rem; min-width: 0; }
 
+/* Personnages / lieux récurrents (#32/#33) : mêmes lignes que les productions ci-dessus. */
+.stApp .st-key-characters, .stApp .st-key-locations {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.6rem;
+}
+[class*="st-key-item_row_"] { gap: 0.75rem 1rem; flex-wrap: wrap; padding: 0.75rem 0; border-top: 1px solid var(--border); align-items: center; }
+.stApp .st-key-characters .card-eyebrow + [class*="st-key-item_row_"],
+.stApp .st-key-locations .card-eyebrow + [class*="st-key-item_row_"] { border-top: 0; }
+[class*="st-key-item_row_"] > div:first-child { flex: 1 1 14rem; min-width: 0; }
+[class*="st-key-item_actions_"] { gap: 0.5rem; flex-wrap: wrap; }
+
 @media (max-width: 640px) {
   .st-key-run_card, .st-key-result, .st-key-productions, [class*="st-key-estimate_"] { padding: 1.15rem 1rem; }
+  .stApp .st-key-characters, .stApp .st-key-locations { padding: 1.15rem 1rem; }
+  [class*="st-key-item_row_"] > div:last-child { flex: 1 1 100%; }
+  [class*="st-key-item_row_"] button { width: 100%; }
   .est-row { flex-direction: column; gap: 0.35rem; }
   .est-amount { text-align: left; white-space: normal; }
   .est-total { flex-direction: column; gap: 0.2rem; }

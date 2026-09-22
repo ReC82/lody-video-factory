@@ -7,11 +7,14 @@ import logging
 import streamlit as st
 
 from lody import nav, settings
-from lody import view_form, view_home, view_production, view_project, view_settings, view_system_settings, view_tracking, view_v2
+from lody import view_characters, view_form, view_home, view_locations, view_production, view_project, view_settings, \
+    view_system_settings, view_tracking, view_v2
+from lody.characters import CharacterRepository
 from lody.generation.kit_service import KitService
 from lody.generation.runtime import DEFAULT_PROVIDER, build_kit_service, build_service
 from lody.generation.service import ProductionService
 from lody.components import accent_for, render_flash, render_footer, render_header
+from lody.locations import LocationRepository
 from lody.projects import ProjectNotFound, ProjectRepository
 from lody.seeds import SEED_PROJECTS
 from lody.theme import DEFAULT_ACCENT, inject_theme
@@ -38,6 +41,18 @@ def get_production_service() -> ProductionService:
 def get_kit_service() -> KitService:
     """Service des kits de publication, construit sur le service de production partagé."""
     return build_kit_service(get_production_service())
+
+
+@st.cache_resource(show_spinner=False)
+def get_character_repository() -> CharacterRepository:
+    """Personnages récurrents (#30/#32) : facultatifs, jamais lus par le pipeline de génération."""
+    return CharacterRepository(settings.db_path())
+
+
+@st.cache_resource(show_spinner=False)
+def get_location_repository() -> LocationRepository:
+    """Lieux récurrents (#31/#33) : facultatifs, jamais lus par le pipeline de génération."""
+    return LocationRepository(settings.db_path())
 
 
 def _render_storage_error() -> None:
@@ -74,7 +89,9 @@ def render() -> None:
             nav.flash("error", "Ce projet est introuvable.")
             nav.go()
             route = nav.Route(nav.VIEW_HOME)
-    if project is not None and project.is_archived and route.view in (nav.VIEW_SETTINGS, nav.VIEW_PRODUCTION, nav.VIEW_V2):
+    if project is not None and project.is_archived and route.view in (
+        nav.VIEW_SETTINGS, nav.VIEW_PRODUCTION, nav.VIEW_V2, nav.VIEW_CHARACTERS, nav.VIEW_LOCATIONS,
+    ):
         nav.flash("info", "Ce projet est archivé : restaure-le pour continuer.")
         nav.go(nav.VIEW_PROJECT, project.id)
         route = nav.Route(nav.VIEW_PROJECT, project.id)
@@ -95,6 +112,10 @@ def render() -> None:
         view_tracking.render(service, project, route.production_id, get_kit_service())
     elif route.view == nav.VIEW_V2 and project and route.production_id:
         view_v2.render(service, project, route.production_id)
+    elif route.view == nav.VIEW_CHARACTERS and project:
+        view_characters.render(get_character_repository(), project)
+    elif route.view == nav.VIEW_LOCATIONS and project:
+        view_locations.render(get_location_repository(), project)
     elif route.view == nav.VIEW_SYSTEM_SETTINGS:
         view_system_settings.render()
     elif project:
