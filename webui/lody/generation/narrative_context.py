@@ -146,19 +146,18 @@ def _bounded_block(header: str, lines: Sequence[str], footer: str, limit: int, t
     return "\n".join([header, *kept, footer])
 
 
-def _detail_line(item: dict[str, Any], fields: Sequence[str]) -> str:
-    details = "; ".join(f"{_FIELD_LABELS[field]} : {item[field]}" for field in fields if item.get(field))
-    return details
+def _detail_line(item: dict[str, Any], fields: Sequence[str], labels: dict[str, str]) -> str:
+    return "; ".join(f"{labels[field]} : {item[field]}" for field in fields if item.get(field))
 
 
 def _character_line(character: dict[str, Any]) -> str:
-    details = _detail_line(character, _SCRIPT_CHARACTER_FIELDS)
+    details = _detail_line(character, _SCRIPT_CHARACTER_FIELDS, _FIELD_LABELS)
     name = character.get("name", "")
     return f"- {name}" + (f" — {details}" if details else "")
 
 
 def _location_line(location: dict[str, Any]) -> str:
-    details = _detail_line(location, _SCRIPT_LOCATION_FIELDS)
+    details = _detail_line(location, _SCRIPT_LOCATION_FIELDS, _FIELD_LABELS)
     name = location.get("name", "")
     return f"Lieu : {name}" + (f" — {details}" if details else "")
 
@@ -214,7 +213,7 @@ _VISUAL_TRUNCATION_NOTE = "(continuité tronquée pour tenir dans la limite du p
 
 
 def _character_visual_full(character: dict[str, Any]) -> str:
-    details = _detail_line(character, _VISUAL_CHARACTER_FIELDS)
+    details = _detail_line(character, _VISUAL_CHARACTER_FIELDS, _VISUAL_FIELD_LABELS)
     name = character.get("name", "")
     return f"- {name}" + (f" — {details}" if details else "")
 
@@ -225,7 +224,7 @@ def _character_visual_repeat(character: dict[str, Any], first_index: int) -> str
 
 
 def _location_visual_full(location: dict[str, Any]) -> str:
-    details = _detail_line(location, _VISUAL_LOCATION_FIELDS)
+    details = _detail_line(location, _VISUAL_LOCATION_FIELDS, _VISUAL_FIELD_LABELS)
     name = location.get("name", "")
     return f"Lieu : {name}" + (f" — {details}" if details else "")
 
