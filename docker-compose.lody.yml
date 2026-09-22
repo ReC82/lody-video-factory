@@ -54,9 +54,16 @@ services:
       # Clés en attente d'application (secrets.toml, signal, statut) : le SEUL dossier où Lody écrit un secret ;
       # jamais dans config.toml lui-même (voir docs/lody-secrets.md et le script hôte lody-apply-secrets.sh).
       LODY_SECRETS_DIR: /secrets
-      # Verrou de mise en ligne (ticket #25) : NE PAS activer tant que le site public n'est pas protégé par une
-      # authentification. Désactivé par défaut ; décommenter uniquement après avoir ajouté cette protection.
+      # Verrou de mise en ligne (ticket #25/#28) : NE PAS activer tant que nginx ne protège pas /lody-auth/*
+      # (limitation de débit sur /login — voir deploy/nginx/lody-auth.conf) et que ce déploiement n'a pas été
+      # validé. Désactivé par défaut ; décommenter uniquement après validation. L'authentification admin
+      # (service lody-auth) protège la PAGE quel que soit ce drapeau ; le drapeau reste une défense en profondeur.
       # LODY_ENABLE_SYSTEM_SETTINGS: "1"
+      # Service d'authentification admin (voir docs/lody-auth.md). URL interne (réseau Docker, jamais
+      # publique) pour vérifier une session ; préfixe PUBLIC (relatif : fonctionne quel que soit le domaine)
+      # pour les liens de connexion/déconnexion affichés dans la page.
+      LODY_AUTH_VERIFY_URL: http://lody-auth:8602/verify
+      LODY_AUTH_PUBLIC_URL: /lody-auth
     ports:
       # Local uniquement (8501 = ancienne WebUI, 8080 = API : non touchés).
       - "127.0.0.1:8601:8601"
@@ -76,6 +83,9 @@ services:
     # fichier versionné (dépend de l'hôte). Requis : sans lui, Lody ne peut ni écrire ni lire secrets/.
     group_add:
       - "${LODY_SECRETS_GID:?exécute ./scripts/lody-setup-secrets-group.sh puis mets LODY_SECRETS_GID dans .env}"
+    depends_on:
+      lody-auth:
+        condition: service_healthy
     networks:
       - default
       - engine
@@ -90,6 +100,46 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  # Service d'authentification admin pour « Paramètres système » (voir docs/lody-auth.md). Aucune dépendance
+  # tierce, aucune donnée persistée dans l'image ; les sessions vivent en mémoire du processus (un redémarrage
+  # déconnecte tout le monde — accepté pour un déploiement mono-administrateur).
+  lody-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.lody-auth
+    image: lody-auth:${LODY_IMAGE_TAG:-local}
+    pull_policy: never
+    container_name: lody-video-factory-auth
+    environment:
+      LODY_AUTH_ADMIN_FILE: /secrets/admin-auth.json
+      # nginx termine toujours le TLS devant ce service : le cookie de session reste Secure. Mettre à "0"
+      # UNIQUEMENT pour un test local sans HTTPS (voir docs/lody-auth.md) — jamais en production.
+      LODY_AUTH_COOKIE_SECURE: "1"
+    ports:
+      # Local uniquement, comme lody-ui ; nginx proxifie /lody-auth/ vers ce port (voir deploy/nginx/lody-auth.conf).
+      - "127.0.0.1:8602:8602"
+    volumes:
+      # Lecture seule : ce service ne modifie jamais admin-auth.json (voir scripts/lody-auth-set-password.sh,
+      # lancé à la main sur l'hôte, jamais depuis un conteneur).
+      - ./secrets:/secrets:ro
+    group_add:
+      - "${LODY_SECRETS_GID:?exécute ./scripts/lody-setup-secrets-group.sh puis mets LODY_SECRETS_GID dans .env}"
+    networks:
+      # Sur le même réseau que lody-ui (pour l'appel interne /verify) ; pas sur le réseau du moteur, qu'il n'a
+      # aucune raison de joindre.
+      - default
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8602/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 networks:
   # Réseau du moteur de génération (créé par son propre Compose) : on s'y rattache, on ne le crée pas.

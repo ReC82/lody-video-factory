@@ -133,8 +133,39 @@ def test_systemd_units_exist_watch_the_signal_file_and_run_the_apply_script():
     assert "User=ubuntu" in service_unit and "User=root" not in service_unit  # jamais en root
 
 
+def test_lody_auth_image_exists_and_never_copies_secrets():
+    dockerfile = (ROOT / "Dockerfile.lody-auth").read_text(encoding="utf-8")
+    dockerignore = (ROOT / "Dockerfile.lody-auth.dockerignore").read_text(encoding="utf-8")
+    assert not re.search(r"COPY[^\n]*secrets", dockerfile)
+    assert not re.search(r"COPY[^\n]*config\.toml", dockerfile)
+    assert re.search(r"^USER lody-auth\s*$", dockerfile, re.MULTILINE)  # jamais root
+    for ignored in ("secrets", "config.toml", ".env", ".git"):
+        assert re.search(rf"^{re.escape(ignored)}$", dockerignore, re.MULTILINE), ignored
+
+
+def test_compose_wires_lody_auth_read_only_and_separately_from_the_engine_network():
+    yaml = pytest.importorskip("yaml")
+    compose = yaml.safe_load((ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8"))
+    auth = compose["services"]["lody-auth"]
+    assert "./secrets:/secrets:ro" in auth["volumes"]  # jamais rw : ce service ne modifie jamais admin-auth.json
+    assert "engine" not in auth.get("networks", [])  # aucune raison de joindre le réseau du moteur
+    assert auth["ports"] == ["127.0.0.1:8602:8602"]  # local uniquement, comme lody-ui
+    assert auth["cap_drop"] == ["ALL"]
+    lody_ui = compose["services"]["lody-ui"]
+    assert lody_ui["environment"]["LODY_AUTH_VERIFY_URL"] == "http://lody-auth:8602/verify"
+    assert lody_ui["depends_on"]["lody-auth"]["condition"] == "service_healthy"
+
+
+def test_nginx_snippet_blocks_verify_publicly_and_rate_limits_login():
+    conf = (ROOT / "deploy/nginx/lody-auth.conf").read_text(encoding="utf-8")
+    assert "location = /lody-auth/verify" in conf and "return 404" in conf
+    assert "limit_req" in conf
+    assert "NE PAS appliquer avant validation" in conf
+
+
 def test_setup_and_verification_scripts_exist_and_are_valid_shell():
-    for name in ("lody-setup-secrets-group.sh", "lody-verify-secrets-permissions.sh", "lody-apply-secrets.sh"):
+    for name in ("lody-setup-secrets-group.sh", "lody-verify-secrets-permissions.sh", "lody-apply-secrets.sh",
+                "lody-auth-set-password.sh"):
         script = ROOT / "scripts" / name
         assert script.is_file(), name
         result = subprocess.run(["sh", "-n", str(script)], capture_output=True, text=True, timeout=10)
