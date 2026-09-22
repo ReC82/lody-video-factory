@@ -96,3 +96,35 @@ def test_demo_journey_has_no_horizontal_overflow(running_app, width):
         page.get_by_text("Une V2 régénère tout").wait_for(timeout=15000)
         check("V2")
         browser.close()
+
+
+@pytest.mark.parametrize("width", list(SIZES))
+def test_characters_and_locations_pages_have_no_horizontal_overflow(running_app, width):
+    """#32/#33 : état vide, formulaire ouvert et liste peuplée, aux trois largeurs."""
+    base, chrome, data_dir = running_app
+    overflow = "() => { const m = document.querySelector('[data-testid=\"stMain\"]') || document.documentElement; return m.scrollWidth - m.clientWidth; }"
+    with sync_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch(executable_path=chrome, args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width": width, "height": SIZES[width]})
+        project = sqlite3.connect(data_dir / "lody.sqlite3").execute(
+            "select id from projects where name='LodyCrypto'").fetchone()[0]
+
+        def check(label):
+            page.wait_for_timeout(700)
+            assert page.evaluate(overflow) <= 1, f"débordement horizontal ({label}, {width}px)"
+
+        for view, empty_text, add_label, name_placeholder in (
+            ("personnages", "Aucun personnage pour l’instant", "Ajouter un personnage", "Ex. Gaston"),
+            ("lieux", "Aucun lieu pour l’instant", "Ajouter un lieu", "Ex. Place du marché"),
+        ):
+            page.goto(f"{base}/?projet={project}&vue={view}", wait_until="networkidle")
+            page.get_by_text(empty_text).wait_for(timeout=15000)
+            check(f"{view} (vide)")
+            page.get_by_role("button", name=add_label).click()
+            page.get_by_placeholder(name_placeholder).wait_for(timeout=15000)
+            check(f"{view} (formulaire)")
+            page.get_by_placeholder(name_placeholder).fill("Test responsive")
+            page.get_by_role("button", name="Enregistrer").click()
+            page.get_by_text("Test responsive").wait_for(timeout=15000)
+            check(f"{view} (liste peuplée)")
+        browser.close()
