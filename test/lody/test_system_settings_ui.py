@@ -161,3 +161,45 @@ def test_rolled_back_state_explains_the_old_configuration_was_restored(lody_env,
     monkeypatch.setenv("LODY_SECRETS_DIR", str(secrets_dir))
     app = _run(monkeypatch, lody_env, enabled=True)
     assert "restaurée" in _text(app)
+
+
+def test_rejected_state_shows_the_provider_refused_the_key_distinctly_from_a_generic_rollback(lody_env, monkeypatch, tmp_path):
+    import json
+
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "secrets-status.json").write_text(json.dumps({
+        "state": "rejected", "fields": {"app.openai_api_key": {
+            "state": "rejected", "message": "Le fournisseur a refusé cette clé (authentification refusée) : l’ancienne configuration a été restaurée automatiquement."}},
+    }), encoding="utf-8")
+    monkeypatch.setenv("LODY_SECRETS_DIR", str(secrets_dir))
+    app = _run(monkeypatch, lody_env, enabled=True)
+    text = _text(app)
+    assert "Refusée par le fournisseur" in text
+
+
+def test_unverified_state_is_distinct_from_configured_and_from_invalid(lody_env, monkeypatch, tmp_path):
+    import json
+
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "secrets-status.json").write_text(json.dumps({
+        "state": "ready_unverified", "fields": {"app.openai_api_key": {
+            "state": "unverified", "message": "Le moteur a redémarré normalement, mais la vérification auprès du fournisseur a dépassé le délai : la clé est appliquée mais non confirmée."}},
+    }), encoding="utf-8")
+    monkeypatch.setenv("LODY_SECRETS_DIR", str(secrets_dir))
+    app = _run(monkeypatch, lody_env, enabled=True)
+    text = _text(app)
+    assert "non vérifiée" in text.lower()
+
+
+def test_verifying_in_progress_state_shows_a_transient_label(lody_env, monkeypatch, tmp_path):
+    import json
+
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "secrets-status.json").write_text(
+        json.dumps({"state": "verifying", "processing": ["elevenlabs.api_key"], "fields": {}}), encoding="utf-8")
+    monkeypatch.setenv("LODY_SECRETS_DIR", str(secrets_dir))
+    app = _run(monkeypatch, lody_env, enabled=True)
+    assert "Vérification auprès du fournisseur" in _text(app)
