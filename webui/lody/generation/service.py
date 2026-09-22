@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from lody import brief as brief_lib
 from lody import catalog
+from lody.characters import CharacterRepository
 from lody.generation import kit_files, publication, thumbnail, typography
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
 from lody.generation.models import (
@@ -40,10 +41,12 @@ from lody.generation.models import (
     TaskSnapshot,
     VoiceSpec,
 )
+from lody.generation.narrative_context import NarrativeContextError, resolve_narrative_context
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import sanitize
 from lody.generation.storyboard import MAX_SCENES, build_storyboard
 from lody.generation.store import Production, ProductionRepository
+from lody.locations import LocationRepository
 from lody.projects import Project
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
@@ -109,11 +112,15 @@ def project_part(request: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in request.items() if key not in _PER_RUN_FIELDS}
 
 
-def make_snapshot(project: Project, request: GenerationRequest, captured_at: str, inherited_from: str | None = None) -> dict[str, Any]:
+def make_snapshot(project: Project, request: GenerationRequest, captured_at: str, inherited_from: str | None = None,
+                   narrative_context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Instantané IMMUABLE des paramètres du projet au moment de la préparation.
 
     Copie profonde (JSON) : aucun objet n'est partagé avec le projet ni avec une autre production. ``origins``
     dit d'où vient chaque valeur ; ``version`` est l'empreinte des seuls paramètres du projet.
+
+    ``narrative_context`` (ticket #35) : instantané déjà résolu des personnages et du lieu sélectionnés, ou
+    ``{}``/``None`` sans sélection — auquel cas le reste du snapshot est fonctionnellement identique à avant #35.
     """
     import copy
     import hashlib
@@ -126,7 +133,7 @@ def make_snapshot(project: Project, request: GenerationRequest, captured_at: str
     origins.update({key: origin for key, origin in _ORIGIN_OF_RUN_FIELD.items() if key in data})
     return {"version": version, "captured_at": captured_at, "inherited_from": inherited_from,
             "project": {"id": project.id, "name": project.name, "updated_at": project.updated_at},
-            "request": data, "origins": origins}
+            "request": data, "origins": origins, "narrative_context": copy.deepcopy(narrative_context) or {}}
 
 
 def request_of(production: Production) -> GenerationRequest:
@@ -158,12 +165,17 @@ def validate_script(script: str) -> str:
 class ProductionService:
     def __init__(self, repo: ProductionRepository, providers: dict[str, VideoGenerationProvider],
                  executor: Executor, price_book: Callable[[], PriceBook] = load_price_book,
-                 clock: Callable[[], str] = _now):
+                 clock: Callable[[], str] = _now, character_repo: CharacterRepository | None = None,
+                 location_repo: LocationRepository | None = None):
         self.repo = repo
         self._providers = providers
         self._executor = executor
         self._price_book = price_book
         self._clock = clock
+        # Facultatifs (#35) : sans eux, prepare() n'accepte aucune sélection de personnage/lieu (comportement
+        # inchangé). Aucun écran ne les propose encore (#34) ; runtime.build_service() les fournit déjà.
+        self._character_repo = character_repo
+        self._location_repo = location_repo
         self._inflight: set[str] = set()
         self._lock = threading.Lock()
 
@@ -223,17 +235,37 @@ class ProductionService:
         low, high = provider.plan_units(request).scenes
         return max(1, min(MAX_SCENES, round((low + high) / 2)))
 
+    def _resolve_narrative_context(self, project_id: str, character_ids: Sequence[str],
+                                    location_id: str | None) -> dict[str, Any]:
+        """Traduit la sélection facultative (#35) en snapshot immuable, ou lève ``LaunchError`` si invalide."""
+        if not character_ids and not location_id:
+            return {}  # cas le plus courant : comportement strictement inchangé
+        if self._character_repo is None or self._location_repo is None:
+            raise LaunchError("La sélection de personnages ou de lieux n'est pas disponible pour cette production.")
+        try:
+            return resolve_narrative_context(project_id, character_ids, location_id,
+                                             self._character_repo, self._location_repo)
+        except NarrativeContextError as error:
+            raise LaunchError(str(error)) from error
+
     def prepare(self, project: Project, subject: str, *, provider_id: str, script: str = "",
-                draft_id: str | None = None, retry_of: str | None = None) -> Production:
+                draft_id: str | None = None, retry_of: str | None = None,
+                character_ids: Sequence[str] = (), location_id: str | None = None) -> Production:
         """Crée (ou met à jour) un brouillon avec son estimation : EN_ATTENTE_CONFIRMATION.
 
         ``retry_of`` = une production échouée du même projet : la nouvelle tentative lui est *liée* (elle ne
         l'écrase jamais) et repart d'une estimation et d'une confirmation neuves.
+
+        ``character_ids``/``location_id`` (#35, facultatifs) : sélection résolue dans le projet courant et
+        copiée dans l'instantané (``snapshot.narrative_context``). Non modifiée par les éditions ultérieures
+        du projet. Sans sélection (le cas de toute l'interface actuelle, #34 n'existant pas encore) : aucun
+        changement de comportement.
         """
         text = validate_subject(subject)
         script_text = typography.normalize_for_language(validate_script(script), project.language) if script.strip() else ""
         provider = self.provider(provider_id)
         request = build_request(project, text, script_text)
+        narrative_context = self._resolve_narrative_context(project.id, character_ids, location_id)
         _, cost = self._plan(provider, request)
         fields: dict[str, Any] = {
             "brief": brief_lib.build_brief(project, text), "script": script_text,
@@ -241,7 +273,8 @@ class ProductionService:
             "params": {"request": request.to_dict(), "engine": provider.describe_params(request)},
             "storyboard": [], "visual_prompts": [], "current_step": "En attente de confirmation",
             "error_code": "", "error_message": "", "trace": {},
-            "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of), **cost,
+            "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of,
+                                      narrative_context=narrative_context), **cost,
         }
         if retry_of:
             failed = self.repo.get(retry_of)
@@ -272,7 +305,7 @@ class ProductionService:
 
         inherited = copy.deepcopy(parent.snapshot) or {
             "version": "", "captured_at": parent.created_at, "project": {"id": parent.project_id, "name": ""},
-            "request": copy.deepcopy(parent.params.get("request", {})), "origins": {}}
+            "request": copy.deepcopy(parent.params.get("request", {})), "origins": {}, "narrative_context": {}}
         inherited["inherited_from"] = parent.id  # la V2 reprend les paramètres de sa version précédente, pas ceux du projet actuel
         return self.repo.create(
             project_id=parent.project_id, subject=parent.subject, provider=parent.provider,
