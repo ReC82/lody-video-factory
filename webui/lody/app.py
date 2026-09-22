@@ -107,7 +107,7 @@ def render() -> None:
     elif route.view == nav.VIEW_SETTINGS and project:
         view_settings.render(repo, project, service.option_states(project, DEFAULT_PROVIDER))
     elif route.view == nav.VIEW_PRODUCTION and project:
-        view_production.render(project, service)
+        view_production.render(project, service, get_character_repository(), get_location_repository())
     elif route.view == nav.VIEW_TRACK and project and route.production_id:
         view_tracking.render(service, project, route.production_id, get_kit_service())
     elif route.view == nav.VIEW_V2 and project and route.production_id:

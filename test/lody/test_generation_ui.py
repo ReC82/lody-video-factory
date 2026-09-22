@@ -8,11 +8,13 @@ from pathlib import Path
 import pytest
 
 from lody import settings
+from lody.characters import CharacterRepository
 from lody.generation import runtime
 from lody.generation.costing import PriceBook
 from lody.generation.models import ErrorKind, ProviderError, RemoteState, TaskSnapshot
 from lody.generation.service import ProductionService
 from lody.generation.store import ProductionRepository
+from lody.locations import LocationRepository
 from lody.projects import ProjectRepository
 from lody.seeds import SEED_PROJECTS
 from test.lody.fakes import SCRIPT, ScriptedConnector, SyncExecutor
@@ -44,7 +46,9 @@ def engine(lody_env, monkeypatch, tmp_path):
         repo = ProductionRepository(settings.db_path())
         return ProductionService(repo, {runtime.DEFAULT_PROVIDER: connector, runtime.DEMO_PROVIDER: runtime.demo.DemoConnector(
             settings.data_dir(), clock=lambda: clock["now"], make_video=lambda target: target.write_bytes(b"demo-video"))},
-            SyncExecutor(), price_book=lambda: holder["book"])
+            SyncExecutor(), price_book=lambda: holder["book"],
+            # Comme runtime.build_service() en production (#35) : sans sélection (#34), aucun autre test n'est affecté.
+            character_repo=CharacterRepository(settings.db_path()), location_repo=LocationRepository(settings.db_path()))
 
     monkeypatch.setattr("lody.app.build_service", build)
     connector.holder = holder
