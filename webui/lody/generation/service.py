@@ -41,7 +41,7 @@ from lody.generation.models import (
     TaskSnapshot,
     VoiceSpec,
 )
-from lody.generation.narrative_context import NarrativeContextError, resolve_narrative_context
+from lody.generation.narrative_context import NarrativeContextError, render_prompt_block, resolve_narrative_context
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import sanitize
 from lody.generation.storyboard import MAX_SCENES, build_storyboard
@@ -403,9 +403,15 @@ class ProductionService:
             return
         try:
             request = request_of(production)
-            script_request = provider.describe_script_request(request) if not request.script else None
+            # #36 : rendu UNIQUEMENT depuis le snapshot déjà figé de CETTE production (jamais les tables
+            # characters/locations, qui peuvent avoir changé depuis) ; "" sans sélection ou snapshot antérieur
+            # à #35 — le prompt reste alors identique à avant #36 (voir render_prompt_block). N'affecte ni la
+            # voix ni les prompts d'images : seul script_request/write_script le reçoit, jamais build_payload.
+            narrative_block = render_prompt_block(production.snapshot.get("narrative_context"))
+            script_request = provider.describe_script_request(request, narrative_block) if not request.script else None
             if not request.script:
-                script = typography.normalize_for_language(provider.write_script(request).strip(), request.language)
+                script = typography.normalize_for_language(
+                    provider.write_script(request, narrative_block).strip(), request.language)
                 if not script:
                     raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script reçu est vide.", stage="script")
                 request = request.with_updates(script=script)
@@ -463,8 +469,12 @@ class ProductionService:
         """Ce qui est RÉELLEMENT envoyé, et d'où vient chaque élément (sans clé : aucun champ secret n'existe ici)."""
         detail = provider.trace_prompts(request)
         engine_template = detail.get("image_template", {})
+        narrative_present = bool(production.snapshot.get("narrative_context"))  # #36 : pour l'audit de l'injection
+        script_origin = "projet — durée, ton, public, orientation, structure, consignes permanentes"
+        if narrative_present:
+            script_origin += " ; personnages et lieu sélectionnés — instantané de production (#34/#35/#36)"
         origins = [
-            {"item": "Prompt éditorial du script", "origin": "projet — durée, ton, public, orientation, structure, consignes permanentes"
+            {"item": "Prompt éditorial du script", "origin": script_origin
              if script_request else "script fourni ou repris : aucun appel texte"},
             {"item": "Prompt système du script", "origin": "moteur — prompt par défaut (aucun prompt système personnalisé n'est envoyé)"},
             {"item": "Prompts de scène (envoyés par Lody)", "origin": "projet — style visuel, consignes visuelles, liste négative + passage du script"},

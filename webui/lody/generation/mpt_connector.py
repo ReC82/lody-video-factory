@@ -114,8 +114,13 @@ def apply_image_template(template: str, term: str) -> str:
     return template.replace("{term}", term)
 
 
-def script_prompt(request: GenerationRequest, limit: int = 2000) -> str:
-    """Consignes envoyées au moteur pour écrire le script (borné à la limite du moteur)."""
+def script_prompt(request: GenerationRequest, narrative_block: str = "", limit: int = 2000) -> str:
+    """Consignes envoyées au moteur pour écrire le script (borné à la limite du moteur).
+
+    ``narrative_block`` (#36) : bloc narratif déjà rendu depuis le snapshot de production (voir
+    ``narrative_context.render_prompt_block``), ajouté à la fin, séparé du reste. Chaîne vide par défaut :
+    le prompt reste alors identique à avant #36 (aucune sélection, ou production antérieure à #35).
+    """
     words = tuple(round(seconds / 60 * WORDS_PER_MINUTE.get(request.narration_pace, 155))
                   for seconds in (request.duration_min, request.duration_max))
     head = [
@@ -133,6 +138,8 @@ def script_prompt(request: GenerationRequest, limit: int = 2000) -> str:
     if len(rules) > budget:
         rules = rules[: max(budget - 1, 0)].rstrip() + "…"
     text = head_text + ("\nConsignes permanentes :\n" + rules if rules else "")
+    if narrative_block:
+        text += "\n\n" + narrative_block
     return text[:limit]
 
 
@@ -419,10 +426,10 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             return CapabilityStatus(C, St.UNAVAILABLE, music, "elevenlabs", message=blocked, fix="platform", admin=details)
         return CapabilityStatus(C, St.READY, music, "elevenlabs", message="Musique générée par le fournisseur choisi.", admin=details)
 
-    def describe_script_request(self, request: GenerationRequest) -> dict[str, Any]:
+    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "") -> dict[str, Any]:
         """Requête d'écriture du script (POST /api/v1/scripts) : aucun prompt système personnalisé n'est envoyé."""
         return {"video_subject": request.subject, "video_language": request.language, "paragraph_number": 1,
-                "video_script_prompt": script_prompt(request),
+                "video_script_prompt": script_prompt(request, narrative_block),
                 "custom_system_prompt": "(non envoyé : prompt système par défaut du moteur)"}
 
     def trace_prompts(self, request: GenerationRequest) -> dict[str, Any]:
@@ -438,8 +445,9 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             "origin": "moteur — config.toml, gabarit GLOBAL partagé par tous les projets" if applied
             else ("inconnu (configuration du moteur non vérifiable)" if not facts.known else "aucun")}}
 
-    def write_script(self, request: GenerationRequest) -> str:
-        payload = {key: value for key, value in self.describe_script_request(request).items() if key != "custom_system_prompt"}
+    def write_script(self, request: GenerationRequest, narrative_block: str = "") -> str:
+        payload = {key: value for key, value in self.describe_script_request(request, narrative_block).items()
+                  if key != "custom_system_prompt"}
         status, envelope = self._call("POST", "/api/v1/scripts", payload, timeout=240.0)
         self._raise_for_status(status, envelope, "script")
         data = envelope.get("data")

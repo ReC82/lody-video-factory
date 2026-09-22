@@ -91,10 +91,12 @@ class DemoConnector(VideoGenerationProvider):
             for capability in (Capability.TEXT, Capability.VISUAL, Capability.VOICE, Capability.MUSIC,
                                Capability.ENGINE, Capability.STORAGE, Capability.SETTINGS)))
 
-    def describe_script_request(self, request: GenerationRequest) -> dict:
+    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "") -> dict:
+        # Simulation : aucun prompt n'est réellement construit ni envoyé (voir mpt_connector.script_prompt
+        # pour le rendu effectif du bloc narratif, #36) ; narrative_block est accepté pour respecter l'interface.
         return {"video_subject": request.subject, "video_language": request.language, "note": "simulation : aucun appel"}
 
-    def write_script(self, request: GenerationRequest) -> str:
+    def write_script(self, request: GenerationRequest, narrative_block: str = "") -> str:
         return demo_script(request.subject)
 
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:

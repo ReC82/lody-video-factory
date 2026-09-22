@@ -58,6 +58,7 @@ class ScriptedConnector(VideoGenerationProvider):
         self.subtitles_text: str | None = None
         self.background_bytes: bytes | None = None
         self.background_error: ProviderError | None = None
+        self.narrative_blocks_received: list[str] = []  # #36 : ce que write_script a réellement reçu, dans l'ordre
 
     # -- scénario -----------------------------------------------------------
     def queue(self, *items: TaskSnapshot | ProviderError) -> None:
@@ -99,8 +100,13 @@ class ScriptedConnector(VideoGenerationProvider):
             items[capability] = CapabilityStatus(capability, state, message=issue.message, fix="platform")
         return PreflightReport(tuple(items.values()))
 
-    def write_script(self, request):
+    def describe_script_request(self, request, narrative_block=""):
+        return {"video_subject": request.subject, "video_language": request.language,
+                "video_script_prompt": narrative_block or "(aucun bloc narratif)"}
+
+    def write_script(self, request, narrative_block=""):
         self.calls.append("write_script")
+        self.narrative_blocks_received.append(narrative_block)
         if self.script_error:
             raise self.script_error
         return SCRIPT
