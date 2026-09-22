@@ -1,4 +1,4 @@
-"""``secrets_store`` : écriture atomique de ``secrets.toml`` (0600), jamais de lecture de valeur, statut sûr."""
+"""``secrets_store`` : écriture atomique de ``secrets.toml`` (0640, groupe lody-secrets), jamais de lecture de valeur, statut sûr."""
 
 from __future__ import annotations
 
@@ -30,11 +30,14 @@ def test_no_function_returns_a_secret_value_to_a_caller_outside_this_module():
         assert not hasattr(secrets_store, name)
 
 
-def test_set_pending_writes_the_file_mode_0600(paths):
+def test_set_pending_writes_the_file_mode_0640_group_readable_not_world_readable(paths):
     secrets_store.set_pending("app.openai_api_key", "sk-abcdefghij", secrets_path=paths["secrets"], reload_path=paths["reload"])
     mode = stat.S_IMODE(paths["secrets"].stat().st_mode)
-    assert mode == 0o600
+    assert mode == 0o640
+    assert mode & 0o007 == 0, "aucun bit « autre » : voir docs/lody-secrets.md (groupe lody-secrets)"
     assert paths["reload"].exists()
+    reload_mode = stat.S_IMODE(paths["reload"].stat().st_mode)
+    assert reload_mode == 0o640 and reload_mode & 0o007 == 0
 
 
 def test_round_trips_through_read_pending(paths):

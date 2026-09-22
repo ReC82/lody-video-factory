@@ -2,7 +2,7 @@
 statut d'application. Volontairement asymétrique :
 
 * **écriture** : la seule chose que ce module sait faire avec une valeur de clé est l'écrire, chiffres et lettres
-  inclus, dans ``secrets.toml`` (0600). Il n'existe **aucune fonction qui relit une valeur** — pas « pour l'instant »,
+  inclus, dans ``secrets.toml`` (0640, groupe partagé ``lody-secrets`` — voir docs/lody-secrets.md). Il n'existe **aucune fonction qui relit une valeur** — pas « pour l'instant »,
   elle n'existe pas du tout, ce qui se vérifie en lisant ce fichier plutôt qu'en faisant confiance à un test.
 * **lecture** : uniquement le fichier de statut (``secrets-status.json``), écrit par le script hôte, qui ne contient
   jamais de secret par construction (voir ``apply_secrets.py``).
@@ -23,9 +23,9 @@ from typing import Any
 
 from lody import settings
 from lody.generation.secrets_fields import FIELDS, ShapeError, validate
+from lody.generation.toml_patch import toml_string
 
 __all__ = ["ShapeError", "clear_pending", "field_status", "read_pending", "set_pending", "status"]
-from lody.generation.toml_patch import toml_string
 
 DEFAULT_STATUS: dict[str, Any] = {"state": "idle", "fields": {}}
 
@@ -81,15 +81,16 @@ def _atomic_write(path: Path, content: str, mode: int) -> None:
 
 def set_pending(field_path: str, value: str, *, secrets_path: Path | None = None,
                 reload_path: Path | None = None) -> None:
-    """Valide la FORME de ``value`` (voir ``secrets_fields.validate``) puis l'écrit dans ``secrets.toml`` (0600),
-    fusionnée avec les autres champs déjà en attente. Touche ensuite le fichier signal : c'est ce qui réveille le
-    ``systemd.path`` côté hôte. Lève ``ShapeError`` sans rien écrire si la forme est invalide."""
+    """Valide la FORME de ``value`` (voir ``secrets_fields.validate``) puis l'écrit dans ``secrets.toml`` (0640,
+    groupe ``lody-secrets`` hérité du bit setgid du dossier — voir docs/lody-secrets.md), fusionnée avec les
+    autres champs déjà en attente. Touche ensuite le fichier signal : c'est ce qui réveille le ``systemd.path``
+    côté hôte. Lève ``ShapeError`` sans rien écrire si la forme est invalide."""
     cleaned = validate(field_path, value)  # lève ShapeError avant toute écriture si invalide
     path = secrets_path or settings.secrets_path()
     pending = read_pending(path)
     pending[field_path] = cleaned
-    _atomic_write(path, _serialize(pending), 0o600)
-    _atomic_write(reload_path or settings.secrets_reload_path(), "", 0o600)
+    _atomic_write(path, _serialize(pending), 0o640)
+    _atomic_write(reload_path or settings.secrets_reload_path(), "", 0o640)
 
 
 def clear_pending(field_paths: list[str], *, secrets_path: Path | None = None) -> None:
@@ -100,7 +101,7 @@ def clear_pending(field_paths: list[str], *, secrets_path: Path | None = None) -
     for field_path in field_paths:
         pending.pop(field_path, None)
     if pending:
-        _atomic_write(path, _serialize(pending), 0o600)
+        _atomic_write(path, _serialize(pending), 0o640)
     elif path.exists():
         path.unlink()
 
@@ -118,10 +119,10 @@ def status(*, status_path: Path | None = None) -> dict[str, Any]:
 
 
 def field_status(field_path: str, *, status_path: Path | None = None) -> dict[str, Any]:
-    """Statut pour UN champ : ``{"state": "idle|applying|restarting|restoring|ok|invalid|rolled_back|critical",
-    "message": "..."}. Jamais de valeur de secret."""
+    """Statut pour UN champ : ``{"state": "idle|applying|restarting|verifying|restoring|ok|invalid|unverified|
+    rejected|rolled_back|critical", "message": "..."}``. Jamais de valeur de secret."""
     overall = status(status_path=status_path)
-    in_flight = overall.get("state") in {"applying", "restarting", "restoring"}
+    in_flight = overall.get("state") in {"applying", "restarting", "verifying", "restoring"}
     fields = overall.get("fields") if isinstance(overall.get("fields"), dict) else {}
     entry = fields.get(field_path) if isinstance(fields, dict) else None
     if in_flight and field_path in (overall.get("processing") or []):

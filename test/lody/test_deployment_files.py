@@ -1,7 +1,12 @@
-"""Fichiers de déploiement : Dockerfile, Compose, healthcheck (sans Docker ni réseau externe)."""
+"""Fichiers de déploiement : Dockerfile, Compose, healthcheck (sans réseau externe).
+
+La plupart des tests lisent seulement les fichiers (aucun Docker requis). Un test vérifie en plus, avec un
+vrai `docker compose config`, que LODY_SECRETS_GID est obligatoire — ignoré si Docker ou le sudo sans mot de
+passe attendu par ce dépôt (voir docs/lody-secrets.md) ne sont pas disponibles."""
 
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -98,6 +103,24 @@ def test_compose_mounts_only_a_small_secrets_directory_read_write_config_toml_st
     assert service["environment"]["LODY_SECRETS_DIR"] == "/secrets"
     # Verrou de mise en ligne : désactivé (absent ou commenté), jamais actif par défaut.
     assert "LODY_ENABLE_SYSTEM_SETTINGS" not in service.get("environment", {})
+    # Groupe partagé host<->conteneur (voir lody-setup-secrets-group.sh) : requis, pas de GID par défaut codé
+    # en dur (chaque hôte a le sien). Compose doit refuser de démarrer si LODY_SECRETS_GID est absent.
+    assert service["group_add"] == ["${LODY_SECRETS_GID:?exécute ./scripts/lody-setup-secrets-group.sh puis mets LODY_SECRETS_GID dans .env}"]
+
+
+def test_compose_refuses_to_start_without_lody_secrets_gid_set():
+    """Vérification réelle avec Docker Compose (pas seulement une lecture YAML) : sans LODY_SECRETS_GID, la
+    résolution de group_add doit échouer avec un message clair plutôt que démarrer sans le groupe."""
+    if not shutil.which("docker") or not shutil.which("sudo"):
+        pytest.skip("docker ou sudo introuvable")
+    if subprocess.run(["sudo", "-n", "true"], capture_output=True, timeout=10).returncode != 0:
+        pytest.skip("sudo sans mot de passe indisponible dans cet environnement")
+    result = subprocess.run(
+        ["sudo", "-n", "env", "-u", "LODY_SECRETS_GID", "docker", "compose", "--env-file", "/dev/null",
+         "-f", str(ROOT / "docker-compose.lody.yml"), "config", "--quiet"],
+        capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert "LODY_SECRETS_GID" in result.stderr
 
 
 def test_systemd_units_exist_watch_the_signal_file_and_run_the_apply_script():
@@ -107,6 +130,28 @@ def test_systemd_units_exist_watch_the_signal_file_and_run_the_apply_script():
     assert "PathModified=/srv/moneyprinterturbo/secrets/secrets.reload" in path_unit
     assert "Type=oneshot" in service_unit
     assert "lody-apply-secrets.sh" in service_unit
+    assert "User=ubuntu" in service_unit and "User=root" not in service_unit  # jamais en root
+
+
+def test_setup_and_verification_scripts_exist_and_are_valid_shell():
+    for name in ("lody-setup-secrets-group.sh", "lody-verify-secrets-permissions.sh", "lody-apply-secrets.sh"):
+        script = ROOT / "scripts" / name
+        assert script.is_file(), name
+        result = subprocess.run(["sh", "-n", str(script)], capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0, f"{name}: {result.stderr}"
+
+
+def test_setup_script_creates_a_dedicated_group_with_setgid_and_no_world_access():
+    content = (ROOT / "scripts" / "lody-setup-secrets-group.sh").read_text(encoding="utf-8")
+    assert "groupadd" in content and "lody-secrets" in content
+    assert "chmod 2770 secrets" in content  # setgid + rwxrws--- : aucun accès pour « autre »
+    assert "usermod -aG" in content
+
+
+def test_verify_script_reproduces_the_real_container_uid_and_a_third_party_user():
+    content = (ROOT / "scripts" / "lody-verify-secrets-permissions.sh").read_text(encoding="utf-8")
+    assert "-o 10001" in content  # le vrai uid du conteneur lody-ui (voir Dockerfile.lody)
+    assert "nobody" in content  # utilisateur tiers, hors du groupe : doit échouer à lire
 
 
 def test_lody_container_never_gets_docker_access():
