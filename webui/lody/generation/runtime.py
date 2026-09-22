@@ -6,11 +6,13 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 from lody import settings
+from lody.characters import CharacterRepository
 from lody.generation import demo, mpt_connector
 from lody.generation.kit_service import KitService
 from lody.generation.kit_store import KitRepository
 from lody.generation.service import ProductionService
 from lody.generation.store import ProductionRepository
+from lody.locations import LocationRepository
 from lody.projects import ProjectRepository
 
 logger = logging.getLogger("lody.runtime")
@@ -29,7 +31,11 @@ def build_service() -> ProductionService:
         mpt_connector.PROVIDER_ID: mpt_connector.build_from_environment(),
         demo.PROVIDER_ID: demo.DemoConnector(),
     }
-    service = ProductionService(repo, providers, ThreadPoolExecutor(max_workers=2, thread_name_prefix="lody-production"))
+    # character_repo/location_repo (#35) : sans écran de sélection encore (#34), rien ne les utilise ; ils
+    # rendent prepare() capable de résoudre une sélection dès que cet écran existera, sans nouveau branchement.
+    service = ProductionService(repo, providers, ThreadPoolExecutor(max_workers=2, thread_name_prefix="lody-production"),
+                                character_repo=CharacterRepository(settings.db_path()),
+                                location_repo=LocationRepository(settings.db_path()))
     try:
         service.resume_active()
     except Exception as error:  # le démarrage de l'interface ne doit jamais dépendre du moteur

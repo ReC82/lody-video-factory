@@ -139,6 +139,31 @@ Audiovisuel / Fill & Key (audit : `docs/audits/lody-project-isolation-audit.md`)
   multiview, SDI, schéma FILL/KEY, caméra de plateau/PTZ, studio TV sauf demande explicite) ; migration additive au démarrage pour le
   projet existant (ne remplit que les clés absentes, n'écrase jamais une saisie).
 
+### Personnages et lieu sélectionnés (#35)
+
+Même principe que l'instantané des paramètres du projet, appliqué à la sélection facultative de personnages et
+d'un lieu (`lody/characters.py`, `lody/locations.py`, fondations #30/#31) : `ProductionService.prepare()` accepte
+`character_ids`/`location_id`, résout ces identifiants dans le **projet courant** via
+`lody.generation.narrative_context.resolve_narrative_context` (refusé si l'identifiant est inconnu, appartient à
+un autre projet, ou désigne un élément désactivé), puis copie une valeur (id, nom, descriptions effectives) dans
+`snapshot.narrative_context`. Comme le reste de `snapshot`, c'est écrit une seule fois à la préparation puis
+jamais relu depuis les tables `characters`/`locations` : modifier ou désactiver un personnage ou un lieu après
+coup ne change donc jamais une production déjà préparée ou lancée, et une V2 hérite du bloc de sa version
+précédente avec le reste de l'instantané (`create_v2` copie tout `snapshot`).
+
+Sans sélection (tout l'écran actuel — #34, l'UI de sélection, n'existe pas encore), `narrative_context` vaut
+`{}` : comportement fonctionnellement inchangé. Une production antérieure à #35 n'a pas du tout cette clé
+(`snapshot.get("narrative_context", {})` côté lecture) — aucune migration ne les modifie.
+
+**Pas de nouvelle colonne SQLite.** Le `snapshot` JSON existant (v3) suffit déjà à porter des données arbitraires
+immuables par production et il est déjà couvert par le garde-fou secrets (`GUARDED` dans `generation/store.py`) ;
+une table dédiée aurait dupliqué ce mécanisme sans bénéfice. `SCHEMA_VERSION` reste donc à 5.
+
+Aucune injection dans le script, la voix ou les prompts d'images à ce stade (les seuls modules autorisés à
+référencer `lody.characters`/`lody.locations` dans `generation/` sont `narrative_context.py`, `service.py` et
+`runtime.py` — voir le test de frontière dans `test/lody/test_characters.py`/`test_locations.py`) : c'est l'objet
+d'un ticket ultérieur.
+
 ## Sous-titres français : apostrophes et police
 
 Incident V7 : « mais l’  idée de base est simple » à l'écran, alors que le script, le texte envoyé au moteur, le
