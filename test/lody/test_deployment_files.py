@@ -101,8 +101,10 @@ def test_compose_mounts_only_a_small_secrets_directory_read_write_config_toml_st
     assert "./config.toml:/MoneyPrinterTurbo/config.toml:ro" in volumes  # jamais rw : voir docs/lody-secrets.md
     assert not any(v.startswith("./config.toml:") and v.endswith(":rw") for v in volumes)
     assert service["environment"]["LODY_SECRETS_DIR"] == "/secrets"
-    # Verrou de mise en ligne : désactivé (absent ou commenté), jamais actif par défaut.
-    assert "LODY_ENABLE_SYSTEM_SETTINGS" not in service.get("environment", {})
+    # Verrou de mise en ligne (ticket #28) : activé en production après la finalisation opérationnelle
+    # complète (nginx protège /lody-auth/*, authentification admin en place — voir docs/lody-auth.md).
+    # Avant cette validation, le drapeau devait rester absent ou commenté ; ce n'est plus l'état voulu.
+    assert service["environment"].get("LODY_ENABLE_SYSTEM_SETTINGS") == "1"
     # Groupe partagé host<->conteneur (voir lody-setup-secrets-group.sh) : requis, pas de GID par défaut codé
     # en dur (chaque hôte a le sien). Compose doit refuser de démarrer si LODY_SECRETS_GID est absent.
     assert service["group_add"] == ["${LODY_SECRETS_GID:?exécute ./scripts/lody-setup-secrets-group.sh puis mets LODY_SECRETS_GID dans .env}"]
