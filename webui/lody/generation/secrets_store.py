@@ -120,13 +120,33 @@ def status(*, status_path: Path | None = None) -> dict[str, Any]:
 
 def field_status(field_path: str, *, status_path: Path | None = None) -> dict[str, Any]:
     """Statut pour UN champ : ``{"state": "idle|applying|restarting|verifying|restoring|ok|invalid|unverified|
-    rejected|rolled_back|critical", "message": "..."}``. Jamais de valeur de secret."""
+    rejected|expired|rolled_back|critical", "message": "...", "modified_at": "...", "checked_at": "..."}``.
+    Jamais de valeur de secret."""
     overall = status(status_path=status_path)
     in_flight = overall.get("state") in {"applying", "restarting", "verifying", "restoring"}
     fields = overall.get("fields") if isinstance(overall.get("fields"), dict) else {}
     entry = fields.get(field_path) if isinstance(fields, dict) else None
     if in_flight and field_path in (overall.get("processing") or []):
-        return {"state": overall["state"], "message": ""}
+        base = entry if isinstance(entry, dict) else {}
+        return {"state": overall["state"], "message": "", "modified_at": base.get("modified_at"),
+                "checked_at": base.get("checked_at")}
     if isinstance(entry, dict):
-        return {"state": str(entry.get("state", "idle")), "message": str(entry.get("message", ""))}
-    return {"state": "idle", "message": ""}
+        return {"state": str(entry.get("state", "idle")), "message": str(entry.get("message", "")),
+                "modified_at": entry.get("modified_at"), "checked_at": entry.get("checked_at")}
+    return {"state": "idle", "message": "", "modified_at": None, "checked_at": None}
+
+
+_BLOCKING_KEY_STATES = frozenset({"rejected", "expired"})
+
+
+def key_blocked(field_path: str, *, status_path: Path | None = None) -> str | None:
+    """Message sûr à afficher si le dernier contrôle connu de ce champ a été refusé/a expiré — sinon ``None``.
+    Utilisé par le préflight de chaque projet pour ne pas annoncer « Prêt » avec une clé qu'on sait déjà mauvaise,
+    sans le moindre nouvel appel (relecture du fichier de statut, jamais du fournisseur)."""
+    entry = field_status(field_path, status_path=status_path)
+    if entry["state"] not in _BLOCKING_KEY_STATES:
+        return None
+    spec = FIELDS.get(field_path)
+    label = spec.provider_label if spec else "Le fournisseur"
+    verb = "a expiré" if entry["state"] == "expired" else "est invalide"
+    return f"{label} : clé {verb}. Remplace-la dans Paramètres système."

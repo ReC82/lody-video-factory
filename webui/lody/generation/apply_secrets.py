@@ -16,14 +16,21 @@ Déroulé :
 5. moteur sain → appel de vérification minimal et **non générateur** auprès du fournisseur de chaque clé
    modifiée (liste de modèles OpenAI, compte ElevenLabs) :
      - accepté (2xx) → *ok* ;
-     - refusé (401/403) → retour arrière automatique, comme un moteur pas sain (voir ci-dessous) ;
+     - refusé, code d'erreur reconnu comme une expiration (ex. ``expired_secret_key``) → *expired* ;
+     - refusé pour toute autre raison (401/403) → *rejected* ; les deux déclenchent le même retour arrière
+       automatique que si le moteur n'était pas sain (voir ci-dessous), seul le message affiché diffère ;
      - fournisseur injoignable ou délai dépassé → *unverified* : la clé reste appliquée (le moteur, lui, est
        sain), mais annoncée comme non confirmée plutôt que « Configurée » — jamais confondue avec un refus ;
-6. moteur pas sain, OU clé refusée par le fournisseur → restaurer la sauvegarde vérifiée, redémarrer à nouveau,
-   revérifier la santé (jamais une seconde vérification auprès du fournisseur : la valeur restaurée est celle
-   qui fonctionnait avant) :
-     - sain → *rolled_back* (ou *rejected* pour le ou les champs directement refusés) ;
+6. moteur pas sain, OU clé refusée/expirée chez le fournisseur → restaurer la sauvegarde vérifiée, redémarrer à
+   nouveau, revérifier la santé (jamais une seconde vérification auprès du fournisseur : la valeur restaurée est
+   celle qui fonctionnait avant) :
+     - sain → *rolled_back* (ou *rejected*/*expired* pour le ou les champs directement en cause) ;
      - toujours pas sain → *critical*, aucune boucle, intervention manuelle décrite dans le message.
+
+Chaque champ garde par ailleurs un historique persistant (dans ``secrets-status.json``, jamais de secret) :
+``modified_at`` (dernière fois que sa valeur ACTIVE a réellement changé) et ``checked_at`` (dernière fois qu'un
+contrôle a été tenté, succès ou non) — utilisés par « Paramètres système » pour afficher ces deux dates
+séparément, et par le préflight de chaque projet pour refléter une clé invalide/expirée sans nouvel appel.
 
 Aucune valeur de secret n'entre JAMAIS dans un message de statut, une exception journalisée, ou la sortie
 standard : au-delà de la validation de forme (qui ne fait que constater si la valeur est vide/mal formée, sans
@@ -67,7 +74,7 @@ class ProviderCheck:
     """Résultat d'une vérification auprès d'un fournisseur. ``detail`` est TOUJOURS un message générique fixe :
     jamais un extrait de réponse, d'URL ou de valeur de clé (voir la doc du module)."""
 
-    outcome: str  # "valid" | "rejected" | "timeout" | "unavailable"
+    outcome: str  # "valid" | "rejected" | "expired" | "timeout" | "unavailable"
     detail: str = ""
 
 
@@ -97,6 +104,10 @@ _ROLLED_BACK_COMPANION = (
 _REJECTED = (
     "Le fournisseur a refusé cette clé (authentification refusée) : "
     "l’ancienne configuration a été restaurée automatiquement."
+)
+_EXPIRED = (
+    "Cette clé a expiré chez le fournisseur : l’ancienne configuration a été restaurée automatiquement. "
+    "Remplace-la par une clé valide dans Paramètres système."
 )
 _UNVERIFIED_TIMEOUT = (
     "Le moteur a redémarré normalement, mais la vérification auprès du fournisseur a dépassé le délai : "
@@ -158,6 +169,57 @@ def _write_status(status_path: Path, data: dict[str, Any]) -> None:
             temp.unlink()
 
 
+# États dans lesquels la valeur écrite est réellement devenue active (jamais annulée par un retour arrière) :
+# « unverified » compte, la clé EST en place, seule sa confirmation auprès du fournisseur est incertaine.
+_LIVE_STATES = frozenset({"ok", "unverified"})
+
+
+def load_history(status_path: Path) -> dict[str, dict[str, Any]]:
+    """Historique connu (modified_at/checked_at inclus), lu UNE SEULE FOIS au début de ``apply()`` — jamais
+    relu en cours de route, pour ne pas se retrouver à fusionner avec une écriture transitoire de ce même
+    appel (qui n'a pas encore les nouveaux horodatages) et perdre par erreur l'historique des autres champs."""
+    try:
+        data = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+    fields = data.get("fields")
+    return dict(fields) if isinstance(fields, dict) else {}
+
+
+def _merged_fields(history: dict[str, dict[str, Any]], results: dict[str, dict[str, str]]) -> dict[str, dict[str, Any]]:
+    """Les champs de ce lot par-dessus l'historique des autres : rien ne disparaît pendant que ce lot est en cours."""
+    return {**history, **results}
+
+
+def _write_progress(status_path: Path, *, state: str, to_apply: dict[str, str], history: dict[str, dict[str, Any]],
+                    results: dict[str, dict[str, str]]) -> None:
+    _write_status(status_path, {"state": state, "processing": list(to_apply), "fields": _merged_fields(history, results)})
+
+
+def _finalize_and_write(status_path: Path, *, state: str, to_apply: dict[str, str],
+                        history: dict[str, dict[str, Any]], results: dict[str, dict[str, str]],
+                        message: str = "") -> dict[str, Any]:
+    """Fusionne ``results`` (ce lot) avec l'historique déjà connu des AUTRES champs, pose ``checked_at`` sur tout
+    champ traité cette fois et ``modified_at`` seulement sur ceux dont la valeur est réellement devenue active
+    (pas un champ dont l'écriture a été annulée par un retour arrière, ni un état hérité comme celui de
+    app.llm_provider sur son contrôle compagnon)."""
+    now = _now()
+    merged = dict(history)
+    for field_path, entry in results.items():
+        stamped = dict(entry)
+        stamped["checked_at"] = now
+        if field_path in to_apply and entry.get("state") in _LIVE_STATES:
+            stamped["modified_at"] = now
+        else:
+            stamped["modified_at"] = history.get(field_path, {}).get("modified_at")
+        merged[field_path] = stamped
+    final: dict[str, Any] = {"state": state, "fields": merged}
+    if message:
+        final["message"] = message
+    _write_status(status_path, final)
+    return final
+
+
 def _backup(config_path: Path, backup_path: Path) -> str | None:
     """Copie ``config.toml`` tel quel, vérifiée par empreinte. Retourne l'empreinte, ou ``None`` si la
     vérification échoue (rien n'est alors modifié en aval)."""
@@ -207,19 +269,22 @@ def _fields_to_verify(to_apply: dict[str, str], patched_config: dict[str, Any]) 
 
 def _rollback(*, config_path: Path, backup_path: Path, backup_hash: str, status_path: Path, report_path: Path,
              restart_engine: RestartFn, wait_healthy: HealthFn, to_apply: dict[str, str],
-             results: dict[str, dict[str, str]], secrets_path: Path, pending: dict[str, str], overall_message: str,
-             rejected: frozenset[str] = frozenset()) -> dict[str, Any]:
+             results: dict[str, dict[str, str]], history: dict[str, dict[str, Any]], secrets_path: Path,
+             pending: dict[str, str], overall_message: str, blocking: dict[str, str] | None = None) -> dict[str, Any]:
     """Restaure la sauvegarde vérifiée, redémarre, revérifie la santé. Partagé par « moteur pas sain » et
-    « clé refusée par le fournisseur » : dans les deux cas, on revient à la dernière configuration qui
-    fonctionnait, sans revérifier cette ancienne clé auprès du fournisseur (elle fonctionnait déjà avant)."""
-    _write_status(status_path, {"state": "restoring", "processing": list(to_apply), "fields": results})
+    « clé refusée/expirée chez le fournisseur » : dans les deux cas, on revient à la dernière configuration qui
+    fonctionnait, sans revérifier cette ancienne clé auprès du fournisseur (elle fonctionnait déjà avant).
+
+    ``blocking`` associe un champ DIRECTEMENT en cause à son état précis (``rejected`` ou ``expired``) ; les
+    autres champs du même lot reçoivent l'état générique ``rolled_back`` (ils n'étaient pas eux-mêmes en cause)."""
+    blocking = blocking or {}
+    _write_progress(status_path, state="restoring", to_apply=to_apply, history=history, results=results)
     restored = _restore(backup_path, backup_hash, config_path)
     if not restored:
         for field_path in to_apply:
             results[field_path] = {"state": "critical", "message": _CRITICAL_NO_RESTORE_BACKUP}
-        final = {"state": "critical", "message": _CRITICAL_NO_RESTORE_BACKUP, "fields": results}
-        _write_status(status_path, final)
-        return final
+        return _finalize_and_write(status_path, state="critical", to_apply=to_apply, history=history, results=results,
+                                   message=_CRITICAL_NO_RESTORE_BACKUP)
 
     healthy_again = False
     try:
@@ -232,23 +297,23 @@ def _rollback(*, config_path: Path, backup_path: Path, backup_hash: str, status_
         for field_path in to_apply:
             results[field_path] = {"state": "critical", "message": _CRITICAL_STILL_DOWN}
         secrets_store.clear_pending(list(pending), secrets_path=secrets_path)
-        final = {"state": "critical", "message": _CRITICAL_STILL_DOWN, "fields": results}
-        _write_status(status_path, final)
-        return final
+        return _finalize_and_write(status_path, state="critical", to_apply=to_apply, history=history, results=results,
+                                   message=_CRITICAL_STILL_DOWN)
 
     try:
         engine_facts.write_report(config_path, report_path)
     except Exception:  # noqa: BLE001 — le rapport sera simplement régénéré au prochain cycle
         pass
     for field_path in to_apply:
-        if field_path in rejected:
-            results[field_path] = {"state": "rejected", "message": _REJECTED}
+        if field_path in blocking:
+            outcome = blocking[field_path]
+            results[field_path] = {"state": outcome, "message": _EXPIRED if outcome == "expired" else _REJECTED}
         else:
             results[field_path] = {"state": "rolled_back", "message": overall_message}
     secrets_store.clear_pending(list(pending), secrets_path=secrets_path)
-    final = {"state": "rejected" if rejected else "rolled_back", "message": overall_message, "fields": results}
-    _write_status(status_path, final)
-    return final
+    overall = next(iter(blocking.values()), "rolled_back") if blocking else "rolled_back"
+    return _finalize_and_write(status_path, state=overall, to_apply=to_apply, history=history, results=results,
+                               message=overall_message)
 
 
 def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_path: Path, report_path: Path,
@@ -258,6 +323,9 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
     if not pending:
         return {"state": "noop"}
 
+    # Lu UNE SEULE FOIS, avant toute écriture : voir load_history.
+    history = load_history(status_path)
+
     results: dict[str, dict[str, str]] = {}
     to_apply: dict[str, str] = {}
     for field_path, value in pending.items():
@@ -266,20 +334,18 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
         except ShapeError as error:
             results[field_path] = {"state": "invalid", "message": str(error)}
 
-    _write_status(status_path, {"state": "applying", "processing": list(to_apply), "fields": results})
+    _write_progress(status_path, state="applying", to_apply=to_apply, history=history, results=results)
 
     if not to_apply:
         secrets_store.clear_pending(list(pending), secrets_path=secrets_path)
-        final = {"state": "error", "fields": results}
-        _write_status(status_path, final)
-        return final
+        return _finalize_and_write(status_path, state="error", to_apply=to_apply, history=history, results=results)
 
     backup_hash = _backup(config_path, backup_path)
     if backup_hash is None:
-        final = {"state": "critical", "message": _CRITICAL_NO_BACKUP,
-                 "fields": {**results, **{f: {"state": "critical", "message": _CRITICAL_NO_BACKUP} for f in to_apply}}}
-        _write_status(status_path, final)
-        return final
+        for field_path in to_apply:
+            results[field_path] = {"state": "critical", "message": _CRITICAL_NO_BACKUP}
+        return _finalize_and_write(status_path, state="critical", to_apply=to_apply, history=history, results=results,
+                                   message=_CRITICAL_NO_BACKUP)
 
     try:
         text = config_path.read_text(encoding="utf-8")
@@ -291,12 +357,10 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
         for field_path in to_apply:
             results[field_path] = {"state": "invalid", "message": message}
         secrets_store.clear_pending(list(pending), secrets_path=secrets_path)
-        final = {"state": "error", "fields": results}
-        _write_status(status_path, final)
-        return final
+        return _finalize_and_write(status_path, state="error", to_apply=to_apply, history=history, results=results)
 
     _atomic_write_text(config_path, text)
-    _write_status(status_path, {"state": "restarting", "processing": list(to_apply), "fields": results})
+    _write_progress(status_path, state="restarting", to_apply=to_apply, history=history, results=results)
 
     healthy = False
     try:
@@ -308,8 +372,8 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
     if not healthy:
         return _rollback(config_path=config_path, backup_path=backup_path, backup_hash=backup_hash,
                          status_path=status_path, report_path=report_path, restart_engine=restart_engine,
-                         wait_healthy=wait_healthy, to_apply=to_apply, results=results, secrets_path=secrets_path,
-                         pending=pending, overall_message=_ROLLED_BACK_ENGINE)
+                         wait_healthy=wait_healthy, to_apply=to_apply, results=results, history=history,
+                         secrets_path=secrets_path, pending=pending, overall_message=_ROLLED_BACK_ENGINE)
 
     # Le PROCESSUS du moteur redémarre : ça ne prouve pas que la clé fonctionne (une clé expirée ne fait pas
     # planter le démarrage). Vérification minimale, non génératrice, auprès du fournisseur.
@@ -318,7 +382,7 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
     except tomllib.TOMLDecodeError:
         patched_config = {}
     to_verify = _fields_to_verify(to_apply, patched_config)
-    _write_status(status_path, {"state": "verifying", "processing": list(to_apply), "fields": results})
+    _write_progress(status_path, state="verifying", to_apply=to_apply, history=history, results=results)
     checks: dict[str, ProviderCheck] = {}
     for field_path, value in to_verify.items():
         try:
@@ -326,14 +390,19 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
         except Exception:  # noqa: BLE001 — jamais de détail journalisé : voir la doc du module
             checks[field_path] = ProviderCheck("unavailable")
 
-    rejected = frozenset(field_path for field_path, check in checks.items() if check.outcome == "rejected")
-    if rejected:
-        directly_rejected = rejected & set(to_apply)
-        overall_message = _REJECTED if directly_rejected else _ROLLED_BACK_COMPANION
+    blocking = {field_path: check.outcome for field_path, check in checks.items()
+               if check.outcome in ("rejected", "expired")}
+    if blocking:
+        directly_blocking = {f: o for f, o in blocking.items() if f in to_apply}
+        overall_message = (
+            (_EXPIRED if "expired" in directly_blocking.values() else _REJECTED)
+            if directly_blocking else _ROLLED_BACK_COMPANION
+        )
         return _rollback(config_path=config_path, backup_path=backup_path, backup_hash=backup_hash,
                          status_path=status_path, report_path=report_path, restart_engine=restart_engine,
-                         wait_healthy=wait_healthy, to_apply=to_apply, results=results, secrets_path=secrets_path,
-                         pending=pending, overall_message=overall_message, rejected=directly_rejected)
+                         wait_healthy=wait_healthy, to_apply=to_apply, results=results, history=history,
+                         secrets_path=secrets_path, pending=pending, overall_message=overall_message,
+                         blocking=directly_blocking)
 
     try:
         engine_facts.write_report(config_path, report_path)
@@ -351,9 +420,7 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
             results[field_path] = {"state": "unverified", "message": _UNVERIFIED_UNAVAILABLE}
     secrets_store.clear_pending(list(pending), secrets_path=secrets_path)
     overall = "ready" if all(r["state"] == "ok" for r in results.values()) else "ready_unverified"
-    final = {"state": overall, "fields": results}
-    _write_status(status_path, final)
-    return final
+    return _finalize_and_write(status_path, state=overall, to_apply=to_apply, history=history, results=results)
 
 
 # -- câblage réel (CLI, exécuté sur l'hôte par le service systemd) -----------------------------------------------
@@ -389,6 +456,24 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
+# Codes d'erreur COURTS (jamais le message associé, qui échoue parfois avec un fragment de la clé — voir
+# « Incorrect API key provided: sk-proj-... » observé en pratique) que les fournisseurs renvoient pour une clé
+# expirée précisément. Liste blanche fermée : toute autre valeur (ou absence) reste un « rejected » générique.
+_EXPIRED_CODES = frozenset({"expired_secret_key", "expired_api_key", "token_expired"})
+
+
+def _expired_code(body: bytes) -> bool:
+    """Lit UNIQUEMENT ``error.code`` (un court identifiant, jamais un secret) dans une réponse JSON 401/403,
+    pour distinguer une clé expirée d'une clé simplement invalide. N'importe quelle autre forme — y compris tout
+    le reste du corps, qui PEUT contenir un fragment de la clé dans ``error.message`` — n'est jamais lue."""
+    try:
+        data = json.loads(body[:2048])
+        code = data.get("error", {}).get("code")
+    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
+        return False
+    return isinstance(code, str) and code in _EXPIRED_CODES
+
+
 def _http_check(url: str, headers: dict[str, str], timeout_s: float) -> ProviderCheck:
     """Un seul GET, en-têtes uniquement (jamais la clé dans l'URL), aucune redirection suivie, timeout court.
     Le détail retourné est toujours un texte fixe : jamais un extrait de réponse ni d'exception."""
@@ -400,6 +485,13 @@ def _http_check(url: str, headers: dict[str, str], timeout_s: float) -> Provider
             return ProviderCheck("unavailable", f"réponse inattendue ({response.status})")
     except urllib.error.HTTPError as error:
         if error.code in (401, 403):
+            body = b""
+            try:
+                body = error.read(4096)
+            except OSError:
+                pass
+            if _expired_code(body):
+                return ProviderCheck("expired", f"clé expirée ({error.code})")
             return ProviderCheck("rejected", f"authentification refusée ({error.code})")
         return ProviderCheck("unavailable", f"réponse inattendue ({error.code})")
     except (TimeoutError, socket.timeout):

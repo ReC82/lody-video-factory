@@ -31,22 +31,28 @@ class Field:
     secret: bool          # True : jamais journalisé/affiché en clair, jamais dans un message d'erreur
     label: str
     provider_label: str
+    provider_id: str = ""      # identifiant du fournisseur dans engine_facts (llm_key/eleven_key) : "" si sans objet
+    capability: str = ""       # "Texte", "Image", "Voix, musique" — affiché sur la carte
     choices: tuple[str, ...] = field(default_factory=tuple)
 
 
 FIELDS: dict[str, Field] = {
     f.path: f for f in (
         Field("app.openai_api_key", "app", "openai_api_key", "scalar", True,
-              "Clé de script", "OpenAI"),
+              "Clé de script", "OpenAI", provider_id="openai", capability="Texte"),
         Field("app.openai_image_api_keys", "app", "openai_image_api_keys", "list1", True,
-              "Clé d’images", "OpenAI"),
+              "Clé d’images", "OpenAI", provider_id="openai", capability="Image"),
         Field("app.llm_provider", "app", "llm_provider", "choice", False,
               "Fournisseur de script actif", "Moteur", choices=LLM_PROVIDER_CHOICES),
         Field("elevenlabs.api_key", "elevenlabs", "api_key", "scalar", True,
-              "Clé voix et musique", "ElevenLabs"),
+              "Clé voix et musique", "ElevenLabs", provider_id="elevenlabs", capability="Voix, musique"),
     )
 }
 FIELD_ORDER = tuple(FIELDS)  # ordre d'affichage stable
+# Fournisseurs de script reconnus par le moteur (voir app/models/llm_provider.py) mais que le catalogue de Lody
+# ne propose PAS de sélectionner : affichés en lecture seule (« Autres fournisseurs »), sans formulaire de
+# remplacement — Lody n'enverrait jamais de requête à travers eux.
+_MANAGED_LLM_PROVIDERS = frozenset({"openai"})
 
 
 class ShapeError(ValueError):
