@@ -58,7 +58,7 @@ services:
       # (limitation de débit sur /login — voir deploy/nginx/lody-auth.conf) et que ce déploiement n'a pas été
       # validé. Désactivé par défaut ; décommenter uniquement après validation. L'authentification admin
       # (service lody-auth) protège la PAGE quel que soit ce drapeau ; le drapeau reste une défense en profondeur.
-      # LODY_ENABLE_SYSTEM_SETTINGS: "1"
+      LODY_ENABLE_SYSTEM_SETTINGS: "1"
       # Service d'authentification admin (voir docs/lody-auth.md). URL interne (réseau Docker, jamais
       # publique) pour vérifier une session ; préfixe PUBLIC (relatif : fonctionne quel que soit le domaine)
       # pour les liens de connexion/déconnexion affichés dans la page.
