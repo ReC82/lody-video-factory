@@ -30,5 +30,8 @@ def lody_env(tmp_path, monkeypatch):
     monkeypatch.delenv("LODY_ENGINE_API_KEY", raising=False)
     monkeypatch.setenv("LODY_PRICING_PATH", str(tmp_path / "pricing.toml"))
     monkeypatch.setenv("LODY_ENGINE_REPORT", str(tmp_path / "engine-report" / "engine-capabilities.json"))
+    # Sans ceci, un test qui omet de le faire lui-même écrirait dans le vrai secrets/ du dépôt (arrivé une fois
+    # pendant le développement : voir l'historique de test_system_settings_ui.py). Isolé pour TOUS les tests.
+    monkeypatch.setenv("LODY_SECRETS_DIR", str(tmp_path / "secrets"))
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
     return data_dir
