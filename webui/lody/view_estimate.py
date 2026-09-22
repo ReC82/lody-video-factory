@@ -87,6 +87,22 @@ def estimate_html(production: Production) -> str:
     )
 
 
+def _narrative_rows(production: Production) -> list[tuple[str, str]]:
+    """Résumé de la sélection facultative de personnages/lieu (#34), telle que figée dans le snapshot (#35).
+
+    Rien n'apparaît si rien n'a été sélectionné : le résumé reste identique à avant ce ticket.
+    """
+    narrative = (production.snapshot or {}).get("narrative_context") or {}
+    rows: list[tuple[str, str]] = []
+    characters = narrative.get("characters") or []
+    if characters:
+        rows.append(("Personnages", ", ".join(character["name"] for character in characters)))
+    location = narrative.get("location")
+    if location:
+        rows.append(("Lieu", location["name"]))
+    return rows
+
+
 def summary_html(production: Production) -> str:
     request = request_of(production)
     scenes = production.cost_detail.get("scenes", [0, 0])
@@ -103,6 +119,7 @@ def summary_html(production: Production) -> str:
         ("Durée cible", duration),
         ("Scènes estimées", _span(scenes[0], scenes[1], "scène")),
         ("Fournisseurs", providers),
+        *_narrative_rows(production),
     ]
     items = "".join(f"<div><dt>{esc(label)}</dt><dd>{esc(value)}</dd></div>" for label, value in rows)
     return f'<dl class="kv est-summary">{items}</dl>'

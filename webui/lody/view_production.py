@@ -2,6 +2,12 @@
 
 Aucun appel payant n'a lieu ici avant le clic « Confirmer et générer la vidéo » : « Préparer la
 génération » ne crée qu'un brouillon local avec son estimation.
+
+Sélection facultative de personnages et d'un lieu (#34) : section repliable, entièrement optionnelle,
+qui ne propose que les éléments actifs du projet courant (voir ``_active_characters``/``_active_locations``).
+Rien n'est imposé automatiquement — le personnage ou lieu « principal » n'est qu'indiqué visuellement
+dans la liste — et la sélection ne change strictement rien tant qu'elle reste vide (voir #35 pour le
+snapshot immuable qui la porte au lancement).
 """
 
 from __future__ import annotations
@@ -10,6 +16,7 @@ import streamlit as st
 
 from lody import brief as brief_lib
 from lody import nav, view_estimate
+from lody.characters import Character, CharacterRepository
 from lody.generation.models import PreflightReport
 from lody.generation.runtime import DEFAULT_PROVIDER, DEMO_PROVIDER
 from lody.generation.service import (
@@ -20,6 +27,7 @@ from lody.generation.service import (
     request_of,
 )
 from lody.generation.store import Production
+from lody.locations import Location, LocationRepository
 from lody.projects import Project
 from lody.theme import esc
 
@@ -39,7 +47,76 @@ def _keys(project: Project) -> dict[str, str]:
         "accept": f"accept_partial_{project.id}",
         "running": f"running_{project.id}",
         "retry": f"retry_{project.id}",
+        "characters": f"chars_sel_{project.id}",
+        "location": f"loc_sel_{project.id}",
     }
+
+
+def _active_characters(repo: CharacterRepository, project: Project) -> list[Character]:
+    return repo.list_for_project(project.id, include_inactive=False)
+
+
+def _active_locations(repo: LocationRepository, project: Project) -> list[Location]:
+    return repo.list_for_project(project.id, include_inactive=False)
+
+
+def _character_label(character: Character) -> str:
+    return character.name + (" · Principal" if character.is_primary else "")
+
+
+def _location_label(location: Location) -> str:
+    return location.name + (" · Principal" if location.is_primary else "")
+
+
+def selected_narrative(project: Project) -> tuple[list[str], str | None]:
+    """La sélection actuelle (personnages, lieu), lue depuis l'état de session de CE projet uniquement."""
+    keys = _keys(project)
+    return list(st.session_state.get(keys["characters"], [])), st.session_state.get(keys["location"]) or None
+
+
+def _render_narrative_section(project: Project, character_repo: CharacterRepository,
+                              location_repo: LocationRepository) -> None:
+    """Section repliable, facultative : ne propose que les personnages/lieux ACTIFS du projet courant.
+
+    Toute sélection devenue invalide (désactivation concurrente pendant que l'écran est ouvert, ou
+    bascule vers un autre projet) est silencieusement retirée avant l'affichage des widgets : jamais
+    d'erreur, jamais d'identifiant fantôme envoyé à ``service.prepare()``.
+    """
+    keys = _keys(project)
+    characters = _active_characters(character_repo, project)
+    locations = _active_locations(location_repo, project)
+    if not characters and not locations:
+        return  # rien à proposer : le formulaire reste identique à avant ce ticket
+
+    character_ids = [character.id for character in characters]
+    valid_selection = [cid for cid in st.session_state.get(keys["characters"], []) if cid in character_ids]
+    if valid_selection != st.session_state.get(keys["characters"]):
+        st.session_state[keys["characters"]] = valid_selection
+
+    location_ids = [location.id for location in locations]
+    current_location = st.session_state.get(keys["location"])
+    if current_location and current_location not in location_ids:
+        st.session_state[keys["location"]] = None
+
+    with st.expander("Personnages et lieu (facultatif)", expanded=False):
+        st.caption(
+            "Entièrement facultatif : sans sélection, ta vidéo se génère exactement comme aujourd’hui. "
+            "Rien de sélectionné ici n’est ajouté au script, à la voix ou aux images pour l’instant."
+        )
+        if characters:
+            by_id = {character.id: character for character in characters}
+            st.multiselect(
+                "Personnages actifs de ce projet", character_ids,
+                format_func=lambda cid: _character_label(by_id[cid]),
+                key=keys["characters"],
+            )
+        if locations:
+            by_loc_id = {location.id: location for location in locations}
+            st.selectbox(
+                "Lieu actif de ce projet", [None, *location_ids],
+                format_func=lambda lid: "Aucun lieu" if lid is None else _location_label(by_loc_id[lid]),
+                key=keys["location"],
+            )
 
 
 def example_for(project: Project) -> str:
@@ -55,6 +132,13 @@ def _use_example(project: Project) -> None:
 
 def _provider_id(project: Project) -> str:
     return DEMO_PROVIDER if st.session_state.get(_keys(project)["demo"]) else DEFAULT_PROVIDER
+
+
+def _draft_narrative(draft: Production) -> tuple[list[str], str | None]:
+    narrative = (draft.snapshot or {}).get("narrative_context") or {}
+    character_ids = [character["id"] for character in narrative.get("characters") or []]
+    location = narrative.get("location")
+    return character_ids, (location or {}).get("id")
 
 
 def fresh_draft(service: ProductionService, project: Project) -> Production | None:
@@ -77,6 +161,10 @@ def fresh_draft(service: ProductionService, project: Project) -> Production | No
         return None
     if not draft.snapshot or draft.snapshot.get("project", {}).get("id") != project.id:
         return None  # estimation sans instantané (ou d'un autre projet) : à préparer à nouveau
+    character_ids, location_id = selected_narrative(project)
+    draft_character_ids, draft_location_id = _draft_narrative(draft)
+    if set(draft_character_ids) != set(character_ids) or draft_location_id != location_id:
+        return None  # sélection de personnages/lieu changée depuis cette estimation : à refaire
     return draft
 
 
@@ -87,12 +175,14 @@ def _primary(project: Project, service: ProductionService) -> None:
     st.session_state.pop(keys["running"], None)
     text = str(st.session_state.get(keys["request"], ""))
     script = str(st.session_state.get(keys["script"], ""))
+    character_ids, location_id = selected_narrative(project)
     try:
         draft = fresh_draft(service, project)
         if draft is None:
             prepared = service.prepare(project, text, provider_id=_provider_id(project), script=script,
                                        draft_id=st.session_state.get(keys["draft"]),
-                                       retry_of=st.session_state.get(keys["retry"]) or None)
+                                       retry_of=st.session_state.get(keys["retry"]) or None,
+                                       character_ids=character_ids, location_id=location_id)
             st.session_state[keys["draft"]] = prepared.id
             return
         launched = service.confirm(draft.id, accept_partial=bool(st.session_state.get(keys["accept"])))
@@ -172,7 +262,8 @@ def _render_retry_notice(service: ProductionService, keys: dict[str, str], retry
     )
 
 
-def render(project: Project, service: ProductionService) -> None:
+def render(project: Project, service: ProductionService, character_repo: CharacterRepository,
+          location_repo: LocationRepository) -> None:
     keys = _keys(project)
     st.markdown(
         f'<section class="hero"><p class="eyebrow">{esc(project.name)}</p>'
@@ -211,6 +302,7 @@ def render(project: Project, service: ProductionService) -> None:
         with st.expander("J’ai déjà mon script (optionnel)", expanded=bool(st.session_state.get(keys["script"]))):
             st.text_area("Script à utiliser", key=keys["script"], height=150, max_chars=8000,
                          placeholder="Colle ici ton texte : aucun script ne sera écrit par un fournisseur.")
+        _render_narrative_section(project, character_repo, location_repo)
         st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"])
         with st.container(horizontal=True, vertical_alignment="center", key="composer_actions"):
             st.markdown(
