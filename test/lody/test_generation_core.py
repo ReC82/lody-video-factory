@@ -31,9 +31,9 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
     ProductionRepository(path)
     ProductionRepository(path)  # rejeu : sans effet
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 4
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 5
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert {"projects", "productions"} <= tables
+    assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
     columns = {row[1] for row in connection.execute("PRAGMA table_info(productions)")}
     assert {"project_id", "version", "parent_production_id", "subject", "brief", "script", "storyboard",
             "visual_prompts", "params", "cost_currency", "cost_detail", "confirmed_at", "provider",
@@ -41,6 +41,13 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
             "started_at", "finished_at", "video_ref", "assets", "snapshot", "trace"} <= columns
     # « idempotency_key » est la clé d'idempotence locale, pas une clé d'API.
     assert not [c for c in columns if ("key" in c or "token" in c or "secret" in c) and c != "idempotency_key"]
+    character_columns = {row[1] for row in connection.execute("PRAGMA table_info(characters)")}
+    location_columns = {row[1] for row in connection.execute("PRAGMA table_info(locations)")}
+    assert {"project_id", "name", "is_primary", "is_active"} <= character_columns
+    assert {"project_id", "name", "is_primary", "is_active"} <= location_columns
+    # Ni personnages ni lieux ne stockent d'image (aucune colonne BLOB, aucune colonne "image") ni de secret.
+    for table_columns in (character_columns, location_columns):
+        assert not [c for c in table_columns if "image" in c or "key" in c or "token" in c or "secret" in c]
 
 
 def test_upgrade_from_schema_v1_keeps_existing_projects(tmp_path):
@@ -56,7 +63,7 @@ def test_upgrade_from_schema_v1_keeps_existing_projects(tmp_path):
     connection.close()
     ProductionRepository(path)
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT COUNT(*) FROM productions").fetchone()[0] == 0
 
@@ -81,7 +88,46 @@ def test_upgrade_from_schema_v2_adds_snapshot_and_trace_without_touching_existin
     ProductionRepository(path)  # rejeu : sans effet, pas de colonne dupliquée
     old = repo.get("prd_old")
     assert (old.script, old.snapshot, old.trace) == ("Un script.", {}, {})
-    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 4
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 5
+
+
+def test_upgrade_from_schema_v4_adds_characters_and_locations_without_touching_existing_kits(tmp_path):
+    """Base v4 réelle — le schéma actuellement déployé (projects + productions + publication_kits) — avec un
+    projet, une production et un kit de publication déjà présents. La migration additive v5 (#30/#31) doit
+    laisser tout cela strictement intact et n'ajouter que characters/locations, vides."""
+    path = tmp_path / "v4.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(db.PROJECTS_SCHEMA + db.PRODUCTIONS_SCHEMA)
+    db._productions_isolation(connection)
+    connection.executescript(db.KITS_SCHEMA)
+    connection.execute("PRAGMA user_version = 4")
+    connection.execute(
+        "INSERT INTO projects (id, name, created_at, updated_at, language, format, content_type, text_provider,"
+        " visual_provider, voice_provider, music_provider) VALUES ('prj_a', 'A', 'x', 'x', 'fr-FR', '9:16',"
+        " 'pedagogique', 'openai', 'openai_image', 'elevenlabs', 'none')")
+    connection.execute(
+        "INSERT INTO productions (id, project_id, root_production_id, version, subject, provider, idempotency_key,"
+        " status, created_at, updated_at, script) VALUES ('prd_old', 'prj_a', 'prd_old', 1, 'Sujet', 'p', 'k',"
+        " 'TERMINEE', 'x', 'x', 'Un script.')")
+    connection.execute(
+        "INSERT INTO publication_kits (id, production_id, project_id, created_at, updated_at)"
+        " VALUES ('kit_old', 'prd_old', 'prj_a', 'x', 'x')")
+    connection.commit()
+    connection.close()
+
+    repo = ProductionRepository(path)
+    ProductionRepository(path)  # rejeu : sans effet
+    old = repo.get("prd_old")
+    assert (old.script, old.snapshot, old.trace) == ("Un script.", {}, {})  # inchangé
+
+    upgraded = sqlite3.connect(path)
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert upgraded.execute("SELECT name FROM projects").fetchall() == [("A",)]
+    assert upgraded.execute("SELECT id FROM publication_kits").fetchall() == [("kit_old",)]
+    tables = {row[0] for row in upgraded.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"characters", "locations"} <= tables
+    assert upgraded.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 0
+    assert upgraded.execute("SELECT COUNT(*) FROM locations").fetchone()[0] == 0
 
 
 def test_snapshot_is_immutable_after_confirmation(tmp_path):
