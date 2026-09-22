@@ -78,6 +78,46 @@ def test_requirements_and_gitignore_protect_local_data():
     assert re.search(r"^/data/$", (ROOT / ".gitignore").read_text(encoding="utf-8"), re.MULTILINE)
 
 
+def test_secrets_directory_is_never_versioned_or_baked_into_the_image():
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert re.search(r"^/secrets/$", gitignore, re.MULTILINE)
+    assert re.search(r"^/config\.toml\.rollback$", gitignore, re.MULTILINE)
+    assert re.search(r"^secrets$", DOCKERIGNORE, re.MULTILINE)
+    assert re.search(r"^config\.toml\.rollback$", DOCKERIGNORE, re.MULTILINE)
+    assert not re.search(r"COPY[^\n]*secrets", DOCKERFILE)
+
+
+def test_compose_mounts_only_a_small_secrets_directory_read_write_config_toml_stays_read_only():
+    yaml = pytest.importorskip("yaml")
+    compose = yaml.safe_load((ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8"))
+    service = compose["services"]["lody-ui"]
+    volumes = service["volumes"]
+    assert "./secrets:/secrets:rw" in volumes
+    assert "./config.toml:/MoneyPrinterTurbo/config.toml:ro" in volumes  # jamais rw : voir docs/lody-secrets.md
+    assert not any(v.startswith("./config.toml:") and v.endswith(":rw") for v in volumes)
+    assert service["environment"]["LODY_SECRETS_DIR"] == "/secrets"
+    # Verrou de mise en ligne : désactivé (absent ou commenté), jamais actif par défaut.
+    assert "LODY_ENABLE_SYSTEM_SETTINGS" not in service.get("environment", {})
+
+
+def test_systemd_units_exist_watch_the_signal_file_and_run_the_apply_script():
+    path_unit = (ROOT / "deploy/systemd/lody-secrets-reload.path").read_text(encoding="utf-8")
+    service_unit = (ROOT / "deploy/systemd/lody-secrets-reload.service").read_text(encoding="utf-8")
+    assert "PathModified=" in path_unit and "secrets.reload" in path_unit
+    assert "PathModified=/srv/moneyprinterturbo/secrets/secrets.reload" in path_unit
+    assert "Type=oneshot" in service_unit
+    assert "lody-apply-secrets.sh" in service_unit
+
+
+def test_lody_container_never_gets_docker_access():
+    """Le redémarrage du moteur est fait par le service systemd, hors conteneur — jamais par Lody lui-même."""
+    yaml = pytest.importorskip("yaml")
+    compose = yaml.safe_load((ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8"))
+    service = compose["services"]["lody-ui"]
+    assert not any("docker.sock" in str(v) for v in service["volumes"])
+    assert "cap_drop" in service and "ALL" in service["cap_drop"]
+
+
 def _free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))

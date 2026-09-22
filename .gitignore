@@ -2,6 +2,8 @@
 /config.toml
 /config.toml.bak
 /config.toml.bak*
+/config.toml.rollback
+/secrets/
 /storage/
 /engine-report/
 /.idea/

@@ -3,6 +3,8 @@
 .github
 .gitignore
 config.toml
+config.toml.rollback
+secrets
 storage
 data
 **/__pycache__
