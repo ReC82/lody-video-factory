@@ -99,6 +99,35 @@ def test_demo_journey_has_no_horizontal_overflow(running_app, width):
 
 
 @pytest.mark.parametrize("width", list(SIZES))
+def test_narrative_selection_in_production_form_has_no_horizontal_overflow(running_app, width):
+    """#34 : section « Personnages et lieu (facultatif) », repliée puis dépliée, aux trois largeurs."""
+    base, chrome, data_dir = running_app
+    from lody.characters import CharacterRepository
+    from lody.locations import LocationRepository
+
+    overflow = "() => { const m = document.querySelector('[data-testid=\"stMain\"]') || document.documentElement; return m.scrollWidth - m.clientWidth; }"
+    project = sqlite3.connect(data_dir / "lody.sqlite3").execute(
+        "select id from projects where name='LodyCrypto'").fetchone()[0]
+    CharacterRepository(data_dir / "lody.sqlite3").create(project, name="Léa", role="Guide", is_primary=True)
+    LocationRepository(data_dir / "lody.sqlite3").create(project, name="Atelier solaire", is_primary=True)
+
+    with sync_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch(executable_path=chrome, args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width": width, "height": SIZES[width]})
+
+        def check(label):
+            page.wait_for_timeout(700)
+            assert page.evaluate(overflow) <= 1, f"débordement horizontal ({label}, {width}px)"
+
+        page.goto(f"{base}/?projet={project}&vue=production", wait_until="networkidle")
+        check("production (section repliée)")
+        page.get_by_text("Personnages et lieu (facultatif)").click()
+        page.get_by_text("Personnages actifs de ce projet").wait_for(timeout=15000)
+        check("production (section dépliée)")
+        browser.close()
+
+
+@pytest.mark.parametrize("width", list(SIZES))
 def test_characters_and_locations_pages_have_no_horizontal_overflow(running_app, width):
     """#32/#33 : état vide, formulaire ouvert et liste peuplée, aux trois largeurs."""
     base, chrome, data_dir = running_app
