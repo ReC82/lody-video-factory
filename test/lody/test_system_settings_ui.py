@@ -13,6 +13,14 @@ WEBUI_DIR = Path(__file__).resolve().parents[2] / "webui"
 SECRET = "sk-marker-should-never-render-XYZ99"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_secrets_dir(tmp_path, monkeypatch):
+    """Sans ceci, un test qui omet de le faire lui-même écrirait dans le vrai secrets/ du dépôt (arrivé une
+    fois : voir l'historique de ce fichier). Les tests qui définissent LODY_SECRETS_DIR eux-mêmes écrasent
+    simplement cette valeur par défaut ensuite — sans risque, toujours isolé."""
+    monkeypatch.setenv("LODY_SECRETS_DIR", str(tmp_path / "secrets"))
+
+
 def _run(monkeypatch, lody_env, *, enabled: bool, query: dict | None = None):
     monkeypatch.setenv("LODY_ENABLE_SYSTEM_SETTINGS", "1" if enabled else "0")
     app = apptest.AppTest.from_file(str(WEBUI_DIR / "Lody.py"), default_timeout=30)
