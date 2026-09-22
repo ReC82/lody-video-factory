@@ -174,6 +174,10 @@ def render(repo: ProjectRepository, project: Project, service: ProductionService
         with st.container(horizontal=True, key="project_actions"):
             st.button("Commencer une production", type="primary", icon=":material/play_arrow:",
                       key="start_production", on_click=nav.go, args=(nav.VIEW_PRODUCTION, project.id))
+            st.button("Personnages", icon=":material/person:", key="characters_project",
+                      on_click=nav.go, args=(nav.VIEW_CHARACTERS, project.id))
+            st.button("Lieux", icon=":material/place:", key="locations_project",
+                      on_click=nav.go, args=(nav.VIEW_LOCATIONS, project.id))
             st.button("Paramètres", icon=":material/tune:", key="settings_project",
                       on_click=nav.go, args=(nav.VIEW_SETTINGS, project.id))
             st.button("Archiver", icon=":material/archive:", type="tertiary", key="archive_project",

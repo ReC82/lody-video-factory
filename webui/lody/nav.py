@@ -7,6 +7,8 @@
   ?projet=<id>&vue=production → nouvelle production
   ?projet=<id>&vue=suivi&production=<id> → suivi et résultat d'une production
   ?projet=<id>&vue=v2&production=<id>    → création d'une V2 (script modifiable)
+  ?projet=<id>&vue=personnages          → personnages récurrents du projet (#32)
+  ?projet=<id>&vue=lieux                → lieux récurrents du projet (#33)
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ VIEW_SETTINGS = "parametres"
 VIEW_PRODUCTION = "production"
 VIEW_TRACK = "suivi"
 VIEW_V2 = "v2"
+VIEW_CHARACTERS = "personnages"
+VIEW_LOCATIONS = "lieux"
 # Accessible uniquement en connaissant ce paramètre : aucun bouton ni lien n'y mène nulle part dans l'interface
 # (verrouillée en plus par settings.system_settings_enabled(), désactivée par défaut — voir docs/lody-secrets.md).
 VIEW_SYSTEM_SETTINGS = "systeme"
@@ -45,6 +49,8 @@ def current_route() -> Route:
             return Route(VIEW_SETTINGS, project_id)
         if view == VIEW_PRODUCTION:
             return Route(VIEW_PRODUCTION, project_id)
+        if view in (VIEW_CHARACTERS, VIEW_LOCATIONS):
+            return Route(view, project_id)
         return Route(VIEW_PROJECT, project_id)
     if view == VIEW_NEW:
         return Route(VIEW_NEW)
@@ -58,11 +64,16 @@ def go(view: str = VIEW_HOME, project_id: str | None = None, production_id: str 
     params: dict[str, str] = {}
     # Une nouvelle page repart toujours des valeurs enregistrées : on oublie erreurs et saisies non validées.
     st.session_state.pop("form_errors", None)
-    for key in [k for k in st.session_state if str(k).startswith(f"set_{project_id}_")] if project_id else []:
+    prefixes = (f"set_{project_id}_", f"char_{project_id}_", f"loc_{project_id}_") if project_id else ()
+    for key in [k for k in st.session_state if str(k).startswith(prefixes)]:
         del st.session_state[key]
+    # Personnages/lieux (#32/#33) : un formulaire ou une confirmation laissés ouverts ne doivent jamais
+    # survivre à un changement de page (nouvelle page = état propre, comme pour le reste de la navigation).
+    for key in ("_char_form", "_char_confirm_deactivate", "_loc_form", "_loc_confirm_deactivate"):
+        st.session_state.pop(key, None)
     if project_id:
         params["projet"] = project_id
-        if view in (VIEW_SETTINGS, VIEW_PRODUCTION):
+        if view in (VIEW_SETTINGS, VIEW_PRODUCTION, VIEW_CHARACTERS, VIEW_LOCATIONS):
             params["vue"] = view
         elif view in (VIEW_TRACK, VIEW_V2) and production_id:
             params["vue"] = view
