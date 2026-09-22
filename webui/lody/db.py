@@ -104,6 +104,50 @@ CREATE INDEX IF NOT EXISTS idx_kits_project ON publication_kits (project_id);
 """
 
 
+# Personnages et lieux récurrents d'un projet (epic #29, fondations #30/#31) : entièrement facultatifs,
+# jamais lus par le pipeline de génération tant que la sélection (#34) n'existe pas. Aucune image binaire
+# ici (voir #38) ; aucune clé API (voir secrets_guard, appliqué par characters.py/locations.py).
+CHARACTERS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS characters (
+    id                  TEXT PRIMARY KEY,
+    project_id          TEXT NOT NULL REFERENCES projects (id),
+    name                TEXT NOT NULL,
+    role                TEXT NOT NULL DEFAULT '',
+    personality         TEXT NOT NULL DEFAULT '',
+    visual_description  TEXT NOT NULL DEFAULT '',
+    reference_prompt    TEXT NOT NULL DEFAULT '',
+    speech_style        TEXT NOT NULL DEFAULT '',
+    voice_provider      TEXT NOT NULL DEFAULT '',
+    voice_name          TEXT NOT NULL DEFAULT '',
+    external_voice_id   TEXT NOT NULL DEFAULT '',
+    permanent_elements  TEXT NOT NULL DEFAULT '',
+    continuity_notes    TEXT NOT NULL DEFAULT '',
+    is_primary          INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+    is_active           INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_characters_project ON characters (project_id, is_active DESC, name COLLATE NOCASE);
+"""
+
+LOCATIONS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS locations (
+    id                TEXT PRIMARY KEY,
+    project_id        TEXT NOT NULL REFERENCES projects (id),
+    name              TEXT NOT NULL,
+    location_type     TEXT NOT NULL DEFAULT '',
+    description       TEXT NOT NULL DEFAULT '',
+    reference_prompt  TEXT NOT NULL DEFAULT '',
+    continuity_notes  TEXT NOT NULL DEFAULT '',
+    is_primary        INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+    is_active         INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_locations_project ON locations (project_id, is_active DESC, name COLLATE NOCASE);
+"""
+
+
 def _add_columns(connection: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
     """ALTER TABLE ... ADD COLUMN, seulement pour les colonnes absentes (SQLite n'a pas IF NOT EXISTS ici)."""
     existing = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
@@ -126,6 +170,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (2, PRODUCTIONS_SCHEMA),
     (3, _productions_isolation),
     (4, KITS_SCHEMA),
+    (5, CHARACTERS_SCHEMA + LOCATIONS_SCHEMA),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
