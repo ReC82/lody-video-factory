@@ -290,7 +290,10 @@ def test_final_prompts_and_origins_are_recorded_before_sending_even_if_sending_f
     failed = env.launch(env.project("LodyCrypto"), SUBJECT_CRYPTO)
     trace = ProductionRepository(env.path).get(failed.id).trace
     assert failed.status is S.ECHEC and trace["snapshot_version"] and trace["project"]["name"] == "LodyCrypto"
-    assert trace["script_request"] in ({}, None)                          # le faux connecteur n'écrit pas de requête de script
+    # #36 : le faux connecteur décrit aussi une requête sans bloc narratif — ici, aucun personnage/lieu
+    # n'est sélectionné, donc le sujet et la langue sont ceux de LodyCrypto et le bloc narratif est absent.
+    assert trace["script_request"] == {"video_subject": SUBJECT_CRYPTO, "video_language": "fr-FR",
+                                       "video_script_prompt": "(aucun bloc narratif)"}
     assert len(trace["scenes"]) == len(failed.storyboard) and all(s["prompt_sent"] == s["final_prompt"] for s in trace["scenes"])
     assert trace["image_template"]["applied"] is False
     assert {"Prompt éditorial du script", "Prompt système du script", "Gabarit d'images du moteur"} <= {o["item"] for o in trace["origins"]}
