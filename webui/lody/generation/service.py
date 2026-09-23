@@ -41,7 +41,12 @@ from lody.generation.models import (
     TaskSnapshot,
     VoiceSpec,
 )
-from lody.generation.narrative_context import NarrativeContextError, render_prompt_block, resolve_narrative_context
+from lody.generation.narrative_context import (
+    NarrativeContextError,
+    enrich_visual_prompts,
+    render_prompt_block,
+    resolve_narrative_context,
+)
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import sanitize
 from lody.generation.storyboard import MAX_SCENES, build_storyboard
@@ -424,6 +429,10 @@ class ProductionService:
                                       visual_avoid=request.visual_avoid)
             if not scenes:
                 raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script ne contient aucune phrase exploitable.", stage="script")
+            # #37 : enrichit les prompts d'image des scènes déjà construites (mêmes scènes, même narration,
+            # même nombre — donc même estimation de coût) avec la continuité visuelle du snapshot. "" sans
+            # sélection ou snapshot antérieur à #35 : storyboard/prompts strictement inchangés (voir docstring).
+            scenes = enrich_visual_prompts(scenes, production.snapshot.get("narrative_context"))
             request = request.with_updates(visual_prompts=[scene.prompt for scene in scenes])
             self.repo.update(
                 production_id, storyboard=[scene.to_dict() for scene in scenes],
@@ -469,15 +478,17 @@ class ProductionService:
         """Ce qui est RÉELLEMENT envoyé, et d'où vient chaque élément (sans clé : aucun champ secret n'existe ici)."""
         detail = provider.trace_prompts(request)
         engine_template = detail.get("image_template", {})
-        narrative_present = bool(production.snapshot.get("narrative_context"))  # #36 : pour l'audit de l'injection
+        narrative_present = bool(production.snapshot.get("narrative_context"))  # #36/#37 : pour l'audit de l'injection
         script_origin = "projet — durée, ton, public, orientation, structure, consignes permanentes"
+        scene_origin = "projet — style visuel, consignes visuelles, liste négative + passage du script"
         if narrative_present:
             script_origin += " ; personnages et lieu sélectionnés — instantané de production (#34/#35/#36)"
+            scene_origin += " ; continuité visuelle des personnages/lieu présents — instantané de production (#34/#35/#37)"
         origins = [
             {"item": "Prompt éditorial du script", "origin": script_origin
              if script_request else "script fourni ou repris : aucun appel texte"},
             {"item": "Prompt système du script", "origin": "moteur — prompt par défaut (aucun prompt système personnalisé n'est envoyé)"},
-            {"item": "Prompts de scène (envoyés par Lody)", "origin": "projet — style visuel, consignes visuelles, liste négative + passage du script"},
+            {"item": "Prompts de scène (envoyés par Lody)", "origin": scene_origin},
             {"item": "Gabarit d'images du moteur", "origin": engine_template.get("origin", "aucun")},
             {"item": "Police et réglages de sous-titres", "origin": "plateforme (connecteur) et moteur (section [ui] de la configuration)"},
             {"item": "Voix, langue, format, durée", "origin": "projet"},
