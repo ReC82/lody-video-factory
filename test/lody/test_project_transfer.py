@@ -4,16 +4,20 @@ aucun appel réseau, aucun coût."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import sqlite3
 
 import pytest
 
-from lody.characters import CharacterRepository
-from lody.locations import LocationRepository
+from lody.characters import Character, CharacterRepository
+from lody.locations import Location, LocationRepository
 from lody.project_transfer import (
+    CHARACTER_FIELDS,
+    LOCATION_FIELDS,
     MAX_FILE_BYTES,
     MAX_ITEMS,
+    PROJECT_FIELDS,
     SCHEMA_VERSION,
     TransferError,
     blank_template,
@@ -21,7 +25,7 @@ from lody.project_transfer import (
     export_project,
     preview_import,
 )
-from lody.projects import ProjectRepository
+from lody.projects import Project, ProjectRepository
 
 
 @pytest.fixture
@@ -370,3 +374,147 @@ def test_importing_never_mutates_an_unrelated_existing_projects_characters_or_lo
     preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
     commit_import(db_path, preview)
     assert [c.name for c in characters.list_for_project(project.id)] == ["Gardien"]
+
+
+# -- exigence complémentaire du ticket #44 : maintien automatique du format d'export -----------------------------
+# Champs structurels/internes des dataclasses, volontairement EXCLUS de l'export — chacun avec sa raison.
+# Un champ ajouté à Project/Character/Location qui n'apparaît ni dans EDITABLE_FIELDS (donc exporté) ni ici
+# fait échouer test_every_*_field_is_exported_or_explicitly_excluded ci-dessous : un oubli est détecté par
+# un test, jamais découvert plus tard sous la forme d'un export incomplet.
+PROJECT_FIELDS_EXCLUDED = {
+    "id": "identifiant interne — régénéré à l'import, jamais réutilisé",
+    "status": "état d'archivage (actif/archivé) — décision d'administration, pas une configuration exportable",
+    "created_at": "horodatage interne — régénéré à l'import",
+    "updated_at": "horodatage interne — régénéré à l'import",
+    "seed_key": "marqueur interne des projets d'exemple livrés avec l'application — sans sens hors de ce dépôt",
+}
+CHARACTER_FIELDS_EXCLUDED = {
+    "id": "identifiant interne — régénéré à l'import",
+    "project_id": "relation interne — recalculée à l'import (le personnage rejoint le NOUVEAU projet)",
+    "created_at": "horodatage interne — régénéré à l'import",
+    "updated_at": "horodatage interne — régénéré à l'import",
+}
+LOCATION_FIELDS_EXCLUDED = {
+    "id": "identifiant interne — régénéré à l'import",
+    "project_id": "relation interne — recalculée à l'import (le lieu rejoint le NOUVEAU projet)",
+    "created_at": "horodatage interne — régénéré à l'import",
+    "updated_at": "horodatage interne — régénéré à l'import",
+}
+
+
+def _dataclass_field_names(cls) -> set[str]:
+    return {f.name for f in dataclasses.fields(cls)}
+
+
+def test_every_project_field_is_exported_or_explicitly_excluded_with_a_reason():
+    all_fields = _dataclass_field_names(Project)
+    exported, excluded = set(PROJECT_FIELDS), set(PROJECT_FIELDS_EXCLUDED)
+    assert not (exported & excluded), exported & excluded  # jamais les deux à la fois
+    assert all_fields == exported | excluded, (
+        f"champ(s) ni exporté(s) ni exclu(s) avec raison : {all_fields - exported - excluded} — "
+        f"ajoute-le/les à PROJECT_FIELDS (via projects.EDITABLE_FIELDS) ou à PROJECT_FIELDS_EXCLUDED ci-dessus.")
+    # PROJECT_FIELDS (utilisé par export/import) EST projects.EDITABLE_FIELDS — pas une copie qui pourrait diverger.
+    from lody.projects import EDITABLE_FIELDS as project_editable_fields
+
+    assert PROJECT_FIELDS == project_editable_fields
+
+
+def test_every_character_field_is_exported_or_explicitly_excluded_with_a_reason():
+    all_fields = _dataclass_field_names(Character)
+    exported, excluded = set(CHARACTER_FIELDS), set(CHARACTER_FIELDS_EXCLUDED)
+    assert not (exported & excluded), exported & excluded
+    assert all_fields == exported | excluded, (
+        f"champ(s) ni exporté(s) ni exclu(s) avec raison : {all_fields - exported - excluded}")
+    from lody.characters import EDITABLE_FIELDS as character_editable_fields
+
+    assert CHARACTER_FIELDS == character_editable_fields
+
+
+def test_every_location_field_is_exported_or_explicitly_excluded_with_a_reason():
+    all_fields = _dataclass_field_names(Location)
+    exported, excluded = set(LOCATION_FIELDS), set(LOCATION_FIELDS_EXCLUDED)
+    assert not (exported & excluded), exported & excluded
+    assert all_fields == exported | excluded, (
+        f"champ(s) ni exporté(s) ni exclu(s) avec raison : {all_fields - exported - excluded}")
+    from lody.locations import EDITABLE_FIELDS as location_editable_fields
+
+    assert LOCATION_FIELDS == location_editable_fields
+
+
+def test_blank_template_field_names_come_from_the_same_fields_tuples_as_import_export():
+    """Le modèle téléchargeable ne doit contenir AUCUNE liste de champs maintenue séparément : ses clés
+    doivent être EXACTEMENT PROJECT_FIELDS/CHARACTER_FIELDS/LOCATION_FIELDS — les tuples que preview_import()
+    et export_project() utilisent déjà (voir project_transfer._example, appelé par blank_template())."""
+    template = blank_template()
+    assert set(template["project"]) == set(PROJECT_FIELDS)
+    for character in template["characters"]:
+        assert set(character) == set(CHARACTER_FIELDS)
+    for location in template["locations"]:
+        assert set(location) == set(LOCATION_FIELDS)
+
+
+# -- round-trip complet : plusieurs personnages et lieux, TOUS les champs fonctionnels comparés -------------------
+def test_full_round_trip_with_multiple_characters_and_locations_preserves_every_functional_field(db_path):
+    """Projet avec plusieurs personnages et plusieurs lieux → export JSON → import dans un nouveau projet →
+    comparaison de CHAQUE champ fonctionnel (via PROJECT_FIELDS/CHARACTER_FIELDS/LOCATION_FIELDS, la même
+    liste que l'export/import lui-même : si un champ cesse de survivre au round-trip, ce test le détecte
+    sans qu'il faille se souvenir de l'ajouter à une liste d'assertions à la main)."""
+    projects = ProjectRepository(db_path)
+    characters = CharacterRepository(db_path)
+    locations = LocationRepository(db_path)
+    source = projects.create(
+        name="Projet source complet", description="Une description complète et détaillée", language="en-US",
+        format="16:9", content_type="tutoriel", tone="Inspirant", visual_style="Univers complet et détaillé",
+        platforms=["youtube", "linkedin"], text_provider="openai", visual_provider="openai_image",
+        voice_provider="elevenlabs", voice_name="Voix source", music_provider="library",
+        settings={"brief": {"audience": "Public complet", "orientation": "Progression claire",
+                            "structure": ["Accroche", "Développement", "Conclusion"],
+                            "standing_instructions": "Toujours rester concret.",
+                            "visual_rules": "Toujours un cadrage stable.", "visual_avoid": ["texte à l'écran"]}})
+    character_specs = (
+        dict(name="Gaston", role="Guide", personality="Bavard, chaleureux", visual_description="Chapeau, gilet",
+             reference_prompt="portrait voxel", speech_style="Phrases courtes", voice_provider="elevenlabs",
+             voice_name="Voix Gaston", external_voice_id="21m00Tcm4TlvDq8ikWAM", permanent_elements="Porte un chapeau",
+             continuity_notes="Toujours enjoué", is_primary=True, is_active=True),
+        dict(name="Zoé", role="Alliée", personality="Calme et précise", is_primary=False, is_active=False),
+    )
+    location_specs = (
+        dict(name="Studio", location_type="Intérieur", description="Studio moderne", reference_prompt="plan large",
+             continuity_notes="Toujours la même disposition", is_primary=True, is_active=True),
+        dict(name="Extérieur ville", location_type="Extérieur", description="Rue animée", is_primary=False, is_active=False),
+    )
+    source_characters = [characters.create(source.id, **spec) for spec in character_specs]
+    source_locations = [locations.create(source.id, **spec) for spec in location_specs]
+
+    payload = export_project(source, characters.list_for_project(source.id), locations.list_for_project(source.id))
+    # Le nom du projet SOURCE est déjà pris (par lui-même) : l'import est forcément renommé (politique
+    # « jamais d'écrasement », testée pour elle-même ailleurs) — donc exclu ici de la comparaison champ à
+    # champ, qui porte sur tout le reste (tous les autres champs de PROJECT_FIELDS, sans exception).
+    preview = preview_import(json.dumps(payload).encode("utf-8"),
+                             existing_project_names=[p.name for p in projects.list_projects()])
+    assert preview.is_valid and preview.name_was_renamed, preview.errors
+    created = commit_import(db_path, preview)
+
+    assert created.id != source.id and created.name != source.name
+    for field in PROJECT_FIELDS:
+        if field == "name":
+            continue
+        assert getattr(created, field) == getattr(source, field), f"project.{field}"
+
+    new_by_name = {c.name: c for c in characters.list_for_project(created.id)}
+    old_by_name = {c.name: c for c in source_characters}
+    assert set(new_by_name) == set(old_by_name) == {"Gaston", "Zoé"}
+    for name, old in old_by_name.items():
+        new = new_by_name[name]
+        assert new.id != old.id and new.project_id == created.id
+        for field in CHARACTER_FIELDS:
+            assert getattr(new, field) == getattr(old, field), f"characters[{name}].{field}"
+
+    new_locs_by_name = {loc.name: loc for loc in locations.list_for_project(created.id)}
+    old_locs_by_name = {loc.name: loc for loc in source_locations}
+    assert set(new_locs_by_name) == set(old_locs_by_name) == {"Studio", "Extérieur ville"}
+    for name, old in old_locs_by_name.items():
+        new = new_locs_by_name[name]
+        assert new.id != old.id and new.project_id == created.id
+        for field in LOCATION_FIELDS:
+            assert getattr(new, field) == getattr(old, field), f"locations[{name}].{field}"

@@ -12,6 +12,9 @@ récente ou plus ancienne de ce format, jamais un blocage surprise pour une clé
 L'import ne modifie jamais un projet existant : il crée toujours un nouveau projet (``commit_import``),
 avec de nouveaux identifiants pour le projet, ses personnages et ses lieux. Aucun secret, identifiant
 interne, project_id, timestamp ou chemin local n'est jamais exporté ni accepté à l'import.
+
+Toute PR qui ajoute un champ persistant à ``Project``/``Character``/``Location`` doit vérifier son impact
+ici : voir la règle et les tests de couverture dans ``docs/lody-project-transfer.md``.
 """
 
 from __future__ import annotations
@@ -121,74 +124,64 @@ def export_project(project: Project, characters: Iterable[Character], locations:
     return payload
 
 
+def _example(known_fields: tuple[str, ...], defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    """Un exemple dont le JEU DE CLÉS provient de ``known_fields`` (donc de la même source de vérité que
+    l'export/import), jamais d'une liste tapée séparément : un champ ajouté à ``EDITABLE_FIELDS`` apparaît
+    ici automatiquement (avec sa valeur par défaut tant qu'aucun exemple n'est fourni), et un champ retiré
+    disparaît de même — impossible de diverger en silence (exigence complémentaire du ticket #44)."""
+    return {key: overrides.get(key, defaults.get(key, "")) for key in known_fields}
+
+
+# Valeurs d'exemple pour un modèle vierge lisible : seules celles utiles à la démonstration sont listées
+# ici, tout champ absent de ces dictionnaires retombe simplement sur sa valeur par défaut (``_example``).
+_PROJECT_EXAMPLE = {
+    "name": "Mon nouveau projet",
+    "description": "Décris ici l'objectif et le ton général de ce projet.",
+    "visual_style": "Décris ici le style visuel voulu (univers, ambiance, ce qu'il faut éviter).",
+    "tone": "Clair et précis",
+    "platforms": ["youtube_shorts", "tiktok"],
+}
+_CHARACTER_EXAMPLE_PRIMARY = {
+    "name": "Personnage principal", "role": "Protagoniste",
+    "personality": "Curieux, bienveillant, un peu maladroit.",
+    "visual_description": "Silhouette simple, couleurs vives, sans texte ni logo.",
+    "reference_prompt": "portrait stylisé, univers coloré, cohérent d'une scène à l'autre",
+    "speech_style": "Phrases courtes, ton chaleureux.",
+    "permanent_elements": "Porte toujours le même carnet.",
+    "continuity_notes": "Reste cohérent d'une vidéo à l'autre.",
+    "is_primary": True,
+}
+_CHARACTER_EXAMPLE_SECONDARY = {
+    "name": "Personnage secondaire", "role": "Allié",
+    "personality": "Calme, précis, complémentaire du personnage principal.",
+    "is_primary": False,
+}
+_LOCATION_EXAMPLE_PRIMARY = {
+    "name": "Lieu principal", "location_type": "Intérieur",
+    "description": "Décris ici l'ambiance, la lumière, les éléments récurrents de ce lieu.",
+    "reference_prompt": "plan large, lumière douce, mêmes couleurs à chaque apparition",
+    "continuity_notes": "Toujours le même agencement d'une vidéo à l'autre.",
+    "is_primary": True,
+}
+_LOCATION_EXAMPLE_SECONDARY = {"name": "Lieu secondaire", "location_type": "Extérieur", "is_primary": False}
+
+
 def blank_template() -> dict[str, Any]:
     """Modèle vierge téléchargeable, avec deux personnages et deux lieux d'exemple.
 
-    Construit depuis les mêmes tuples de champs (``PROJECT_FIELDS``/``CHARACTER_FIELDS``/``LOCATION_FIELDS``)
-    que la validation d'import : si le format évolue, ce modèle évolue avec lui — il ne peut pas devenir
-    obsolète en silence. Valeurs génériques, clairement à remplacer ; aucun secret réel.
+    Chaque exemple est construit par ``_example()`` en itérant ``PROJECT_FIELDS``/``CHARACTER_FIELDS``/
+    ``LOCATION_FIELDS`` — les mêmes tuples que ceux utilisés par ``export_project``/``preview_import`` : ce
+    modèle ne contient donc aucune liste de champs maintenue séparément et ne peut pas devenir obsolète en
+    silence (voir ``test_blank_template_field_names_come_from_the_same_fields_tuples_as_import_export``).
+    Valeurs génériques, clairement à remplacer ; aucun secret réel.
     """
-    project = {
-        "name": "Mon nouveau projet",
-        "description": "Décris ici l'objectif et le ton général de ce projet.",
-        "language": "fr-FR",
-        "format": "9:16",
-        "content_type": "pedagogique",
-        "tone": "Clair et précis",
-        "visual_style": "Décris ici le style visuel voulu (univers, ambiance, ce qu'il faut éviter).",
-        "platforms": ["youtube_shorts", "tiktok"],
-        "text_provider": "openai",
-        "visual_provider": "openai_image",
-        "voice_provider": "elevenlabs",
-        "voice_name": "",
-        "music_provider": "none",
-        "settings": {},
-    }
-    assert set(project) == set(PROJECT_FIELDS)  # garde-fou : toujours synchronisé avec le modèle réel
-    character_examples = [
-        {
-            "name": "Personnage principal", "role": "Protagoniste",
-            "personality": "Curieux, bienveillant, un peu maladroit.",
-            "visual_description": "Silhouette simple, couleurs vives, sans texte ni logo.",
-            "reference_prompt": "portrait stylisé, univers coloré, cohérent d'une scène à l'autre",
-            "speech_style": "Phrases courtes, ton chaleureux.",
-            "voice_provider": "", "voice_name": "", "external_voice_id": "",
-            "permanent_elements": "Porte toujours le même carnet.",
-            "continuity_notes": "Reste cohérent d'une vidéo à l'autre.",
-            "is_primary": True, "is_active": True,
-        },
-        {
-            "name": "Personnage secondaire", "role": "Allié",
-            "personality": "Calme, précis, complémentaire du personnage principal.",
-            "visual_description": "", "reference_prompt": "", "speech_style": "",
-            "voice_provider": "", "voice_name": "", "external_voice_id": "",
-            "permanent_elements": "", "continuity_notes": "",
-            "is_primary": False, "is_active": True,
-        },
-    ]
-    for example in character_examples:
-        assert set(example) == set(CHARACTER_FIELDS)
-    location_examples = [
-        {
-            "name": "Lieu principal", "location_type": "Intérieur",
-            "description": "Décris ici l'ambiance, la lumière, les éléments récurrents de ce lieu.",
-            "reference_prompt": "plan large, lumière douce, mêmes couleurs à chaque apparition",
-            "continuity_notes": "Toujours le même agencement d'une vidéo à l'autre.",
-            "is_primary": True, "is_active": True,
-        },
-        {
-            "name": "Lieu secondaire", "location_type": "Extérieur",
-            "description": "", "reference_prompt": "", "continuity_notes": "",
-            "is_primary": False, "is_active": True,
-        },
-    ]
-    for example in location_examples:
-        assert set(example) == set(LOCATION_FIELDS)
     return {
         "schema_version": SCHEMA_VERSION,
-        "project": project,
-        "characters": character_examples,
-        "locations": location_examples,
+        "project": _example(PROJECT_FIELDS, PROJECT_DEFAULTS, _PROJECT_EXAMPLE),
+        "characters": [_example(CHARACTER_FIELDS, CHARACTER_DEFAULTS, override)
+                       for override in (_CHARACTER_EXAMPLE_PRIMARY, _CHARACTER_EXAMPLE_SECONDARY)],
+        "locations": [_example(LOCATION_FIELDS, LOCATION_DEFAULTS, override)
+                      for override in (_LOCATION_EXAMPLE_PRIMARY, _LOCATION_EXAMPLE_SECONDARY)],
     }
 
 
