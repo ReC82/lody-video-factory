@@ -6,10 +6,15 @@ alimente automatiquement le brief de la page « Nouvelle production ».
 
 from __future__ import annotations
 
+import json
+
 import streamlit as st
 
 from lody import brief as brief_lib
-from lody import catalog, nav
+from lody import catalog, nav, project_transfer
+from lody.characters import CharacterRepository
+from lody.generation.publication import slugify
+from lody.locations import LocationRepository
 from lody.projects import Project, ProjectNotFound, ProjectRepository, ProjectValidationError
 from lody.theme import esc
 from lody.view_form import ERRORS_KEY, States, error_under, provider_select
@@ -17,6 +22,10 @@ from lody.view_form import ERRORS_KEY, States, error_under, provider_select
 
 def _prefix(project_id: str) -> str:
     return f"set_{project_id}"
+
+
+def _transfer_prefix(project_id: str) -> str:
+    return f"impexp_{project_id}"
 
 
 def _submit(repo: ProjectRepository, project_id: str) -> None:
@@ -78,7 +87,92 @@ def _cancel(project_id: str) -> None:
     nav.go(nav.VIEW_PROJECT, project_id)
 
 
-def render(repo: ProjectRepository, project: Project, states: States) -> None:
+# -- import / export de configuration (#44) -----------------------------------------------------------------------
+def _export_bytes(repo: ProjectRepository, character_repo: CharacterRepository, location_repo: LocationRepository,
+                  project_id: str) -> bytes:
+    project = repo.get(project_id)
+    payload = project_transfer.export_project(
+        project, character_repo.list_for_project(project_id), location_repo.list_for_project(project_id))
+    return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _template_bytes() -> bytes:
+    return json.dumps(project_transfer.blank_template(), ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _confirm_import(repo: ProjectRepository, project_id: str, preview: project_transfer.ImportPreview) -> None:
+    t = _transfer_prefix(project_id)
+    try:
+        created = project_transfer.commit_import(repo.db_path, preview)
+    except project_transfer.TransferError as error:
+        nav.flash("error", f"Import impossible : {error}")
+        return
+    st.session_state.pop(f"{t}_uploader", None)
+    renamed = " (le nom demandé existait déjà, un nom distinct a été utilisé)" if preview.name_was_renamed else ""
+    nav.flash("success", f"Projet « {created.name} » créé depuis le fichier importé{renamed}.")
+    nav.go(nav.VIEW_PROJECT, created.id)
+
+
+def _render_transfer_preview(preview: project_transfer.ImportPreview) -> None:
+    if preview.errors:
+        lines = [f"{esc(issue.path)} — {esc(issue.message)}" if issue.path else esc(issue.message)
+                 for issue in preview.errors]
+        st.markdown(
+            '<div class="banner banner-error" role="alert"><strong>Fichier invalide, rien n’a été créé :</strong><br>'
+            + "<br>".join(lines) + "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+    summary = preview.project_summary
+    details = [
+        f"Langue : {catalog.label(catalog.LANGUAGES, summary.get('language', ''))}",
+        f"Format : {catalog.label(catalog.FORMATS, summary.get('format', ''))}",
+        f"Type de contenu : {catalog.label(catalog.CONTENT_TYPES, summary.get('content_type', ''))}",
+        f"Ton : {summary.get('tone') or '—'}",
+        f"Personnages ({len(preview.character_names)}) : {', '.join(preview.character_names) or 'aucun'}",
+        f"Lieux ({len(preview.location_names)}) : {', '.join(preview.location_names) or 'aucun'}",
+    ]
+    st.markdown(
+        f'<div class="banner banner-info" role="status">Aperçu — aucune écriture pour l’instant.<br>'
+        f'Nouveau projet : <strong>{esc(preview.project_name)}</strong><br>'
+        + "<br>".join(esc(line) for line in details) + "</div>",
+        unsafe_allow_html=True,
+    )
+    if preview.warnings:
+        st.markdown(
+            '<div class="banner banner-info" role="status">'
+            + "<br>".join(esc(warning) for warning in preview.warnings) + "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_import_export(repo: ProjectRepository, character_repo: CharacterRepository,
+                          location_repo: LocationRepository, project: Project) -> None:
+    t = _transfer_prefix(project.id)
+    with st.container(key="import_export_card"):
+        st.markdown('<p class="card-eyebrow">Import / Export</p>', unsafe_allow_html=True)
+        st.caption("Exporte la configuration de ce projet, ou importe un fichier pour en créer un nouveau. "
+                   "L’import ne modifie jamais un projet existant.")
+        with st.container(horizontal=True, key=f"{t}_export_actions"):
+            st.download_button("Exporter ce projet", data=_export_bytes(repo, character_repo, location_repo, project.id),
+                               file_name=f"lody-export-{slugify(project.name, 40)}.json", mime="application/json",
+                               key=f"{t}_export")
+            st.download_button("Télécharger un modèle vierge", data=_template_bytes(),
+                               file_name="lody-modele-projet.json", mime="application/json", key=f"{t}_template")
+
+        uploaded = st.file_uploader("Importer une configuration (fichier .json)", type=["json"],
+                                    key=f"{t}_uploader")
+        if uploaded is not None:
+            preview = project_transfer.preview_import(
+                uploaded.getvalue(), existing_project_names=[p.name for p in repo.list_projects()])
+            _render_transfer_preview(preview)
+            st.button("Confirmer la création du projet", type="primary", icon=":material/check:",
+                      key=f"{t}_confirm", disabled=not preview.is_valid,
+                      on_click=_confirm_import, args=(repo, project.id, preview))
+
+
+def render(repo: ProjectRepository, project: Project, states: States, character_repo: CharacterRepository,
+          location_repo: LocationRepository) -> None:
     p = _prefix(project.id)
     current = brief_lib.brief_settings(project.settings)
 
@@ -215,3 +309,5 @@ def render(repo: ProjectRepository, project: Project, states: States) -> None:
                 st.form_submit_button("Enregistrer les paramètres", type="primary", icon=":material/check:",
                                       on_click=_submit, args=(repo, project.id))
                 st.form_submit_button("Annuler", on_click=_cancel, args=(project.id,))
+
+    _render_import_export(repo, character_repo, location_repo, project)
