@@ -7,7 +7,7 @@ import sqlite3
 
 import pytest
 
-from lody import db
+from lody import catalog, db
 from lody.characters import (
     CharacterNotFound,
     CharacterRepository,
@@ -272,9 +272,40 @@ def test_unknown_voice_provider_is_refused(repo, project):
     assert "voice_provider" in error.value.errors
 
 
+def test_unknown_voice_provider_message_lists_accepted_values(repo, project):
+    """#63 : le message doit indiquer les valeurs techniques acceptées, pas un renvoi générique « dans la
+    liste »."""
+    with pytest.raises(CharacterValidationError) as error:
+        repo.create(project.id, name="Test", voice_provider="myspace-voice")
+    assert '"elevenlabs"' in error.value.errors["voice_provider"]
+    assert '"edge"' in error.value.errors["voice_provider"]
+
+
 def test_empty_voice_provider_is_allowed(repo, project):
     character = repo.create(project.id, name="Test", voice_provider="")
     assert character.voice_provider == ""
+
+
+@pytest.mark.parametrize("technical_value", ["elevenlabs", "edge"])
+def test_technical_voice_provider_is_accepted(repo, project, technical_value):
+    character = repo.create(project.id, name="Test", voice_provider=technical_value)
+    assert character.voice_provider == technical_value
+
+
+@pytest.mark.parametrize(
+    ("raw_label", "expected_technical_value"),
+    [("ElevenLabs", "elevenlabs"), ("ELEVENLABS", "elevenlabs"), ("Voix gratuite (Edge)", "edge")],
+)
+def test_ui_label_is_normalized_to_the_technical_value(repo, project, raw_label, expected_technical_value):
+    """#63 : un import JSON reprenant le libellé affiché dans l'interface (ex. « ElevenLabs ») est accepté et
+    normalisé vers l'identifiant technique attendu (« elevenlabs »)."""
+    character = repo.create(project.id, name="Test", voice_provider=raw_label)
+    assert character.voice_provider == expected_technical_value
+
+
+def test_voice_provider_validation_uses_the_catalog_as_single_source_of_truth():
+    """#63 : la validation ne duplique pas la liste des fournisseurs — elle consomme catalog.VOICE_PROVIDERS."""
+    assert catalog.normalize(catalog.VOICE_PROVIDERS, "ElevenLabs") == "elevenlabs"
 
 
 @pytest.mark.parametrize("field", ["name", "role", "personality", "visual_description", "reference_prompt",

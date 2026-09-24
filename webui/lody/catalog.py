@@ -93,3 +93,26 @@ def label(options: tuple[Option, ...], value: str) -> str:
         if option.value == value:
             return option.label
     return value or "—"
+
+
+def normalize(options: tuple[Option, ...], raw_value: object) -> str | None:
+    """Identifiant technique canonique si ``raw_value`` correspond, en ignorant la casse, à une valeur OU à
+    un libellé de ce catalogue (ex. ``"ElevenLabs"`` → ``"elevenlabs"``) — sinon ``None``. Un import JSON
+    reprend parfois le libellé affiché dans l'interface plutôt que l'identifiant technique attendu (#63) ;
+    ne normalise que sur une correspondance EXACTE (insensible à la casse), jamais une sous-chaîne : aucune
+    ambiguïté possible entre deux options d'un même catalogue."""
+    if not isinstance(raw_value, str):
+        return None
+    needle = raw_value.strip().casefold()
+    if not needle:
+        return None
+    for option in options:
+        if option.value.casefold() == needle or option.label.casefold() == needle:
+            return option.value
+    return None
+
+
+def allowed_values_text(options: tuple[Option, ...]) -> str:
+    """Liste lisible des identifiants techniques acceptés par ce catalogue, pour un message d'erreur
+    précis plutôt qu'un générique « dans la liste » (#63)."""
+    return ", ".join(f'"{value}"' for value in values(options))

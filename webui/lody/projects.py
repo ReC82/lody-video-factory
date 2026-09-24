@@ -149,11 +149,16 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
         "music_provider": "Choisis une option de musique dans la liste.",
     }
     for key, message in choice_messages.items():
+        options = catalog.CATALOGS[key]
         value = fields.get(key, copy.deepcopy(DEFAULTS[key]))
-        if value in catalog.values(catalog.CATALOGS[key]):
-            clean[key] = value
+        # #63 : accepte aussi le libellé affiché dans l'interface (ex. « ElevenLabs »), pas seulement
+        # l'identifiant technique (« elevenlabs ») — normalisation exacte et insensible à la casse
+        # uniquement, voir catalog.normalize(). Un import JSON reprend parfois ce libellé par erreur.
+        normalized = catalog.normalize(options, value)
+        if normalized is not None:
+            clean[key] = normalized
         else:
-            errors[key] = message
+            errors[key] = f"{message} Valeurs acceptées : {catalog.allowed_values_text(options)}."
             clean[key] = value
 
     raw_platforms = fields.get("platforms", copy.deepcopy(DEFAULTS["platforms"])) or []
