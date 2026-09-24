@@ -31,7 +31,7 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
     ProductionRepository(path)
     ProductionRepository(path)  # rejeu : sans effet
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 5
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 6
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
     columns = {row[1] for row in connection.execute("PRAGMA table_info(productions)")}
@@ -41,13 +41,20 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
             "started_at", "finished_at", "video_ref", "assets", "snapshot", "trace"} <= columns
     # « idempotency_key » est la clé d'idempotence locale, pas une clé d'API.
     assert not [c for c in columns if ("key" in c or "token" in c or "secret" in c) and c != "idempotency_key"]
-    character_columns = {row[1] for row in connection.execute("PRAGMA table_info(characters)")}
-    location_columns = {row[1] for row in connection.execute("PRAGMA table_info(locations)")}
+    character_types = {row[1]: row[2] for row in connection.execute("PRAGMA table_info(characters)")}
+    location_types = {row[1]: row[2] for row in connection.execute("PRAGMA table_info(locations)")}
+    character_columns, location_columns = set(character_types), set(location_types)
     assert {"project_id", "name", "is_primary", "is_active"} <= character_columns
     assert {"project_id", "name", "is_primary", "is_active"} <= location_columns
-    # Ni personnages ni lieux ne stockent d'image (aucune colonne BLOB, aucune colonne "image") ni de secret.
-    for table_columns in (character_columns, location_columns):
-        assert not [c for c in table_columns if "image" in c or "key" in c or "token" in c or "secret" in c]
+    # Ni personnages ni lieux ne stockent des octets d'image (aucune colonne BLOB) ni de secret. Depuis #38,
+    # "reference_image" existe bien (colonne TEXT) mais ne porte qu'une RÉFÉRENCE déjà validée vers un fichier
+    # hors SQLite (voir lody.reference_images) — jamais l'image elle-même : distinguée ici par son TYPE de
+    # colonne, pas exclue du seul fait que son nom contienne "image".
+    for table_types in (character_types, location_types):
+        assert not [c for c, t in table_types.items() if t.upper() == "BLOB"]
+        assert not [c for c, t in table_types.items()
+                    if c != "reference_image" and ("image" in c or "key" in c or "token" in c or "secret" in c)]
+    assert character_types["reference_image"] == "TEXT" and location_types["reference_image"] == "TEXT"
 
 
 def test_upgrade_from_schema_v1_keeps_existing_projects(tmp_path):
@@ -63,7 +70,7 @@ def test_upgrade_from_schema_v1_keeps_existing_projects(tmp_path):
     connection.close()
     ProductionRepository(path)
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 6
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT COUNT(*) FROM productions").fetchone()[0] == 0
 
@@ -88,13 +95,14 @@ def test_upgrade_from_schema_v2_adds_snapshot_and_trace_without_touching_existin
     ProductionRepository(path)  # rejeu : sans effet, pas de colonne dupliquée
     old = repo.get("prd_old")
     assert (old.script, old.snapshot, old.trace) == ("Un script.", {}, {})
-    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 5
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == 6
 
 
-def test_upgrade_from_schema_v4_adds_characters_and_locations_without_touching_existing_kits(tmp_path):
-    """Base v4 réelle — le schéma actuellement déployé (projects + productions + publication_kits) — avec un
-    projet, une production et un kit de publication déjà présents. La migration additive v5 (#30/#31) doit
-    laisser tout cela strictement intact et n'ajouter que characters/locations, vides."""
+def test_upgrade_from_schema_v4_adds_characters_locations_and_reference_image_without_touching_existing_kits(tmp_path):
+    """Base v4 réelle (projects + productions + publication_kits) avec un projet, une production et un kit de
+    publication déjà présents. Les migrations additives v5 (#30/#31, tables characters/locations) PUIS v6
+    (#38, colonne reference_image sur ces deux tables) doivent laisser tout cela strictement intact et
+    n'ajouter que ce que chacune prévoit — characters/locations vides, reference_image par défaut ''."""
     path = tmp_path / "v4.sqlite3"
     connection = sqlite3.connect(path)
     connection.executescript(db.PROJECTS_SCHEMA + db.PRODUCTIONS_SCHEMA)
@@ -121,13 +129,17 @@ def test_upgrade_from_schema_v4_adds_characters_and_locations_without_touching_e
     assert (old.script, old.snapshot, old.trace) == ("Un script.", {}, {})  # inchangé
 
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 6
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("A",)]
     assert upgraded.execute("SELECT id FROM publication_kits").fetchall() == [("kit_old",)]
     tables = {row[0] for row in upgraded.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"characters", "locations"} <= tables
     assert upgraded.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 0
     assert upgraded.execute("SELECT COUNT(*) FROM locations").fetchone()[0] == 0
+    # v6 (#38) : la colonne existe sur les deux tables, vide par défaut — comportement inchangé sans upload.
+    character_columns = {row[1]: row[4] for row in upgraded.execute("PRAGMA table_info(characters)")}
+    location_columns = {row[1]: row[4] for row in upgraded.execute("PRAGMA table_info(locations)")}
+    assert character_columns["reference_image"] == "''" and location_columns["reference_image"] == "''"
 
 
 def test_snapshot_is_immutable_after_confirmation(tmp_path):
