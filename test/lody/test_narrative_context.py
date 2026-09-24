@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import copy
+import io
 from decimal import Decimal
 
 import pytest
+from PIL import Image
 
 from lody.characters import CharacterRepository
 from lody.generation.costing import PriceBook
-from lody.generation.narrative_context import NarrativeContextError, resolve_narrative_context
+from lody.generation.narrative_context import NarrativeContextError, reference_images_status, resolve_narrative_context
 from lody.generation.service import LaunchError, ProductionService, make_snapshot
 from lody.generation.store import ProductionRepository
 from lody.locations import LocationRepository
@@ -19,6 +21,18 @@ from test.lody.fakes import ScriptedConnector, SyncExecutor
 PRICES = PriceBook("EUR", {("text", "openai"): Decimal("0.02"), ("visual", "openai_image"): Decimal("0.04"),
                            ("voice", "elevenlabs"): Decimal("0.3"), ("music", "elevenlabs"): Decimal("0.1")})
 SUBJECT = "Explique simplement comment fonctionne une pile solaire à quelqu'un qui débute."
+
+
+def _png() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (120, 120), color=(255, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_reference_storage(tmp_path, monkeypatch):
+    """Isole le stockage des images de référence (#38) de tout dossier réel du dépôt."""
+    monkeypatch.setenv("LODY_DATA_DIR", str(tmp_path / "ref_storage"))
 
 
 class Env:
@@ -66,16 +80,17 @@ def test_selected_characters_and_location_are_copied_by_value(env):
 
     block = resolve_narrative_context(env.project.id, (lea.id, theo.id), atelier.id, env.characters, env.locations)
 
-    assert block["version"] == 2  # #37 : ajoute reference_prompt (absent de la version 1, voir son docstring)
+    assert block["version"] == 3  # #38 : ajoute reference_image (absent des versions 1 et 2)
     assert [c["id"] for c in block["characters"]] == [lea.id, theo.id]
     assert block["characters"][0] == {
         "id": lea.id, "name": "Léa", "role": "Guide", "personality": "Curieuse",
         "visual_description": "Manteau bleu", "reference_prompt": "", "speech_style": "", "permanent_elements": "",
-        "continuity_notes": "Toujours souriante", "is_primary": False,
+        "continuity_notes": "Toujours souriante", "reference_image": "", "is_primary": False,
     }
     assert block["location"] == {
         "id": atelier.id, "name": "Atelier solaire", "location_type": "Intérieur",
-        "description": "Plein de panneaux", "reference_prompt": "", "continuity_notes": "", "is_primary": False,
+        "description": "Plein de panneaux", "reference_prompt": "", "continuity_notes": "", "reference_image": "",
+        "is_primary": False,
     }
 
 
@@ -224,3 +239,64 @@ def test_legacy_production_snapshot_without_narrative_context_key_is_accepted(en
 
     v2 = env.service.create_v2(launched.id)
     assert v2.snapshot.get("narrative_context", {}) == {}
+
+
+# -- reference_images_status (#38) : jamais une transmission simulée pour un fournisseur incompatible ------------
+def test_reference_images_status_is_empty_without_any_selection():
+    assert reference_images_status(None, provider_supports_reference_images=False) == {
+        "present": [], "used": [], "fallback": [], "provider_supports": False,
+    }
+    assert reference_images_status({}, provider_supports_reference_images=True) == {
+        "present": [], "used": [], "fallback": [], "provider_supports": True,
+    }
+
+
+def test_reference_images_status_is_empty_when_selection_has_no_image(env):
+    lea = env.add_character()  # aucune image de référence
+    block = resolve_narrative_context(env.project.id, (lea.id,), None, env.characters, env.locations)
+    status = reference_images_status(block, provider_supports_reference_images=True)
+    assert status == {"present": [], "used": [], "fallback": [], "provider_supports": True}
+
+
+def test_reference_images_status_falls_back_explicitly_for_an_incompatible_provider(env):
+    lea = env.add_character(name="Léa")
+    env.characters.set_reference_image(env.project.id, lea.id, _png())
+    atelier = env.add_location(name="Atelier solaire")
+    env.locations.set_reference_image(env.project.id, atelier.id, _png())
+    block = resolve_narrative_context(env.project.id, (lea.id,), atelier.id, env.characters, env.locations)
+
+    status = reference_images_status(block, provider_supports_reference_images=False)
+
+    assert status["present"] == ["Léa", "Atelier solaire"]
+    assert status["used"] == []  # jamais transmise pour un fournisseur qui ne la supporte pas
+    assert status["fallback"] == ["Léa", "Atelier solaire"]  # repli EXPLICITE, pas silencieux
+    assert status["provider_supports"] is False
+
+
+def test_reference_images_status_marks_as_used_for_a_compatible_provider(env):
+    lea = env.add_character(name="Léa")
+    env.characters.set_reference_image(env.project.id, lea.id, _png())
+    block = resolve_narrative_context(env.project.id, (lea.id,), None, env.characters, env.locations)
+
+    status = reference_images_status(block, provider_supports_reference_images=True)
+
+    assert status["present"] == ["Léa"] and status["used"] == ["Léa"] and status["fallback"] == []
+
+
+def test_every_current_provider_declares_no_support_and_reference_images_never_change_cost(env):
+    """Aucun fournisseur actuel ne sait transmettre une image de référence (#38) : la sélectionner ne change
+    donc jamais l'estimation — même invariant que si aucune image n'était choisie."""
+    lea = env.add_character(name="Léa")
+    without_image = env.service.prepare(env.project, SUBJECT, provider_id="scripted", character_ids=(lea.id,))
+
+    env.characters.set_reference_image(env.project.id, lea.id, _png())
+    with_image = env.service.prepare(env.project, SUBJECT, provider_id="scripted", character_ids=(lea.id,))
+
+    assert env.connector.supports_reference_images is False
+    assert (with_image.cost_low, with_image.cost_high) == (without_image.cost_low, without_image.cost_high)
+    assert with_image.params["reference_images"] == {
+        "present": ["Léa"], "used": [], "fallback": ["Léa"], "provider_supports": False,
+    }
+    assert without_image.params["reference_images"] == {
+        "present": [], "used": [], "fallback": [], "provider_supports": False,
+    }

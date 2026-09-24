@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import io
+
 import pytest
+from PIL import Image
 
 from lody import settings
 from lody.characters import CharacterRepository
@@ -11,6 +14,12 @@ from lody.projects import ProjectRepository
 from test.lody.test_generation_ui import _button, _fresh_resources, _labels, _project, _run, _text, engine  # noqa: F401
 
 pytest.importorskip("streamlit.testing.v1")
+
+
+def _png_bytes(color=(255, 0, 0)) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (120, 120), color=color).save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def _char_repo():
@@ -261,3 +270,82 @@ def test_ui_crud_of_characters_never_changes_the_generation_payload(engine):  # 
 
     after = build_request(ProjectRepository(settings.db_path()).get(project.id), "Un sujet quelconque")
     assert before == after
+
+
+# -- image de référence (#38) ---------------------------------------------------------------------------------
+def test_uploading_a_valid_reference_image_on_creation_saves_it(engine):  # noqa: F811
+    project = _project()
+    app = _open(project)
+    app = _button(app, "Ajouter un personnage").click().run()
+    p = _p(project.id)
+    app.text_input(key=f"{p}_name").set_value("Gaston").run()
+    app.file_uploader(key=f"{p}_reference_image").set_value(("ref.png", _png_bytes(), "image/png")).run()
+    app = _button(app, "Enregistrer").click().run()
+    assert not app.exception
+    assert "« Gaston » est ajouté." in _text(app)
+    character = _char_repo().list_for_project(project.id)[0]
+    assert character.reference_image.startswith(f"references/{project.id}/characters/{character.id}/")
+
+
+def test_editing_a_character_with_a_reference_image_shows_a_preview(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston")
+    _char_repo().set_reference_image(project.id, character.id, _png_bytes())
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    assert len(app.get("image")) == 1  # aperçu affiché
+    p = _p(project.id, character.id)
+    assert app.checkbox(key=f"{p}_reference_image_remove").label == "Retirer l’image actuelle"
+    assert app.file_uploader(key=f"{p}_reference_image").label == "Remplacer l’image"
+
+
+def test_replacing_an_existing_reference_image(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston")
+    first = _char_repo().set_reference_image(project.id, character.id, _png_bytes(color=(255, 0, 0))).reference_image
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    p = _p(project.id, character.id)
+    app.file_uploader(key=f"{p}_reference_image").set_value(("new.png", _png_bytes(color=(0, 255, 0)),
+                                                              "image/png")).run()
+    app = _button(app, "Enregistrer").click().run()
+    updated = _char_repo().get(project.id, character.id)
+    assert updated.reference_image != first and updated.reference_image != ""
+
+
+def test_removing_a_reference_image_via_the_checkbox(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston")
+    _char_repo().set_reference_image(project.id, character.id, _png_bytes())
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    p = _p(project.id, character.id)
+    app.checkbox(key=f"{p}_reference_image_remove").check().run()
+    app = _button(app, "Enregistrer").click().run()
+    assert _char_repo().get(project.id, character.id).reference_image == ""
+
+
+def test_uploading_an_invalid_reference_image_shows_an_error_and_does_not_save_it(engine):  # noqa: F811
+    project = _project()
+    app = _open(project)
+    app = _button(app, "Ajouter un personnage").click().run()
+    p = _p(project.id)
+    app.text_input(key=f"{p}_name").set_value("Gaston").run()
+    app.file_uploader(key=f"{p}_reference_image").set_value(("evil.png", b"pas une image", "image/png")).run()
+    app = _button(app, "Enregistrer").click().run()
+    assert not app.exception
+    assert "pas une image valide" in _text(app)
+    assert _char_repo().count_for_project(project.id) == 0  # rien n'est créé, même partiellement
+
+
+def test_a_character_without_a_reference_image_behaves_exactly_as_before_38(engine):  # noqa: F811
+    """Le cas nominal (aucune image) : comportement strictement inchangé."""
+    project = _project()
+    app = _open(project)
+    app = _button(app, "Ajouter un personnage").click().run()
+    p = _p(project.id)
+    app.text_input(key=f"{p}_name").set_value("Gaston").run()
+    app = _button(app, "Enregistrer").click().run()
+    assert not app.exception
+    character = _char_repo().list_for_project(project.id)[0]
+    assert character.reference_image == ""

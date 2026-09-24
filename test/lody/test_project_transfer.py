@@ -420,12 +420,16 @@ CHARACTER_FIELDS_EXCLUDED = {
     "project_id": "relation interne — recalculée à l'import (le personnage rejoint le NOUVEAU projet)",
     "created_at": "horodatage interne — régénéré à l'import",
     "updated_at": "horodatage interne — régénéré à l'import",
+    "reference_image": "référence de fichier déjà validée (#38) — jamais acceptée depuis un JSON arbitraire, "
+                        "voir characters.set_reference_image ; un import ne transfère donc pas l'image",
 }
 LOCATION_FIELDS_EXCLUDED = {
     "id": "identifiant interne — régénéré à l'import",
     "project_id": "relation interne — recalculée à l'import (le lieu rejoint le NOUVEAU projet)",
     "created_at": "horodatage interne — régénéré à l'import",
     "updated_at": "horodatage interne — régénéré à l'import",
+    "reference_image": "référence de fichier déjà validée (#38) — jamais acceptée depuis un JSON arbitraire, "
+                        "voir locations.set_reference_image ; un import ne transfère donc pas l'image",
 }
 
 

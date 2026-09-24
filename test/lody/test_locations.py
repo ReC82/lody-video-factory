@@ -3,11 +3,13 @@ et non-régression du pipeline de génération classique. Aucun fournisseur, auc
 
 from __future__ import annotations
 
+import io
 import sqlite3
 
 import pytest
+from PIL import Image
 
-from lody import db
+from lody import db, reference_images
 from lody.locations import (
     LocationNotFound,
     LocationRepository,
@@ -40,7 +42,7 @@ def test_fresh_database_has_zero_locations_and_reaches_the_latest_schema(tmp_pat
     assert repo.list_for_project(project.id) == []
     assert repo.count_for_project(project.id) == 0
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 5
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 6
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
 
@@ -69,7 +71,7 @@ def test_upgrade_from_currently_deployed_schema_v4_keeps_existing_data(tmp_path)
     assert repo.list_for_project("prj_old") == []  # zéro lieu par défaut, même pour un projet ancien
 
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 6
     # Rien de préexistant n'a bougé.
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT script FROM productions WHERE id = 'prd_old'").fetchone() == \
@@ -83,7 +85,7 @@ def test_migration_replayed_is_a_no_op(tmp_path):
     LocationRepository(path)  # rejeu explicite
     LocationRepository(path)  # une troisième fois, pour faire bonne mesure
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
     assert connection.execute("SELECT COUNT(*) FROM locations").fetchone()[0] == 0
 
 
@@ -388,3 +390,68 @@ def test_only_the_snapshot_wiring_references_characters_or_locations_not_the_scr
         if path.name not in allowed and any(pattern.search(path.read_text(encoding="utf-8")) for pattern in patterns)
     ]
     assert offenders == []
+
+
+# -- image de référence (#38, symétrique de test_characters.py) --------------------------------------------------
+def _png(color=(255, 0, 0)) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (120, 120), color=color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_reference_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("LODY_DATA_DIR", str(tmp_path / "ref_storage"))
+
+
+def test_new_location_has_no_reference_image_by_default(repo, project):
+    location = repo.create(project.id, name="Atelier")
+    assert location.reference_image == ""
+
+
+def test_set_reference_image_stores_a_validated_reference_not_bytes(repo, project):
+    location = repo.create(project.id, name="Atelier")
+    updated = repo.set_reference_image(project.id, location.id, _png())
+    assert updated.reference_image.startswith(f"references/{project.id}/locations/{location.id}/")
+    path = reference_images.resolve(updated.reference_image, project.id, "locations", location.id)
+    assert path.read_bytes() != b""
+
+
+def test_set_reference_image_rejects_an_invalid_image_and_leaves_the_location_untouched(repo, project):
+    location = repo.create(project.id, name="Atelier")
+    with pytest.raises(LocationValidationError) as error:
+        repo.set_reference_image(project.id, location.id, b"pas une image")
+    assert "reference_image" in error.value.errors
+    assert repo.get(project.id, location.id).reference_image == ""
+
+
+def test_set_reference_image_on_an_unknown_location_raises_not_found(repo, project):
+    with pytest.raises(LocationNotFound):
+        repo.set_reference_image(project.id, "loc_doesnotexist0", _png())
+
+
+def test_set_reference_image_never_writes_into_another_projects_location(repo, projects, project):
+    other_project = projects.create(name="Autre projet")
+    location = repo.create(other_project.id, name="Atelier")
+    with pytest.raises(LocationNotFound):
+        repo.set_reference_image(project.id, location.id, _png())
+
+
+def test_clear_reference_image_resets_the_column_but_keeps_the_file_on_disk(repo, project):
+    location = repo.create(project.id, name="Atelier")
+    with_image = repo.set_reference_image(project.id, location.id, _png())
+    path = reference_images.resolve(with_image.reference_image, project.id, "locations", location.id)
+    cleared = repo.clear_reference_image(project.id, location.id)
+    assert cleared.reference_image == ""
+    assert path.exists()
+
+
+def test_reference_image_is_excluded_from_editable_fields_and_generic_update(repo, project):
+    from lody.locations import EDITABLE_FIELDS
+
+    assert "reference_image" not in EDITABLE_FIELDS
+    location = repo.create(project.id, name="Atelier")
+    with pytest.raises(LocationValidationError) as error:
+        repo.update(project.id, location.id, reference_image="references/evil/path")
+    assert "Champ inconnu" in str(error.value)
+    assert repo.get(project.id, location.id).reference_image == ""
