@@ -11,6 +11,7 @@ from lody.components import format_datetime
 from lody.generation import costing
 from lody.generation.kit_service import KitService
 from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ProductionStatus as S
+from lody.generation.narrative_context import script_injection_applied, visual_injection_applied
 from lody.generation.runtime import DEMO_PROVIDER
 from lody.generation.service import ProductionService, request_of
 from lody.generation.safety import redact
@@ -260,6 +261,64 @@ def _table(pairs: list[tuple[str, object]]) -> str:
     return _kv([(label, redact(value)) for label, value in pairs])
 
 
+def _narrative_diagnostic_html(production: Production) -> str:
+    """Sélection, snapshot et injection RÉELLE des personnages/lieu (#69).
+
+    Toujours lu depuis ``production.snapshot``/``production.trace`` — jamais depuis les fiches
+    personnages/lieux actuelles, qui ont pu changer depuis (voir le docstring du module et
+    ``narrative_context.script_injection_applied``/``visual_injection_applied``). Compatible avec toute
+    production sans sélection ou antérieure à #35 : affiche alors « Aucun personnage ou lieu sélectionné ».
+    """
+    narrative = (production.snapshot or {}).get("narrative_context") or {}
+    if not narrative:
+        return ('<p class="card-eyebrow">Personnages et lieu</p>'
+                '<p class="muted-note">Aucun personnage ou lieu sélectionné pour cette production.</p>')
+
+    characters = narrative.get("characters") or []
+    location = narrative.get("location")
+    trace = production.trace or {}
+    script_request = trace.get("script_request")
+    script_applied = script_injection_applied(narrative, (script_request or {}).get("video_script_prompt", ""))
+    scenes = trace.get("scenes") or []
+    visual_hits = [scene for scene in scenes
+                  if visual_injection_applied(narrative, scene.get("prompt_sent", ""))]
+
+    if script_request is None:
+        script_row = "Non applicable : script fourni ou repris, aucun prompt de script n’a été envoyé."
+    elif script_applied:
+        script_row = "Appliquée : le bloc de contexte narratif est présent dans le prompt de script réellement envoyé."
+    else:
+        script_row = "Non appliquée : le connecteur utilisé n’a pas repris la sélection dans ce prompt."
+
+    if not scenes:
+        visual_row = "Non applicable : aucune scène enregistrée."
+    elif visual_hits:
+        visual_row = (f"Appliquée sur {len(visual_hits)} scène(s) sur {len(scenes)} — seules les scènes qui "
+                      "mentionnent un personnage sélectionné (et toutes si un lieu est sélectionné) reçoivent le bloc.")
+    else:
+        visual_row = "Non appliquée : aucune scène ne mentionne un personnage sélectionné, et aucun lieu n’est sélectionné."
+
+    if production.provider == DEMO_PROVIDER:
+        transmitted_row = "Non : mode démonstration — simulation locale, aucun fournisseur réel n’est appelé."
+    elif script_applied or visual_hits:
+        transmitted_row = "Oui : les prompts ci-dessus (script et/ou scènes) sont exactement ce qui a été envoyé."
+    else:
+        transmitted_row = "Non : rien n’a été injecté, donc rien de plus n’a été transmis à ce sujet."
+
+    return (
+        '<p class="card-eyebrow">Personnages et lieu</p>'
+        '<p class="muted-note">Ces valeurs viennent du snapshot et de la trace de CETTE production — jamais '
+        "des fiches personnages/lieux actuelles, qui ont pu changer depuis.</p>"
+        + _table([
+            ("Personnages sélectionnés (snapshotés)", ", ".join(c["name"] for c in characters) or "Aucun"),
+            ("Lieu sélectionné (snapshoté)", location["name"] if location else "Aucun"),
+            ("Injection dans le script", script_row),
+            ("Injection dans les prompts visuels", visual_row),
+            ("Transmis au fournisseur", transmitted_row),
+        ])
+    )
+
+
 def _render_diagnostic(production: Production) -> None:
     """Traçabilité complète d'une production : d'où vient chaque prompt. Aucune clé n'est jamais affichée."""
     snapshot, trace = production.snapshot, production.trace
@@ -268,6 +327,7 @@ def _render_diagnostic(production: Production) -> None:
             st.markdown('<div class="banner banner-info" role="note">Production antérieure à la traçabilité : aucun instantané ni '
                         "prompt final n’a été enregistré. Le storyboard ci-dessous est ce que Lody a envoyé ; le moteur a pu y ajouter "
                         "son propre gabarit d’images (non enregistré à l’époque).</div>", unsafe_allow_html=True)
+        st.markdown(_narrative_diagnostic_html(production), unsafe_allow_html=True)
         project = snapshot.get("project", {})
         st.markdown('<p class="card-eyebrow">Projet source et instantané</p>' + _table([
             ("Projet", f"{project.get('name', '—')} ({project.get('id', production.project_id)})"),

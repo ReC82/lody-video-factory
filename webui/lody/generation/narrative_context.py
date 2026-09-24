@@ -21,6 +21,13 @@ une image de référence et si elle est réellement TRANSMISE au fournisseur —
 pour un fournisseur qui ne la supporte pas (voir ``generation.provider.VideoGenerationProvider.
 supports_reference_images``) : le repli est toujours explicite (consigné dans ``params`` de la production,
 voir ``generation/service.py``), jamais silencieux.
+
+``script_injection_applied``/``visual_injection_applied`` (#69) sont des lectures PURES, pour le diagnostic
+d'une production (``view_tracking.py``) : elles ne changent RIEN au texte envoyé, elles disent seulement si
+le bloc déjà produit par ``render_prompt_block``/``enrich_visual_prompts`` apparaît RÉELLEMENT dans le texte
+déjà enregistré dans ``production.trace`` (« ce qui est réellement envoyé », voir ``service._trace``) —
+jamais déduit de la seule présence d'une sélection : un connecteur qui ignore le bloc reçu (ex. la
+simulation, voir ``demo.py``) ne l'injecte jamais, même avec une sélection figée dans le snapshot.
 """
 
 from __future__ import annotations
@@ -347,3 +354,24 @@ def reference_images_status(narrative_context: dict[str, Any] | None, provider_s
     if provider_supports_reference_images:
         return {"present": present, "used": list(present), "fallback": [], "provider_supports": True}
     return {"present": present, "used": [], "fallback": list(present), "provider_supports": False}
+
+
+# -- diagnostic : injection réellement appliquée ou non (#69) ------------------------------------------------------
+
+def script_injection_applied(narrative_context: dict[str, Any] | None, sent_prompt_text: str | None) -> bool:
+    """Vrai seulement si le bloc de contexte narratif (voir ``_HEADER``/``render_prompt_block``) apparaît
+    RÉELLEMENT dans ``sent_prompt_text`` — le texte du prompt de script déjà enregistré dans
+    ``production.trace["script_request"]["video_script_prompt"]``. Jamais déduit de la seule présence d'une
+    sélection dans le snapshot : un script fourni par l'utilisateur (aucun appel texte, donc aucun
+    ``script_request``) ou un connecteur qui ignore le bloc reçu (la simulation, par exemple) donnent
+    toujours ``False`` ici, même avec une sélection figée."""
+    return bool(narrative_context) and _HEADER in (sent_prompt_text or "")
+
+
+def visual_injection_applied(narrative_context: dict[str, Any] | None, sent_prompt_text: str | None) -> bool:
+    """Même principe que ``script_injection_applied``, pour UNE scène : vrai seulement si le bloc de
+    continuité visuelle (voir ``_VISUAL_HEADER``/``enrich_visual_prompts``) apparaît dans le prompt de cette
+    scène déjà enregistré dans ``production.trace["scenes"][i]["prompt_sent"]``. Une scène dont la narration
+    ne mentionne aucun personnage sélectionné, et sans lieu sélectionné, n'a jamais ce bloc — c'est le
+    comportement normal de #37, pas une anomalie."""
+    return bool(narrative_context) and _VISUAL_HEADER in (sent_prompt_text or "")
