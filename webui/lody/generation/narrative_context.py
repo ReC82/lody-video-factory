@@ -15,6 +15,12 @@ produit le texte à ajouter au prompt d'écriture du SCRIPT uniquement — voir 
 
 ``enrich_visual_prompts`` (#37) fait de même pour les prompts d'IMAGE d'un storyboard déjà construit (voir
 ``generation/storyboard.py``). Aucune voix : c'est volontairement hors de portée (voir tickets ultérieurs).
+
+``reference_images_status`` (#38) dit, pour un ``narrative_context`` déjà résolu, quels personnages/lieux ont
+une image de référence et si elle est réellement TRANSMISE au fournisseur — jamais une transmission simulée
+pour un fournisseur qui ne la supporte pas (voir ``generation.provider.VideoGenerationProvider.
+supports_reference_images``) : le repli est toujours explicite (consigné dans ``params`` de la production,
+voir ``generation/service.py``), jamais silencieux.
 """
 
 from __future__ import annotations
@@ -32,14 +38,21 @@ if TYPE_CHECKING:  # pragma: no cover
 # Version du *format* du bloc narrative_context (indépendante de ``snapshot["version"]``, qui ne couvre que
 # les paramètres du projet) : à incrémenter si sa forme change un jour. Passée à 2 par #37, qui ajoute
 # "reference_prompt" (absent depuis #35 : "non utilisé tant qu'aucune injection n'existe" — c'est fait ici).
-NARRATIVE_CONTEXT_VERSION = 2
+# Passée à 3 par #38, qui ajoute "reference_image" (référence de fichier déjà validée, jamais des octets :
+# voir ``lody.reference_images``) — copiée telle quelle pour que la production garde la trace de la
+# référence *alors valide*, même si le personnage/lieu est modifié ensuite (voir reference_images.py :
+# un fichier remplacé/retiré n'est jamais supprimé, exactement pour que cette copie reste résolvable).
+NARRATIVE_CONTEXT_VERSION = 3
 
 # Champs copiés dans le snapshot : identité + descriptions effectives, rien de plus (jamais de champ voix).
 _CHARACTER_FIELDS = (
     "id", "name", "role", "personality", "visual_description", "reference_prompt", "speech_style",
-    "permanent_elements", "continuity_notes", "is_primary",
+    "permanent_elements", "continuity_notes", "reference_image", "is_primary",
 )
-_LOCATION_FIELDS = ("id", "name", "location_type", "description", "reference_prompt", "continuity_notes", "is_primary")
+_LOCATION_FIELDS = (
+    "id", "name", "location_type", "description", "reference_prompt", "continuity_notes", "reference_image",
+    "is_primary",
+)
 
 
 class NarrativeContextError(Exception):
@@ -307,3 +320,30 @@ def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str
         block = _bounded_block(_VISUAL_HEADER, lines, _VISUAL_FOOTER, VISUAL_BLOCK_MAX, _VISUAL_TRUNCATION_NOTE)
         enriched.append(replace(scene, prompt=(scene.prompt + "\n\n" + block)))
     return enriched
+
+
+# -- statut des images de référence pour le fournisseur choisi (#38) ---------------------------------------------
+
+def reference_images_status(narrative_context: dict[str, Any] | None, provider_supports_reference_images: bool) -> dict[str, Any]:
+    """Quels personnages/lieux du ``narrative_context`` ont une image de référence, et si elle est réellement
+    transmise au fournisseur — à consigner dans les paramètres de la production (jamais utilisée pour changer
+    le texte du script ou des prompts, voir ``render_prompt_block``/``enrich_visual_prompts`` ci-dessus).
+
+    Aujourd'hui, ``provider_supports_reference_images`` vaut toujours ``False`` (aucun connecteur ne sait
+    encore transmettre une image de référence, voir ``generation.provider``) : toute image présente est donc
+    toujours en repli — JAMAIS silencieusement, cette fonction le rend explicite et vérifiable. Le jour où un
+    fournisseur déclare le support, ``used``/``fallback`` en tiennent compte automatiquement.
+
+    Renvoie ``{"present": [], "used": [], "fallback": [], "provider_supports": ...}`` si rien n'a d'image
+    (dont le cas ``narrative_context`` vide/``None`` : aucun changement de comportement).
+    """
+    characters = (narrative_context or {}).get("characters") or []
+    location = (narrative_context or {}).get("location")
+    present = [character["name"] for character in characters if character.get("reference_image")]
+    if location and location.get("reference_image"):
+        present.append(location["name"])
+    if not present:
+        return {"present": [], "used": [], "fallback": [], "provider_supports": provider_supports_reference_images}
+    if provider_supports_reference_images:
+        return {"present": present, "used": list(present), "fallback": [], "provider_supports": True}
+    return {"present": present, "used": [], "fallback": list(present), "provider_supports": False}

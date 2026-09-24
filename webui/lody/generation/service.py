@@ -44,6 +44,7 @@ from lody.generation.models import (
 from lody.generation.narrative_context import (
     NarrativeContextError,
     enrich_visual_prompts,
+    reference_images_status,
     render_prompt_block,
     resolve_narrative_context,
 )
@@ -275,7 +276,10 @@ class ProductionService:
         fields: dict[str, Any] = {
             "brief": brief_lib.build_brief(project, text), "script": script_text,
             "script_source": "manual" if script_text else "",
-            "params": {"request": request.to_dict(), "engine": provider.describe_params(request)},
+            "params": {"request": request.to_dict(), "engine": provider.describe_params(request),
+                      # #38 : jamais une transmission simulée pour un fournisseur qui ne la supporte pas —
+                      # voir narrative_context.reference_images_status et provider.supports_reference_images.
+                      "reference_images": reference_images_status(narrative_context, provider.supports_reference_images)},
             "storyboard": [], "visual_prompts": [], "current_step": "En attente de confirmation",
             "error_code": "", "error_message": "", "trace": {},
             "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of,

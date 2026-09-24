@@ -2,7 +2,11 @@
 
 Symétrique à ``characters.py`` (mêmes conventions : repository, validation, garde-fou secrets, casefold
 pour l'unicité de nom). Facultatif et sans effet tant que rien ne les sélectionne dans une production
-(voir #34+) : aucune image binaire ici (voir #38), aucune clé API (voir secrets_guard).
+(voir #34+) : aucune clé API (voir secrets_guard).
+
+Image de référence facultative (#38) : voir le docstring équivalent de ``characters.py`` — même contrat
+(``reference_image`` hors ``EDITABLE_FIELDS``, modifiable uniquement par ``set_reference_image``/
+``clear_reference_image``).
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lody import db
+from lody import db, reference_images
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
 logger = logging.getLogger("lody.locations")
@@ -61,6 +65,7 @@ class Location:
     description: str
     reference_prompt: str
     continuity_notes: str
+    reference_image: str
     is_primary: bool
     is_active: bool
     created_at: str
@@ -232,3 +237,28 @@ class LocationRepository:
 
     def deactivate(self, project_id: str, location_id: str) -> Location:
         return self._set_active(project_id, location_id, False)
+
+    # -- image de référence (#38, symétrique de characters.py) -----------------------------------------------------
+    def set_reference_image(self, project_id: str, location_id: str, data: bytes) -> Location:
+        self.get(project_id, location_id)
+        try:
+            stored = reference_images.save(project_id, "locations", location_id, data)
+        except reference_images.ReferenceImageError as error:
+            raise LocationValidationError({"reference_image": str(error)}) from error
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE locations SET reference_image = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+                (stored.ref, self._clock(), location_id, project_id),
+            )
+        logger.info("image de référence enregistrée : %s", location_id)
+        return self.get(project_id, location_id)
+
+    def clear_reference_image(self, project_id: str, location_id: str) -> Location:
+        self.get(project_id, location_id)
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE locations SET reference_image = '', updated_at = ? WHERE id = ? AND project_id = ?",
+                (self._clock(), location_id, project_id),
+            )
+        logger.info("image de référence retirée : %s", location_id)
+        return self.get(project_id, location_id)
