@@ -146,13 +146,95 @@ def _render_transfer_preview(preview: project_transfer.ImportPreview) -> None:
         )
 
 
+# -- import : mise à jour d'un projet existant (#66) ------------------------------------------------------------------
+_PROJECT_CHANGE_LABELS = {
+    "name": "Nom", "description": "Description", "language": "Langue", "format": "Format",
+    "content_type": "Type de contenu", "tone": "Ton", "visual_style": "Style visuel", "platforms": "Plateformes",
+    "text_provider": "Fournisseur de texte", "visual_provider": "Fournisseur d’images",
+    "voice_provider": "Fournisseur de voix", "voice_name": "Nom de la voix", "music_provider": "Musique",
+    "settings": "Réglages avancés (dont le brief de production)",
+}
+
+
+def _confirm_update(repo: ProjectRepository, preview: project_transfer.UpdatePreview) -> None:
+    t = _transfer_prefix(preview.target_project_id)
+    try:
+        updated = project_transfer.commit_update(repo.db_path, preview)
+    except project_transfer.TransferError as error:
+        nav.flash("error", f"Mise à jour impossible : {error}")
+        return
+    st.session_state.pop(f"{t}_update_uploader", None)
+    st.session_state.pop(f"{t}_update_confirm_name", None)
+    nav.flash("success", f"Projet « {updated.name} » mis à jour depuis le fichier importé "
+                         "(identifiant et historique de productions conservés).")
+    nav.go(nav.VIEW_PROJECT, updated.id)
+
+
+def _render_update_preview(preview: project_transfer.UpdatePreview) -> None:
+    if preview.errors:
+        lines = [f"{esc(issue.path)} — {esc(issue.message)}" if issue.path else esc(issue.message)
+                 for issue in preview.errors]
+        st.markdown(
+            '<div class="banner banner-error" role="alert"><strong>Fichier invalide, rien n’a été modifié :'
+            '</strong><br>' + "<br>".join(lines) + "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    lines = [f"Projet cible : <strong>{esc(preview.target_project_name)}</strong> "
+            "(identifiant et historique de productions conservés)"]
+    if preview.new_project_name != preview.target_project_name:
+        lines.append(f"Nouveau nom : « {esc(preview.new_project_name)} »")
+    if preview.project_changes:
+        changed = ", ".join(_PROJECT_CHANGE_LABELS.get(key, key) for key in preview.project_changes if key != "name")
+        lines.append(f"Champs projet modifiés : {changed or 'aucun autre'}")
+    else:
+        lines.append("Aucun champ projet modifié.")
+
+    def _entity_lines(kind: str, added: list[str], modified: list[str], unchanged: list[str],
+                      deactivated: list[str]) -> list[str]:
+        rows = []
+        if added:
+            rows.append(f"{kind} ajouté(s) ({len(added)}) : {', '.join(added)}")
+        if modified:
+            rows.append(f"{kind} modifié(s) ({len(modified)}) : {', '.join(modified)}")
+        if unchanged:
+            rows.append(f"{kind} inchangé(s) ({len(unchanged)}) : {', '.join(unchanged)}")
+        if deactivated:
+            rows.append(f"{kind} désactivé(s), absent(s) du fichier ({len(deactivated)}) : "
+                        f"{', '.join(deactivated)} — jamais supprimé(s), réactivable(s) à tout moment")
+        return rows or [f"Aucun {kind.lower()}."]
+
+    lines += _entity_lines("Personnage(s)", preview.characters_added, preview.characters_modified,
+                           preview.characters_unchanged, preview.characters_deactivated)
+    lines += _entity_lines("Lieu(x)", preview.locations_added, preview.locations_modified,
+                           preview.locations_unchanged, preview.locations_deactivated)
+
+    st.markdown(
+        '<div class="banner banner-info" role="status">Aperçu — aucune écriture pour l’instant.<br>'
+        + "<br>".join(lines) + "</div>",
+        unsafe_allow_html=True,
+    )
+    if preview.warnings:
+        st.markdown(
+            '<div class="banner banner-info" role="status">'
+            + "<br>".join(esc(warning) for warning in preview.warnings) + "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+_MODE_CREATE = "Créer un nouveau projet"
+_MODE_UPDATE = "Mettre à jour un projet existant"
+
+
 def _render_import_export(repo: ProjectRepository, character_repo: CharacterRepository,
                           location_repo: LocationRepository, project: Project) -> None:
     t = _transfer_prefix(project.id)
     with st.container(key="import_export_card"):
         st.markdown('<p class="card-eyebrow">Import / Export</p>', unsafe_allow_html=True)
-        st.caption("Exporte la configuration de ce projet, ou importe un fichier pour en créer un nouveau. "
-                   "L’import ne modifie jamais un projet existant.")
+        st.caption("Exporte la configuration de ce projet, ou importe un fichier pour en créer un nouveau, ou "
+                   "pour mettre à jour volontairement un projet existant (#66) — jamais automatiquement sur "
+                   "la seule base du nom : toujours un choix explicite, avec confirmation.")
         with st.container(horizontal=True, key=f"{t}_export_actions"):
             st.download_button("Exporter ce projet", data=_export_bytes(repo, character_repo, location_repo, project.id),
                                file_name=f"lody-export-{slugify(project.name, 40)}.json", mime="application/json",
@@ -160,15 +242,54 @@ def _render_import_export(repo: ProjectRepository, character_repo: CharacterRepo
             st.download_button("Télécharger un modèle vierge", data=_template_bytes(),
                                file_name="lody-modele-projet.json", mime="application/json", key=f"{t}_template")
 
+        mode = st.radio("Mode d’import", (_MODE_CREATE, _MODE_UPDATE), key=f"{t}_mode", horizontal=True)
+
+        if mode == _MODE_CREATE:
+            uploaded = st.file_uploader("Importer une configuration (fichier .json)", type=["json"],
+                                        key=f"{t}_uploader")
+            if uploaded is not None:
+                preview = project_transfer.preview_import(
+                    uploaded.getvalue(), existing_project_names=[p.name for p in repo.list_projects()])
+                _render_transfer_preview(preview)
+                st.button("Confirmer la création du projet", type="primary", icon=":material/check:",
+                          key=f"{t}_confirm", disabled=not preview.is_valid,
+                          on_click=_confirm_import, args=(repo, project.id, preview))
+            return
+
+        # -- mode mise à jour (#66) ------------------------------------------------------------------------------
+        all_projects = repo.list_projects()
+        ids = [p.id for p in all_projects]
+        default_index = ids.index(project.id) if project.id in ids else 0
+        target_id = st.selectbox(
+            "Projet cible à mettre à jour", ids, index=default_index,
+            format_func=lambda pid: next((p.name for p in all_projects if p.id == pid), pid),
+            key=f"{t}_update_target",
+        )
+        target = repo.get(target_id)
+        st.caption(f"Le fichier importé remplacera la configuration de « {target.name} ». Son identifiant et "
+                   "son historique de productions sont conservés ; les personnages/lieux absents du fichier "
+                   "seront désactivés (jamais supprimés).")
+
         uploaded = st.file_uploader("Importer une configuration (fichier .json)", type=["json"],
-                                    key=f"{t}_uploader")
-        if uploaded is not None:
-            preview = project_transfer.preview_import(
-                uploaded.getvalue(), existing_project_names=[p.name for p in repo.list_projects()])
-            _render_transfer_preview(preview)
-            st.button("Confirmer la création du projet", type="primary", icon=":material/check:",
-                      key=f"{t}_confirm", disabled=not preview.is_valid,
-                      on_click=_confirm_import, args=(repo, project.id, preview))
+                                    key=f"{t}_update_uploader")
+        if uploaded is None:
+            return
+        preview = project_transfer.preview_update(
+            uploaded.getvalue(), target=target,
+            target_characters=character_repo.list_for_project(target.id),
+            target_locations=location_repo.list_for_project(target.id),
+            other_project_names=[p.name for p in all_projects if p.id != target.id],
+        )
+        _render_update_preview(preview)
+        if not preview.is_valid:
+            return
+        st.text_input(f"Tape le nom du projet cible pour confirmer : « {target.name} »",
+                      key=f"{t}_update_confirm_name")
+        typed = (st.session_state.get(f"{t}_update_confirm_name") or "").strip().casefold()
+        confirmed = typed == preview.target_project_name.strip().casefold()
+        st.button("Confirmer la mise à jour du projet", type="primary", icon=":material/check:",
+                  key=f"{t}_update_confirm", disabled=not confirmed,
+                  on_click=_confirm_update, args=(repo, preview))
 
 
 def render(repo: ProjectRepository, project: Project, states: States, character_repo: CharacterRepository,
