@@ -101,7 +101,10 @@ def _render_narrative_section(project: Project, character_repo: CharacterReposit
     with st.expander("Personnages et lieu (facultatif)", expanded=False):
         st.caption(
             "Entièrement facultatif : sans sélection, ta vidéo se génère exactement comme aujourd’hui. "
-            "Rien de sélectionné ici n’est ajouté au script, à la voix ou aux images pour l’instant."
+            "Une sélection est figée au lancement (elle ne change plus ensuite) et peut être reprise dans le "
+            "script et/ou les prompts d’images, selon ce que le fournisseur choisi prend réellement en "
+            "charge. Jamais la voix. Le diagnostic de la production (page de suivi) montre précisément ce "
+            "qui a été appliqué."
         )
         if characters:
             by_id = {character.id: character for character in characters}
