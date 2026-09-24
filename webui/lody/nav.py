@@ -65,7 +65,7 @@ def go(view: str = VIEW_HOME, project_id: str | None = None, production_id: str 
     # Une nouvelle page repart toujours des valeurs enregistrées : on oublie erreurs et saisies non validées.
     st.session_state.pop("form_errors", None)
     prefixes = (f"set_{project_id}_", f"char_{project_id}_", f"loc_{project_id}_",
-               f"impexp_{project_id}_") if project_id else ()
+               f"impexp_{project_id}_", f"charimp_{project_id}_", f"locimp_{project_id}_") if project_id else ()
     for key in [k for k in st.session_state if str(k).startswith(prefixes)]:
         del st.session_state[key]
     # Personnages/lieux (#32/#33) : un formulaire ou une confirmation laissés ouverts ne doivent jamais

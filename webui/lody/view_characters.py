@@ -7,11 +7,14 @@ le modèle et le dépôt livrés par #30 (``lody.characters``).
 
 from __future__ import annotations
 
+import json
+
 import streamlit as st
 
-from lody import catalog, nav, voice_picker
+from lody import catalog, nav, resource_transfer, voice_picker
 from lody.characters import Character, CharacterNotFound, CharacterRepository, CharacterValidationError
 from lody.components import EMPTY_ICON_SVG
+from lody.generation.publication import slugify
 from lody.projects import Project
 from lody.theme import esc
 
@@ -249,6 +252,79 @@ def _render_form(repo: CharacterRepository, project: Project, target: str | None
                 st.form_submit_button("Annuler", on_click=_cancel_form, args=(project.id,))
 
 
+# -- import / export partiel des personnages (#57) -----------------------------------------------------------------
+def _transfer_prefix(project_id: str) -> str:
+    return f"charimp_{project_id}"
+
+
+def _export_bytes(repo: CharacterRepository, project_id: str) -> bytes:
+    payload = resource_transfer.export_characters(repo.list_for_project(project_id))
+    return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _template_bytes() -> bytes:
+    return json.dumps(resource_transfer.character_template(), ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _confirm_character_import(repo: CharacterRepository, project_id: str,
+                              preview: resource_transfer.ResourcePreview) -> None:
+    t = _transfer_prefix(project_id)
+    try:
+        created = resource_transfer.commit_character_import(repo.db_path, project_id, preview)
+    except resource_transfer.TransferError as error:
+        nav.flash("error", f"Import impossible : {error}")
+        return
+    st.session_state.pop(f"{t}_uploader", None)
+    names = ", ".join(character.name for character in created)
+    nav.flash("success", f"{len(created)} personnage(s) importé(s) : {names}." if created
+             else "Fichier importé : aucun personnage à ajouter.")
+
+
+def _render_transfer_preview(preview: resource_transfer.ResourcePreview) -> None:
+    if preview.errors:
+        lines = [f"{esc(issue.path)} — {esc(issue.message)}" if issue.path else esc(issue.message)
+                 for issue in preview.errors]
+        st.markdown(
+            '<div class="banner banner-error" role="alert"><strong>Fichier invalide, rien n’a été importé :'
+            '</strong><br>' + "<br>".join(lines) + "</div>", unsafe_allow_html=True,
+        )
+        return
+    names = ", ".join(preview.item_names) if preview.item_names else "aucun"
+    st.markdown(
+        '<div class="banner banner-info" role="status">Aperçu — aucune écriture pour l’instant.<br>'
+        f'{len(preview.item_names)} personnage(s) à importer : {esc(names)}</div>', unsafe_allow_html=True,
+    )
+    if preview.warnings:
+        st.markdown('<div class="banner banner-info" role="status">'
+                   + "<br>".join(esc(warning) for warning in preview.warnings) + "</div>", unsafe_allow_html=True)
+
+
+def _render_import_export(repo: CharacterRepository, project: Project) -> None:
+    t = _transfer_prefix(project.id)
+    with st.container(key="char_import_export_card"):
+        st.markdown('<p class="card-eyebrow">Import / Export</p>', unsafe_allow_html=True)
+        st.caption("Exporte les personnages de ce projet, ou importe un fichier pour en ajouter — sans jamais "
+                   "toucher aux autres réglages du projet ni écraser un personnage déjà existant.")
+        with st.container(horizontal=True, key=f"{t}_export_actions"):
+            st.download_button("Exporter les personnages", data=_export_bytes(repo, project.id),
+                               file_name=f"lody-personnages-{slugify(project.name, 40)}.json",
+                               mime="application/json", key=f"{t}_export")
+            st.download_button("Télécharger un modèle", data=_template_bytes(),
+                               file_name="lody-modele-personnages.json", mime="application/json",
+                               key=f"{t}_template")
+
+        uploaded = st.file_uploader("Importer des personnages (fichier .json)", type=["json"], key=f"{t}_uploader")
+        if uploaded is not None:
+            existing = repo.list_for_project(project.id)
+            preview = resource_transfer.preview_character_import(
+                uploaded.getvalue(), existing_names=[character.name for character in existing],
+                existing_primary_count=sum(1 for character in existing if character.is_primary))
+            _render_transfer_preview(preview)
+            st.button("Confirmer l’import", type="primary", icon=":material/check:", key=f"{t}_confirm",
+                      disabled=not preview.is_valid, on_click=_confirm_character_import,
+                      args=(repo, project.id, preview))
+
+
 def render(repo: CharacterRepository, project: Project) -> None:
     st.markdown(
         '<section class="hero"><p class="eyebrow">Personnages</p>'
@@ -312,3 +388,5 @@ def render(repo: CharacterRepository, project: Project) -> None:
                   on_click=_start_create, args=(project.id,))
     else:
         _render_form(repo, project, target, current)
+
+    _render_import_export(repo, project)

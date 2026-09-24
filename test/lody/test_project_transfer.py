@@ -444,7 +444,7 @@ def test_every_location_field_is_exported_or_explicitly_excluded_with_a_reason()
 def test_blank_template_field_names_come_from_the_same_fields_tuples_as_import_export():
     """Le modèle téléchargeable ne doit contenir AUCUNE liste de champs maintenue séparément : ses clés
     doivent être EXACTEMENT PROJECT_FIELDS/CHARACTER_FIELDS/LOCATION_FIELDS — les tuples que preview_import()
-    et export_project() utilisent déjà (voir project_transfer._example, appelé par blank_template())."""
+    et export_project() utilisent déjà (voir project_transfer.example_item, appelé par blank_template())."""
     template = blank_template()
     assert set(template["project"]) == set(PROJECT_FIELDS)
     for character in template["characters"]:

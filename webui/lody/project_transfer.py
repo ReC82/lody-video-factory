@@ -124,7 +124,7 @@ def export_project(project: Project, characters: Iterable[Character], locations:
     return payload
 
 
-def _example(known_fields: tuple[str, ...], defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+def example_item(known_fields: tuple[str, ...], defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     """Un exemple dont le JEU DE CLÉS provient de ``known_fields`` (donc de la même source de vérité que
     l'export/import), jamais d'une liste tapée séparément : un champ ajouté à ``EDITABLE_FIELDS`` apparaît
     ici automatiquement (avec sa valeur par défaut tant qu'aucun exemple n'est fourni), et un champ retiré
@@ -141,7 +141,7 @@ _PROJECT_EXAMPLE = {
     "tone": "Clair et précis",
     "platforms": ["youtube_shorts", "tiktok"],
 }
-_CHARACTER_EXAMPLE_PRIMARY = {
+CHARACTER_EXAMPLE_PRIMARY = {
     "name": "Personnage principal", "role": "Protagoniste",
     "personality": "Curieux, bienveillant, un peu maladroit.",
     "visual_description": "Silhouette simple, couleurs vives, sans texte ni logo.",
@@ -151,25 +151,25 @@ _CHARACTER_EXAMPLE_PRIMARY = {
     "continuity_notes": "Reste cohérent d'une vidéo à l'autre.",
     "is_primary": True,
 }
-_CHARACTER_EXAMPLE_SECONDARY = {
+CHARACTER_EXAMPLE_SECONDARY = {
     "name": "Personnage secondaire", "role": "Allié",
     "personality": "Calme, précis, complémentaire du personnage principal.",
     "is_primary": False,
 }
-_LOCATION_EXAMPLE_PRIMARY = {
+LOCATION_EXAMPLE_PRIMARY = {
     "name": "Lieu principal", "location_type": "Intérieur",
     "description": "Décris ici l'ambiance, la lumière, les éléments récurrents de ce lieu.",
     "reference_prompt": "plan large, lumière douce, mêmes couleurs à chaque apparition",
     "continuity_notes": "Toujours le même agencement d'une vidéo à l'autre.",
     "is_primary": True,
 }
-_LOCATION_EXAMPLE_SECONDARY = {"name": "Lieu secondaire", "location_type": "Extérieur", "is_primary": False}
+LOCATION_EXAMPLE_SECONDARY = {"name": "Lieu secondaire", "location_type": "Extérieur", "is_primary": False}
 
 
 def blank_template() -> dict[str, Any]:
     """Modèle vierge téléchargeable, avec deux personnages et deux lieux d'exemple.
 
-    Chaque exemple est construit par ``_example()`` en itérant ``PROJECT_FIELDS``/``CHARACTER_FIELDS``/
+    Chaque exemple est construit par ``example_item()`` en itérant ``PROJECT_FIELDS``/``CHARACTER_FIELDS``/
     ``LOCATION_FIELDS`` — les mêmes tuples que ceux utilisés par ``export_project``/``preview_import`` : ce
     modèle ne contient donc aucune liste de champs maintenue séparément et ne peut pas devenir obsolète en
     silence (voir ``test_blank_template_field_names_come_from_the_same_fields_tuples_as_import_export``).
@@ -177,16 +177,16 @@ def blank_template() -> dict[str, Any]:
     """
     return {
         "schema_version": SCHEMA_VERSION,
-        "project": _example(PROJECT_FIELDS, PROJECT_DEFAULTS, _PROJECT_EXAMPLE),
-        "characters": [_example(CHARACTER_FIELDS, CHARACTER_DEFAULTS, override)
-                       for override in (_CHARACTER_EXAMPLE_PRIMARY, _CHARACTER_EXAMPLE_SECONDARY)],
-        "locations": [_example(LOCATION_FIELDS, LOCATION_DEFAULTS, override)
-                      for override in (_LOCATION_EXAMPLE_PRIMARY, _LOCATION_EXAMPLE_SECONDARY)],
+        "project": example_item(PROJECT_FIELDS, PROJECT_DEFAULTS, _PROJECT_EXAMPLE),
+        "characters": [example_item(CHARACTER_FIELDS, CHARACTER_DEFAULTS, override)
+                       for override in (CHARACTER_EXAMPLE_PRIMARY, CHARACTER_EXAMPLE_SECONDARY)],
+        "locations": [example_item(LOCATION_FIELDS, LOCATION_DEFAULTS, override)
+                      for override in (LOCATION_EXAMPLE_PRIMARY, LOCATION_EXAMPLE_SECONDARY)],
     }
 
 
 # -- lecture du fichier ---------------------------------------------------------------------------------------------
-def _load_json(raw: bytes | str) -> tuple[dict[str, Any] | None, list[FieldIssue]]:
+def load_json(raw: bytes | str) -> tuple[dict[str, Any] | None, list[FieldIssue]]:
     data_bytes = raw.encode("utf-8") if isinstance(raw, str) else raw
     if len(data_bytes) > MAX_FILE_BYTES:
         return None, [FieldIssue("", f"Fichier trop volumineux ({MAX_FILE_BYTES // 1024} Ko maximum).")]
@@ -226,7 +226,7 @@ def _validate_project(raw: Any) -> tuple[dict[str, Any] | None, list[str], list[
     return clean, warnings, []
 
 
-def _validate_items(raw: Any, section: str, known_fields: tuple[str, ...], defaults: dict[str, Any],
+def validate_items(raw: Any, section: str, known_fields: tuple[str, ...], defaults: dict[str, Any],
                     validate_fn, error_type: type[Exception]) -> tuple[list[dict[str, Any]], list[str], list[FieldIssue]]:
     if raw is None:
         raw = []
@@ -284,7 +284,7 @@ def _unique_project_name(name: str, existing_names: Iterable[str]) -> tuple[str,
 
 def preview_import(raw: bytes | str, *, existing_project_names: Iterable[str] = ()) -> ImportPreview:
     """Étape 1 : lecture, validation et aperçu — AUCUNE écriture. Ne lève jamais : les erreurs sont dans le résultat."""
-    data, errors = _load_json(raw)
+    data, errors = load_json(raw)
     warnings: list[str] = []
     if data is None:
         return ImportPreview("", False, {}, [], [], warnings, errors, None)
@@ -301,11 +301,11 @@ def preview_import(raw: bytes | str, *, existing_project_names: Iterable[str] = 
     clean_project, w, e = _validate_project(data.get("project"))
     warnings += w
     errors += e
-    clean_characters, w, e = _validate_items(data.get("characters"), "characters", CHARACTER_FIELDS,
+    clean_characters, w, e = validate_items(data.get("characters"), "characters", CHARACTER_FIELDS,
                                              CHARACTER_DEFAULTS, validate_character_fields, CharacterValidationError)
     warnings += w
     errors += e
-    clean_locations, w, e = _validate_items(data.get("locations"), "locations", LOCATION_FIELDS,
+    clean_locations, w, e = validate_items(data.get("locations"), "locations", LOCATION_FIELDS,
                                             LOCATION_DEFAULTS, validate_location_fields, LocationValidationError)
     warnings += w
     errors += e
