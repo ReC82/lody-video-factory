@@ -61,7 +61,7 @@ from pathlib import Path
 from typing import Any
 
 from lody import settings
-from lody.generation import engine_facts, secrets_store
+from lody.generation import elevenlabs_voices, engine_facts, secrets_store
 from lody.generation.secrets_fields import FIELDS, ShapeError, validate
 from lody.generation.toml_patch import PatchError, patch as toml_patch_one
 
@@ -267,10 +267,26 @@ def _fields_to_verify(to_apply: dict[str, str], patched_config: dict[str, Any]) 
     return to_verify
 
 
+def _maybe_write_voice_report(config_path: Path, voice_report_path: Path | None, to_apply: dict[str, str]) -> None:
+    """Régénère le catalogue de voix ElevenLabs (ticket #55) UNIQUEMENT si sa clé fait partie de ce lot — jamais
+    à chaque rotation d'une autre clé, pour ne jamais appeler ElevenLabs sans raison. Fait un appel réel à
+    ElevenLabs à ce moment précis (clé tout juste vérifiée valide par ``verify_key``) ; best-effort comme le
+    rapport de capacités ci-dessus : une panne transitoire d'ElevenLabs ne doit jamais faire échouer
+    l'application d'une clé par ailleurs valide — le catalogue sera simplement régénéré au prochain cycle
+    (rotation suivante, ou ``scripts/lody-elevenlabs-voices-report.sh`` lancé à la main)."""
+    if voice_report_path is None or "elevenlabs.api_key" not in to_apply:
+        return
+    try:
+        elevenlabs_voices.write_report(config_path, voice_report_path)
+    except Exception:  # noqa: BLE001 — jamais de détail journalisé (peut contenir un fragment de réponse HTTP)
+        pass
+
+
 def _rollback(*, config_path: Path, backup_path: Path, backup_hash: str, status_path: Path, report_path: Path,
              restart_engine: RestartFn, wait_healthy: HealthFn, to_apply: dict[str, str],
              results: dict[str, dict[str, str]], history: dict[str, dict[str, Any]], secrets_path: Path,
-             pending: dict[str, str], overall_message: str, blocking: dict[str, str] | None = None) -> dict[str, Any]:
+             pending: dict[str, str], overall_message: str, blocking: dict[str, str] | None = None,
+             voice_report_path: Path | None = None) -> dict[str, Any]:
     """Restaure la sauvegarde vérifiée, redémarre, revérifie la santé. Partagé par « moteur pas sain » et
     « clé refusée/expirée chez le fournisseur » : dans les deux cas, on revient à la dernière configuration qui
     fonctionnait, sans revérifier cette ancienne clé auprès du fournisseur (elle fonctionnait déjà avant).
@@ -304,6 +320,10 @@ def _rollback(*, config_path: Path, backup_path: Path, backup_hash: str, status_
         engine_facts.write_report(config_path, report_path)
     except Exception:  # noqa: BLE001 — le rapport sera simplement régénéré au prochain cycle
         pass
+    # La clé ACTIVE après ce retour arrière est celle qui fonctionnait déjà avant (restaurée ci-dessus) : si
+    # elle a changé dans ce lot (elle est alors revenue à son ancienne valeur), son catalogue de voix doit
+    # refléter CETTE clé, pas celle refusée.
+    _maybe_write_voice_report(config_path, voice_report_path, to_apply)
     for field_path in to_apply:
         if field_path in blocking:
             outcome = blocking[field_path]
@@ -317,8 +337,15 @@ def _rollback(*, config_path: Path, backup_path: Path, backup_hash: str, status_
 
 
 def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_path: Path, report_path: Path,
-          restart_engine: RestartFn, wait_healthy: HealthFn, verify_key: VerifyFn) -> dict[str, Any]:
-    """Point d'entrée. Toujours sûr à appeler : sans rien en attente, ne touche rien."""
+          restart_engine: RestartFn, wait_healthy: HealthFn, verify_key: VerifyFn,
+          voice_report_path: Path | None = None) -> dict[str, Any]:
+    """Point d'entrée. Toujours sûr à appeler : sans rien en attente, ne touche rien.
+
+    ``voice_report_path`` (#55) : si fourni ET que ``elevenlabs.api_key`` fait partie de ce lot, régénère
+    aussi le catalogue de voix ElevenLabs une fois la nouvelle clé vérifiée valide (même appel réel que
+    ``scripts/lody-elevenlabs-voices-report.sh``, réutilisé ici plutôt que dupliqué) — voir
+    ``_maybe_write_voice_report``. Facultatif (``None`` par défaut) : un appelant qui l'omet retrouve
+    exactement le comportement d'avant #55."""
     pending = secrets_store.read_pending(secrets_path)
     if not pending:
         return {"state": "noop"}
@@ -373,7 +400,8 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
         return _rollback(config_path=config_path, backup_path=backup_path, backup_hash=backup_hash,
                          status_path=status_path, report_path=report_path, restart_engine=restart_engine,
                          wait_healthy=wait_healthy, to_apply=to_apply, results=results, history=history,
-                         secrets_path=secrets_path, pending=pending, overall_message=_ROLLED_BACK_ENGINE)
+                         secrets_path=secrets_path, pending=pending, overall_message=_ROLLED_BACK_ENGINE,
+                         voice_report_path=voice_report_path)
 
     # Le PROCESSUS du moteur redémarre : ça ne prouve pas que la clé fonctionne (une clé expirée ne fait pas
     # planter le démarrage). Vérification minimale, non génératrice, auprès du fournisseur.
@@ -402,12 +430,15 @@ def apply(*, config_path: Path, secrets_path: Path, status_path: Path, backup_pa
                          status_path=status_path, report_path=report_path, restart_engine=restart_engine,
                          wait_healthy=wait_healthy, to_apply=to_apply, results=results, history=history,
                          secrets_path=secrets_path, pending=pending, overall_message=overall_message,
-                         blocking=directly_blocking)
+                         blocking=directly_blocking, voice_report_path=voice_report_path)
 
     try:
         engine_facts.write_report(config_path, report_path)
     except Exception:  # noqa: BLE001 — le rapport sera simplement régénéré au prochain cycle
         pass
+    # La clé elevenlabs.api_key vient d'être vérifiée valide (sinon "blocking" ci-dessus aurait déclenché un
+    # retour arrière) : c'est le seul moment sûr pour un déclenchement automatique du catalogue de voix (#55).
+    _maybe_write_voice_report(config_path, voice_report_path, to_apply)
     for field_path in to_apply:
         # Vérification directe si ce champ porte une clé ; sinon (app.llm_provider) hérite du résultat de la
         # clé « compagnon » vérifiée à sa place, pour rester honnête sur ce qui a vraiment été confirmé.
@@ -531,6 +562,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--secrets-dir", type=Path, default=None)
     parser.add_argument("--report", type=Path, default=None)
+    parser.add_argument("--voice-report", type=Path, default=None,
+                        help="catalogue de voix ElevenLabs (#55) : régénéré automatiquement si "
+                             "elevenlabs.api_key fait partie du lot appliqué (défaut : "
+                             "settings.voice_catalog_report_path())")
     # Le nom du conteneur n'est jamais codé en dur ici (voir test_generation_connector.py) : le script hôte
     # scripts/lody-apply-secrets.sh fournit toujours la valeur par défaut.
     parser.add_argument("--container", default=os.environ.get("LODY_ENGINE_CONTAINER", ""), required=False)
@@ -551,6 +586,7 @@ def main(argv: list[str] | None = None) -> int:
         config_path=config_path, secrets_path=secrets_dir / "secrets.toml",
         status_path=secrets_dir / "secrets-status.json", backup_path=config_path.with_name("config.toml.rollback"),
         report_path=args.report or settings.engine_report_path(),
+        voice_report_path=args.voice_report or settings.voice_catalog_report_path(),
         restart_engine=_real_restart(args.container, shlex.split(args.docker)),
         wait_healthy=_real_wait_healthy(args.health_url, args.health_timeout, args.health_interval),
         verify_key=_real_verify_key(args.provider_timeout),

@@ -14,6 +14,8 @@ from lody.generation import apply_secrets, secrets_store
 from lody.generation.apply_secrets import ProviderCheck
 from lody.generation.engine_facts import build_report
 
+_MISSING = object()  # sentinelle : distingue « voice_report_path non précisé » de « explicitement None »
+
 CONFIG = (
     "[app]\n"
     "openai_api_key = \"sk-old-1234\"\n"
@@ -32,6 +34,7 @@ def env(tmp_path):
     return {
         "config": config, "secrets": tmp_path / "secrets.toml", "status": tmp_path / "secrets-status.json",
         "backup": tmp_path / "config.toml.rollback", "report": tmp_path / "engine-capabilities.json",
+        "voice_report": tmp_path / "elevenlabs-voices.json",
     }
 
 
@@ -43,7 +46,8 @@ def _always_valid(field_path, value, config):
     return ProviderCheck("valid")
 
 
-def _run(env, *, restart=None, healthy=True, restart_calls=None, verify_key=_always_valid, wait_healthy=None):
+def _run(env, *, restart=None, healthy=True, restart_calls=None, verify_key=_always_valid, wait_healthy=None,
+        voice_report_path=_MISSING):
     calls = restart_calls if restart_calls is not None else []
 
     def default_restart():
@@ -55,7 +59,8 @@ def _run(env, *, restart=None, healthy=True, restart_calls=None, verify_key=_alw
     return apply_secrets.apply(
         config_path=env["config"], secrets_path=env["secrets"], status_path=env["status"], backup_path=env["backup"],
         report_path=env["report"], restart_engine=restart or default_restart,
-        wait_healthy=wait_healthy or default_health, verify_key=verify_key), calls
+        wait_healthy=wait_healthy or default_health, verify_key=verify_key,
+        voice_report_path=env["voice_report"] if voice_report_path is _MISSING else voice_report_path), calls
 
 
 def test_nothing_pending_is_a_safe_no_op(env):
@@ -626,3 +631,82 @@ def test_real_verify_key_respects_a_custom_openai_base_url(monkeypatch):
     verify = apply_secrets._real_verify_key(5.0)
     verify("app.openai_api_key", "sk-x", {"app": {"openai_base_url": "https://proxy.example/v1/"}})
     assert seen == ["https://proxy.example/v1/models"]
+
+
+# -- déclenchement automatique du catalogue de voix ElevenLabs (#55) ----------------------------------------------
+def test_elevenlabs_key_change_regenerates_the_voice_report(env, monkeypatch):
+    calls = []
+    monkeypatch.setattr(apply_secrets.elevenlabs_voices, "write_report",
+                        lambda config_path, out_path: calls.append((config_path, out_path)))
+    _set(env, "elevenlabs.api_key", "voice-secret")
+    result, _ = _run(env)
+    assert result["state"] == "ready"
+    assert calls == [(env["config"], env["voice_report"])]
+
+
+def test_unrelated_key_change_never_calls_elevenlabs(env, monkeypatch):
+    """Changer la clé OpenAI ne doit jamais déclencher un appel à ElevenLabs."""
+    calls = []
+    monkeypatch.setattr(apply_secrets.elevenlabs_voices, "write_report",
+                        lambda config_path, out_path: calls.append((config_path, out_path)))
+    _set(env, "app.openai_api_key", "sk-new-9999")
+    result, _ = _run(env)
+    assert result["state"] == "ready"
+    assert calls == []
+
+
+def test_voice_report_path_none_disables_the_feature_without_error(env, monkeypatch):
+    calls = []
+    monkeypatch.setattr(apply_secrets.elevenlabs_voices, "write_report",
+                        lambda config_path, out_path: calls.append((config_path, out_path)))
+    _set(env, "elevenlabs.api_key", "voice-secret")
+    result, _ = _run(env, voice_report_path=None)
+    assert result["state"] == "ready" and calls == []
+
+
+def test_voice_report_failure_is_best_effort_and_never_breaks_a_valid_key_apply(env, monkeypatch):
+    """Une panne ElevenLabs transitoire lors de la régénération du catalogue ne doit jamais faire échouer
+    l'application d'une clé par ailleurs valide et vérifiée."""
+    def boom(config_path, out_path):
+        raise RuntimeError("ElevenLabs indisponible")
+
+    monkeypatch.setattr(apply_secrets.elevenlabs_voices, "write_report", boom)
+    _set(env, "elevenlabs.api_key", "voice-secret")
+    result, _ = _run(env)
+    assert result["state"] == "ready"
+    assert result["fields"]["elevenlabs.api_key"]["state"] == "ok"
+
+
+def test_voice_report_is_also_regenerated_after_a_rollback_when_elevenlabs_key_was_in_the_batch(env, monkeypatch):
+    """Après un retour arrière, la clé ACTIVE redevient l'ancienne : le catalogue doit refléter celle-ci."""
+    calls = []
+    monkeypatch.setattr(apply_secrets.elevenlabs_voices, "write_report",
+                        lambda config_path, out_path: calls.append((config_path, out_path)))
+
+    def rejecting(field_path, value, config):
+        return ProviderCheck("rejected") if field_path == "elevenlabs.api_key" else ProviderCheck("valid")
+
+    _set(env, "elevenlabs.api_key", "voice-forbidden")
+    result, _ = _run(env, verify_key=rejecting)
+    assert result["state"] == "rejected"
+    assert calls == [(env["config"], env["voice_report"])]
+
+
+def test_cli_voice_report_argument_defaults_to_settings_path(monkeypatch, tmp_path):
+    """La CLI (scripts/lody-apply-secrets.sh) doit pouvoir omettre --voice-report et retomber sur le même
+    emplacement que le catalogue lu par l'interface (settings.voice_catalog_report_path())."""
+    import lody.settings as settings_mod
+
+    captured = {}
+
+    def fake_apply(**kwargs):
+        captured.update(kwargs)
+        return {"state": "noop"}
+
+    monkeypatch.setattr(apply_secrets, "apply", fake_apply)
+    monkeypatch.setattr(settings_mod, "voice_catalog_report_path", lambda: tmp_path / "default-voices.json")
+    monkeypatch.setattr(settings_mod, "config_path", lambda: tmp_path / "config.toml")
+    monkeypatch.setattr(settings_mod, "secrets_dir", lambda: tmp_path)
+    (tmp_path / "config.toml").write_text("", encoding="utf-8")
+    apply_secrets.main(["--container", "moneyprinterturbo-api"])
+    assert captured["voice_report_path"] == tmp_path / "default-voices.json"

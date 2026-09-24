@@ -14,5 +14,6 @@ PYTHONPATH=webui python3 -m lody.generation.apply_secrets \
   --config "${LODY_CONFIG:-config.toml}" \
   --secrets-dir "${LODY_SECRETS_DIR:-secrets}" \
   --report "${LODY_REPORT:-engine-report/engine-capabilities.json}" \
+  --voice-report "${LODY_VOICE_REPORT:-engine-report/elevenlabs-voices.json}" \
   --container "${LODY_ENGINE_CONTAINER:-moneyprinterturbo-api}" \
   --docker "${LODY_DOCKER_BIN:-sudo -n docker}"
