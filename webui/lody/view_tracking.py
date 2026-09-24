@@ -319,6 +319,27 @@ def _narrative_diagnostic_html(production: Production) -> str:
     )
 
 
+def _voice_diagnostic_html(production: Production) -> str:
+    """Voix effectivement envoyée et son origine (#70 — MVP mono-voix, prérequis de #39).
+
+    Toujours lue depuis ``production.params["voice_resolution"]`` (déjà figé par
+    ``ProductionService.prepare()``, voir ``narrative_context.resolve_voice``), jamais recalculée ici.
+    Compatible avec toute production antérieure à #70 : la clé est simplement absente, seule la voix
+    effectivement utilisée reste affichée (comportement inchangé). L'identifiant de voix passe par
+    ``_table``/``redact`` comme toute autre valeur de ce diagnostic — jamais de clé affichée.
+    """
+    request = request_of(production)
+    origin = production.params.get("voice_resolution") or {}
+    label = catalog.label(catalog.VOICE_PROVIDERS, request.voice.provider) if request.voice.provider else "—"
+    return '<p class="card-eyebrow">Voix (MVP mono-voix, #70)</p>' + _table([
+        ("Fournisseur de voix", label),
+        ("Nom de la voix", request.voice.name),
+        ("Identifiant de voix", request.voice.voice_id),
+        ("Origine", origin.get("reason") or "voix du projet (production antérieure à #70)"),
+        ("Repli appliqué", "Oui" if origin.get("fallback") else "Non"),
+    ])
+
+
 def _render_diagnostic(production: Production) -> None:
     """Traçabilité complète d'une production : d'où vient chaque prompt. Aucune clé n'est jamais affichée."""
     snapshot, trace = production.snapshot, production.trace
@@ -328,6 +349,7 @@ def _render_diagnostic(production: Production) -> None:
                         "prompt final n’a été enregistré. Le storyboard ci-dessous est ce que Lody a envoyé ; le moteur a pu y ajouter "
                         "son propre gabarit d’images (non enregistré à l’époque).</div>", unsafe_allow_html=True)
         st.markdown(_narrative_diagnostic_html(production), unsafe_allow_html=True)
+        st.markdown(_voice_diagnostic_html(production), unsafe_allow_html=True)
         project = snapshot.get("project", {})
         st.markdown('<p class="card-eyebrow">Projet source et instantané</p>' + _table([
             ("Projet", f"{project.get('name', '—')} ({project.get('id', production.project_id)})"),

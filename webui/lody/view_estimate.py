@@ -12,7 +12,7 @@ import streamlit as st
 
 from lody import catalog, nav
 from lody.generation import costing
-from lody.generation.models import PreflightReport, ReadinessIssue
+from lody.generation.models import GenerationRequest, PreflightReport, ReadinessIssue
 from lody.generation.models import CapabilityState as CS
 from lody.generation.service import request_of
 from lody.generation.store import Production
@@ -103,6 +103,17 @@ def _narrative_rows(production: Production) -> list[tuple[str, str]]:
     return rows
 
 
+def _voice_row(production: Production, request: GenerationRequest) -> tuple[str, str]:
+    """Voix effectivement prévue et son origine (#70 — MVP mono-voix) : toujours lue depuis
+    ``production.params["voice_resolution"]`` (déjà figé par ``ProductionService.prepare()``), jamais
+    recalculée ici. Compatible avec toute production antérieure à #70 (clé absente : origine simplement
+    omise, seule la voix reste affichée — comportement inchangé)."""
+    label = catalog.label(catalog.VOICE_PROVIDERS, request.voice.provider) if request.voice.provider else "—"
+    base = " · ".join(filter(None, [label, request.voice.name])) or "—"
+    reason = (production.params.get("voice_resolution") or {}).get("reason")
+    return ("Voix effective", f"{base} — {reason}" if reason else base)
+
+
 def summary_html(production: Production) -> str:
     request = request_of(production)
     scenes = production.cost_detail.get("scenes", [0, 0])
@@ -120,6 +131,7 @@ def summary_html(production: Production) -> str:
         ("Scènes estimées", _span(scenes[0], scenes[1], "scène")),
         ("Fournisseurs", providers),
         *_narrative_rows(production),
+        _voice_row(production, request),
     ]
     items = "".join(f"<div><dt>{esc(label)}</dt><dd>{esc(value)}</dd></div>" for label, value in rows)
     return f'<dl class="kv est-summary">{items}</dl>'

@@ -28,6 +28,13 @@ le bloc déjà produit par ``render_prompt_block``/``enrich_visual_prompts`` app
 déjà enregistré dans ``production.trace`` (« ce qui est réellement envoyé », voir ``service._trace``) —
 jamais déduit de la seule présence d'une sélection : un connecteur qui ignore le bloc reçu (ex. la
 simulation, voir ``demo.py``) ne l'injecte jamais, même avec une sélection figée dans le snapshot.
+
+``resolve_voice`` (#70, MVP mono-voix — prérequis technique de #39) choisit AU MAXIMUM un personnage de
+référence parmi les personnages SÉLECTIONNÉS (jamais tous les personnages du projet), dans cet ordre :
+personnage sélectionné marqué principal ; sinon, si un seul personnage est sélectionné, celui-ci ; sinon la
+voix du projet est conservée. N'utilise QUE les champs voix déjà copiés dans le ``narrative_context`` figé
+(jamais la fiche personnage actuelle) : une voix incomplète ou un fournisseur non reconnu déclenche un repli
+sûr vers la voix du projet, toujours consigné (jamais silencieux, voir le dict d'origine renvoyé).
 """
 
 from __future__ import annotations
@@ -36,7 +43,9 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
+from lody import catalog
 from lody.characters import Character, CharacterNotFound, CharacterRepository
+from lody.generation.models import VoiceSpec
 from lody.locations import Location, LocationNotFound, LocationRepository
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -49,12 +58,19 @@ if TYPE_CHECKING:  # pragma: no cover
 # voir ``lody.reference_images``) — copiée telle quelle pour que la production garde la trace de la
 # référence *alors valide*, même si le personnage/lieu est modifié ensuite (voir reference_images.py :
 # un fichier remplacé/retiré n'est jamais supprimé, exactement pour que cette copie reste résolvable).
-NARRATIVE_CONTEXT_VERSION = 3
+# Passée à 4 par #70, qui ajoute les champs voix (voice_provider/voice_name/external_voice_id) — copiés
+# pour que ``resolve_voice`` (ci-dessous) n'ait jamais besoin de relire la fiche personnage actuelle, en
+# particulier après le lancement. Toujours ABSENTS de _SCRIPT_CHARACTER_FIELDS/_VISUAL_CHARACTER_FIELDS
+# (plus bas) : ces champs ne rejoignent donc jamais le texte d'un prompt.
+NARRATIVE_CONTEXT_VERSION = 4
 
-# Champs copiés dans le snapshot : identité + descriptions effectives, rien de plus (jamais de champ voix).
+# Champs copiés dans le snapshot : identité + descriptions effectives + voix (#70, jamais utilisée pour le
+# texte des prompts — voir _SCRIPT_CHARACTER_FIELDS/_VISUAL_CHARACTER_FIELDS plus bas, qui ne les reprennent
+# jamais).
 _CHARACTER_FIELDS = (
     "id", "name", "role", "personality", "visual_description", "reference_prompt", "speech_style",
-    "permanent_elements", "continuity_notes", "reference_image", "is_primary",
+    "permanent_elements", "continuity_notes", "reference_image",
+    "voice_provider", "voice_name", "external_voice_id", "is_primary",
 )
 _LOCATION_FIELDS = (
     "id", "name", "location_type", "description", "reference_prompt", "continuity_notes", "reference_image",
@@ -375,3 +391,58 @@ def visual_injection_applied(narrative_context: dict[str, Any] | None, sent_prom
     ne mentionne aucun personnage sélectionné, et sans lieu sélectionné, n'a jamais ce bloc — c'est le
     comportement normal de #37, pas une anomalie."""
     return bool(narrative_context) and _VISUAL_HEADER in (sent_prompt_text or "")
+
+
+# -- voix MVP mono-voix (#70, prérequis technique de #39) -----------------------------------------------------------
+
+def resolve_voice(project_voice: VoiceSpec, narrative_context: dict[str, Any] | None) -> tuple[VoiceSpec, dict[str, Any]]:
+    """(voix effective, informations d'origine — jamais un secret, pour l'aperçu et le diagnostic).
+
+    Choisit AU MAXIMUM un personnage de référence parmi les personnages SÉLECTIONNÉS (jamais tous les
+    personnages du projet, jamais un lieu) :
+
+    1. le personnage sélectionné marqué ``is_primary`` — seulement s'il y en a EXACTEMENT un (plusieurs
+       personnages principaux sélectionnés à la fois : aucune ambiguïté tolérée, voix du projet conservée) ;
+    2. sinon, si un seul personnage est sélectionné, celui-ci ;
+    3. sinon (aucun personnage sélectionné, ou plusieurs sans principal unique), la voix du projet est
+       conservée telle quelle.
+
+    Si le personnage de référence n'a pas ``voice_provider`` ET ``external_voice_id`` renseignés, ou que
+    ``voice_provider`` n'est pas une valeur reconnue de ``catalog.VOICE_PROVIDERS``, repli sûr et TOUJOURS
+    consigné (``fallback: True``) vers la voix du projet — jamais un échec, jamais silencieux.
+
+    N'utilise QUE les champs déjà copiés dans ``narrative_context`` (voir ``_CHARACTER_FIELDS`` ci-dessus) :
+    jamais un appel à ``CharacterRepository``, donc jamais un risque de relire la fiche personnage actuelle
+    après le lancement — le contrat d'immuabilité du snapshot s'applique ici exactement comme ailleurs.
+    """
+    characters = (narrative_context or {}).get("characters") or []
+    if not characters:
+        return project_voice, {"source": "project", "fallback": False, "character_name": "",
+                               "reason": "aucun personnage sélectionné"}
+
+    primaries = [character for character in characters if character.get("is_primary")]
+    if len(primaries) == 1:
+        reference, why = primaries[0], "personnage principal sélectionné"
+    elif len(characters) == 1:
+        reference, why = characters[0], "seul personnage sélectionné"
+    else:
+        return project_voice, {"source": "project", "fallback": False, "character_name": "",
+                               "reason": "plusieurs personnages sélectionnés, aucun principal unique"}
+
+    name = str(reference.get("name") or "")
+    provider_raw = str(reference.get("voice_provider") or "")
+    voice_id = str(reference.get("external_voice_id") or "")
+    if not provider_raw or not voice_id:
+        return project_voice, {"source": "project", "fallback": True, "character_name": name,
+                               "reason": f"{name} ({why}) : voix incomplète (fournisseur ou identifiant "
+                                         "manquant) — repli sur la voix du projet"}
+    provider = catalog.normalize(catalog.VOICE_PROVIDERS, provider_raw)
+    if provider is None:
+        return project_voice, {"source": "project", "fallback": True, "character_name": name,
+                               "reason": f"{name} ({why}) : fournisseur de voix non reconnu — repli sur la "
+                                         "voix du projet"}
+
+    character_voice = VoiceSpec(provider=provider, voice_id=voice_id,
+                                name=str(reference.get("voice_name") or ""), model=project_voice.model)
+    return character_voice, {"source": "character", "fallback": False, "character_name": name,
+                             "reason": f"voix de {name} ({why})"}
