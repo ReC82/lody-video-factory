@@ -158,7 +158,13 @@ def fresh_draft(service: ProductionService, project: Project) -> Production | No
     script = str(st.session_state.get(keys["script"], "")).strip()
     if draft.status.value != "EN_ATTENTE_CONFIRMATION" or draft.provider != _provider_id(project):
         return None
-    if draft.subject != text or request_of(draft) != build_request(project, text, script):
+    current_request = build_request(project, text, script)
+    draft_request = request_of(draft)
+    # #70 : la voix du brouillon peut avoir été résolue vers celle d'un personnage sélectionné (jamais celle
+    # du projet nu que build_request() vient de recalculer) — comparée séparément plus bas, via la sélection
+    # de personnages/lieu elle-même (inchangée = voix toujours fraîche, la résolution étant une fonction pure
+    # du snapshot déjà figé). L'ignorer ici évite de considérer à tort un brouillon frais comme périmé.
+    if draft.subject != text or draft_request.with_updates(voice=current_request.voice) != current_request:
         return None
     if draft.parent_production_id != (st.session_state.get(keys["retry"]) or None):
         return None

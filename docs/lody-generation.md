@@ -151,18 +151,52 @@ jamais relu depuis les tables `characters`/`locations` : modifier ou désactiver
 coup ne change donc jamais une production déjà préparée ou lancée, et une V2 hérite du bloc de sa version
 précédente avec le reste de l'instantané (`create_v2` copie tout `snapshot`).
 
-Sans sélection (tout l'écran actuel — #34, l'UI de sélection, n'existe pas encore), `narrative_context` vaut
-`{}` : comportement fonctionnellement inchangé. Une production antérieure à #35 n'a pas du tout cette clé
-(`snapshot.get("narrative_context", {})` côté lecture) — aucune migration ne les modifie.
+Sans sélection, `narrative_context` vaut `{}` : comportement fonctionnellement inchangé. Une production
+antérieure à #35 n'a pas du tout cette clé (`snapshot.get("narrative_context", {})` côté lecture) — aucune
+migration ne les modifie.
 
-**Pas de nouvelle colonne SQLite.** Le `snapshot` JSON existant (v3) suffit déjà à porter des données arbitraires
+**Pas de nouvelle colonne SQLite.** Le `snapshot` JSON existant suffit déjà à porter des données arbitraires
 immuables par production et il est déjà couvert par le garde-fou secrets (`GUARDED` dans `generation/store.py`) ;
-une table dédiée aurait dupliqué ce mécanisme sans bénéfice. `SCHEMA_VERSION` reste donc à 5.
+une table dédiée aurait dupliqué ce mécanisme sans bénéfice.
 
-Aucune injection dans le script, la voix ou les prompts d'images à ce stade (les seuls modules autorisés à
-référencer `lody.characters`/`lody.locations` dans `generation/` sont `narrative_context.py`, `service.py` et
-`runtime.py` — voir le test de frontière dans `test/lody/test_characters.py`/`test_locations.py`) : c'est l'objet
-d'un ticket ultérieur.
+Les seuls modules autorisés à référencer `lody.characters`/`lody.locations` dans `generation/` sont
+`narrative_context.py`, `service.py` et `runtime.py` (voir le test de frontière dans
+`test/lody/test_characters.py`/`test_locations.py`) : tout le reste du pipeline (script, prompts visuels, voix)
+ne lit QUE le `narrative_context` déjà figé, jamais les tables éditables.
+
+Depuis, ce bloc est effectivement utilisé — jamais un simple enregistrement inerte :
+
+- **script** (#36, `render_prompt_block`) : ajoute un bloc de contexte narratif au prompt d'écriture du script,
+  seulement si une sélection existe et que le script n'est pas fourni par l'utilisateur.
+- **prompts visuels** (#37, `enrich_visual_prompts`) : ajoute un bloc de continuité visuelle aux prompts de
+  scène déjà construits — un personnage seulement aux scènes qui le mentionnent, un lieu à toutes les scènes.
+- **voix** (#70, MVP mono-voix — prérequis technique de #39) : voir la section dédiée ci-dessous.
+- `narrative_context.script_injection_applied`/`visual_injection_applied` (#69) disent, pour une production
+  donnée, si le bloc a RÉELLEMENT atteint le texte envoyé (pas seulement si une sélection existe) — affiché
+  dans le diagnostic de la page de suivi.
+
+### Voix MVP mono-voix (#70)
+
+`narrative_context.resolve_voice(project_voice, narrative_context)` choisit AU MAXIMUM un personnage de
+référence parmi les personnages **sélectionnés** (jamais tous ceux du projet) :
+
+1. le personnage sélectionné marqué `is_primary` — seulement s'il y en a exactement un ;
+2. sinon, si un seul personnage est sélectionné, celui-ci ;
+3. sinon (aucune sélection, ou plusieurs personnages sans principal unique), la voix du projet.
+
+Si le personnage de référence n'a pas `voice_provider` **et** `external_voice_id` renseignés, ou que son
+fournisseur n'est pas une valeur reconnue de `catalog.VOICE_PROVIDERS`, repli sûr et TOUJOURS consigné vers
+la voix du projet (jamais un échec). `ProductionService.prepare()` applique ce choix AVANT de calculer
+l'estimation et l'instantané : l'aperçu de confirmation montre donc déjà la voix effectivement prévue, et
+elle ne change plus ensuite (même si la fiche du personnage est modifiée après coup).
+
+`voice_provider`/`voice_name`/`external_voice_id` font partie des champs copiés dans
+`narrative_context.characters[i]` (depuis #70) — jamais dans `_SCRIPT_CHARACTER_FIELDS`/
+`_VISUAL_CHARACTER_FIELDS`, donc jamais dans le texte d'un prompt. L'origine (« voix de X (raison) » ou
+« voix du projet (raison) ») est enregistrée dans `production.params["voice_resolution"]`, préservée telle
+quelle même une fois la production réellement lancée (voir la fusion de `params` dans `ProductionService.
+_run()`, jamais un écrasement complet), et affichée avant confirmation (`view_estimate.py`) et dans le
+diagnostic (`view_tracking.py`).
 
 ## Sous-titres français : apostrophes et police
 

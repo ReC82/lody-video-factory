@@ -80,12 +80,13 @@ def test_selected_characters_and_location_are_copied_by_value(env):
 
     block = resolve_narrative_context(env.project.id, (lea.id, theo.id), atelier.id, env.characters, env.locations)
 
-    assert block["version"] == 3  # #38 : ajoute reference_image (absent des versions 1 et 2)
+    assert block["version"] == 4  # #70 : ajoute les champs voix (absents avant)
     assert [c["id"] for c in block["characters"]] == [lea.id, theo.id]
     assert block["characters"][0] == {
         "id": lea.id, "name": "Léa", "role": "Guide", "personality": "Curieuse",
         "visual_description": "Manteau bleu", "reference_prompt": "", "speech_style": "", "permanent_elements": "",
-        "continuity_notes": "Toujours souriante", "reference_image": "", "is_primary": False,
+        "continuity_notes": "Toujours souriante", "reference_image": "",
+        "voice_provider": "", "voice_name": "", "external_voice_id": "", "is_primary": False,
     }
     assert block["location"] == {
         "id": atelier.id, "name": "Atelier solaire", "location_type": "Intérieur",

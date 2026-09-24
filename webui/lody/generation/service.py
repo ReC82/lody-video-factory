@@ -47,6 +47,7 @@ from lody.generation.narrative_context import (
     reference_images_status,
     render_prompt_block,
     resolve_narrative_context,
+    resolve_voice,
 )
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import sanitize
@@ -272,6 +273,13 @@ class ProductionService:
         provider = self.provider(provider_id)
         request = build_request(project, text, script_text)
         narrative_context = self._resolve_narrative_context(project.id, character_ids, location_id)
+        # #70 (MVP mono-voix, prérequis de #39) : au maximum un personnage de référence parmi les
+        # SÉLECTIONNÉS remplace la voix du projet, avec repli sûr et toujours consigné — voir
+        # narrative_context.resolve_voice. Appliqué AVANT _plan()/make_snapshot() : l'estimation et
+        # l'instantané reflètent la voix EFFECTIVEMENT prévue, jamais recalculée après confirmation.
+        resolved_voice, voice_origin = resolve_voice(request.voice, narrative_context)
+        if resolved_voice != request.voice:
+            request = request.with_updates(voice=resolved_voice)
         _, cost = self._plan(provider, request)
         fields: dict[str, Any] = {
             "brief": brief_lib.build_brief(project, text), "script": script_text,
@@ -279,7 +287,10 @@ class ProductionService:
             "params": {"request": request.to_dict(), "engine": provider.describe_params(request),
                       # #38 : jamais une transmission simulée pour un fournisseur qui ne la supporte pas —
                       # voir narrative_context.reference_images_status et provider.supports_reference_images.
-                      "reference_images": reference_images_status(narrative_context, provider.supports_reference_images)},
+                      "reference_images": reference_images_status(narrative_context, provider.supports_reference_images),
+                      # #70 : origine de la voix effective (personnage ou projet) et éventuel repli — jamais
+                      # un secret, voir narrative_context.resolve_voice.
+                      "voice_resolution": voice_origin},
             "storyboard": [], "visual_prompts": [], "current_step": "En attente de confirmation",
             "error_code": "", "error_message": "", "trace": {},
             "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of,
@@ -424,8 +435,12 @@ class ProductionService:
                 if not script:
                     raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script reçu est vide.", stage="script")
                 request = request.with_updates(script=script)
+                # Fusionne (jamais un écrasement complet) : préserve les clés de diagnostic déjà posées par
+                # prepare() — "reference_images" (#38), "voice_resolution" (#70) — qu'aucun appel ultérieur
+                # ne doit faire disparaître silencieusement.
                 self.repo.update(production_id, script=script, script_source="generated",
-                                 params={"request": request.to_dict(), "engine": production.params.get("engine", {})})
+                                 params={**production.params, "request": request.to_dict(),
+                                        "engine": production.params.get("engine", {})})
             self.repo.update(production_id, current_step="Préparation des scènes")
             scenes = build_storyboard(request.script, self._scene_count(provider, request),
                                       visual_style=request.visual_style, aspect=request.aspect,
@@ -441,7 +456,11 @@ class ProductionService:
             self.repo.update(
                 production_id, storyboard=[scene.to_dict() for scene in scenes],
                 visual_prompts=list(request.visual_prompts), current_step="Envoi au moteur",
-                params={"request": request.to_dict(), "engine": provider.describe_params(request)},
+                # Fusionne, comme ci-dessus : préserve "reference_images"/"voice_resolution" déjà posés par
+                # prepare() (``production`` est le même objet en mémoire depuis le début de _run() : ses
+                # clés de diagnostic n'ont jamais été perdues, même si l'écriture SQL ci-dessus les a déjà
+                # réécrites une première fois).
+                params={**production.params, "request": request.to_dict(), "engine": provider.describe_params(request)},
                 trace=self._trace(production, provider, request, script_request))  # avant l'envoi : conservée même en cas d'échec
             task = provider.submit(request, production.idempotency_key)
             self.repo.update(production_id, external_task_id=task.task_id, status=ProductionStatus.EN_FILE,
