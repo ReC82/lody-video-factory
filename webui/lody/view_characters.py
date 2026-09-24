@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from lody import catalog, nav
+from lody import catalog, nav, voice_picker
 from lody.characters import Character, CharacterNotFound, CharacterRepository, CharacterValidationError
 from lody.components import EMPTY_ICON_SVG
 from lody.projects import Project
@@ -173,6 +173,13 @@ def _row(repo: CharacterRepository, project: Project, character: Character) -> N
 def _render_form(repo: CharacterRepository, project: Project, target: str | None, current: Character | None) -> None:
     p = _prefix(project.id, target)
     title = f"Modifier « {current.name} »" if current else "Nouveau personnage"
+
+    # #55 : hors du formulaire (un st.button n'y est pas autorisé) — une sélection pré-remplit les champs
+    # manuels ci-dessous (mêmes clés session_state), à enregistrer ensuite normalement. Affiché aussi pour un
+    # nouveau personnage (le fournisseur n'est pas encore choisi) ; masqué seulement si un fournisseur déjà
+    # enregistré et différent d'ElevenLabs est connu.
+    if current is None or current.voice_provider in ("", "elevenlabs"):
+        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id")
 
     with st.container(key="form_card"):
         st.markdown(f'<p class="card-eyebrow">{esc(title)}</p>', unsafe_allow_html=True)

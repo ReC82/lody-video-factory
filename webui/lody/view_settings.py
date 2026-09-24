@@ -11,7 +11,7 @@ import json
 import streamlit as st
 
 from lody import brief as brief_lib
-from lody import catalog, nav, project_transfer
+from lody import catalog, nav, project_transfer, voice_picker
 from lody.characters import CharacterRepository
 from lody.generation.publication import slugify
 from lody.locations import LocationRepository
@@ -189,6 +189,11 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
             "Ils sont indiqués dans les onglets concernés.</div>",
             unsafe_allow_html=True,
         )
+
+    # #55 : hors du formulaire ci-dessous (un st.button n'y est pas autorisé) — une sélection pré-remplit les
+    # champs manuels de l'onglet Voix (mêmes clés session_state), à enregistrer ensuite normalement.
+    if project.voice_provider == "elevenlabs":
+        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_voice_id")
 
     with st.container(key="form_card"):
         with st.form(f"{p}_form", border=False):

@@ -41,6 +41,18 @@ def engine_report_path() -> Path:
     return Path(raw) if raw else Path("/engine-report/engine-capabilities.json")
 
 
+def voice_catalog_report_path() -> Path:
+    """Catalogue de voix ElevenLabs assaini (voice_id/nom/métadonnées publiques, jamais de clé).
+
+    Même dossier monté en lecture seule que le rapport de capacités du moteur (``./engine-report``,
+    voir ``docker-compose.lody.yml``) : aucun montage supplémentaire n'est nécessaire. Produit côté hôte
+    par ``python3 -m lody.generation.elevenlabs_voices`` (ticket #55) ; LODY_VOICE_CATALOG_REPORT pour
+    les tests/conteneur.
+    """
+    raw = os.environ.get("LODY_VOICE_CATALOG_REPORT", "").strip()
+    return Path(raw) if raw else Path("/engine-report/elevenlabs-voices.json")
+
+
 def fonts_dir() -> Path:
     """Polices de sous-titres fournies avec le moteur (resource/fonts) ; LODY_FONTS_DIR pour les tests."""
     raw = os.environ.get("LODY_FONTS_DIR", "").strip()
