@@ -1,18 +1,54 @@
-# Export / import de configuration de projet (tickets #44 et #57)
+# Export / import de configuration de projet (tickets #44, #57 et #66)
 
 Format JSON explicite et versionné (`schema_version`).
 
-- **Complet** (#44, page **Paramètres du projet**, `webui/lody/project_transfer.py`) : exporte/importe un
-  projet entier (paramètres + personnages + lieux). L'import crée **toujours** un nouveau projet (jamais
-  d'écrasement silencieux d'un projet existant : un nom déjà pris est rendu distinct automatiquement).
+- **Complet** (page **Paramètres du projet**, `webui/lody/project_transfer.py`) : exporte/importe un projet
+  entier (paramètres + personnages + lieux), avec **deux modes explicites**, choisis par l'utilisateur dans
+  l'interface (jamais déduits automatiquement du contenu du fichier) :
+  - **Créer un nouveau projet** (#44, `preview_import`/`commit_import`) : crée **toujours** un nouveau
+    projet (jamais d'écrasement silencieux d'un projet existant : un nom déjà pris est rendu distinct
+    automatiquement, ex. `PNJ (import)`).
+  - **Mettre à jour un projet existant** (#66, `preview_update`/`commit_update`) : applique le fichier à un
+    projet **choisi explicitement** par l'utilisateur — voir « Mode mise à jour » ci-dessous.
 - **Partiel** (#57, pages **Personnages** et **Lieux**, `webui/lody/resource_transfer.py`) : exporte/importe
   UNIQUEMENT des personnages ou UNIQUEMENT des lieux, dans le projet **déjà existant** actuellement ouvert
-  (jamais de nouveau projet créé, jamais un autre paramètre du projet touché). Enveloppe distincte
-  (`{schema_version, resource_type: "characters"|"locations", characters|locations: [...]}`, vérifiée : un
-  fichier de personnages ne peut jamais être accepté comme fichier de lieux) mais **réutilise à l'identique**
-  les tuples de champs, `example_item()`, `load_json()` et `validate_items()` de `project_transfer.py` — donc
-  tout ce qui suit dans ce document s'applique aussi bien au complet qu'au partiel. Politique de collision :
-  un nom déjà présent dans le projet cible est un conflit **bloquant** (pas de fusion silencieuse).
+  (jamais de nouveau projet créé, jamais un autre paramètre du projet touché — inchangé par #66). Enveloppe
+  distincte (`{schema_version, resource_type: "characters"|"locations", characters|locations: [...]}`,
+  vérifiée : un fichier de personnages ne peut jamais être accepté comme fichier de lieux) mais **réutilise
+  à l'identique** les tuples de champs, `example_item()`, `load_json()` et `validate_items()` de
+  `project_transfer.py` — donc tout ce qui suit dans ce document s'applique aux trois modes. Politique de
+  collision d'un import PARTIEL : un nom déjà présent dans le projet cible est un conflit **bloquant** (pas
+  de fusion silencieuse) — différent du mode Mise à jour ci-dessous, où un nom déjà présent est précisément
+  ce qui déclenche une correspondance (mise à jour), pas un conflit.
+
+## Mode mise à jour (#66)
+
+Permet d'exporter un projet, modifier sa configuration/ses personnages/ses lieux dans le JSON, puis
+réimporter ce fichier pour appliquer volontairement ces changements **au projet d'origine** (utile pour
+tester une nouvelle génération sans recréer le projet).
+
+- **Identifiant et historique conservés** : le projet cible garde son `id` ; aucune ligne `productions`
+  (snapshots, traces, historique de génération) n'est jamais touchée.
+- **Champs projet** : remplacés par ceux du fichier (y compris `settings`, donc le `brief` et les réglages
+  de génération — jamais ignorés, voir `test_settings_and_brief_are_never_ignored_by_the_round_trip`).
+- **Correspondance des personnages/lieux** : par **nom normalisé** (`casefold()`), à l'intérieur du projet
+  cible uniquement — `id` n'est jamais exporté (voir « Toute PR... » ci-dessous), donc aucun identifiant
+  stable n'est disponible pour une correspondance plus fine. Un nom du fichier qui correspond à un
+  personnage/lieu déjà présent le **met à jour** ; un nom nouveau en **crée** un ; un existant absent du
+  fichier est **désactivé** (jamais supprimé physiquement — cohérent avec `characters.deactivate`/
+  `locations.deactivate`). Un doublon de nom À L'INTÉRIEUR du fichier reste bloqué comme pour les deux
+  autres modes (`validate_items`) : aucune fusion silencieuse, aucune ambiguïté.
+- **Nom du projet** : peut changer (c'est un champ éditable comme un autre), mais jamais renommé
+  automatiquement en cas de collision comme en création — si un AUTRE projet porte déjà ce nom, c'est une
+  erreur bloquante.
+- **Confirmation explicite** : l'interface demande de taper le nom du projet cible avant d'activer le
+  bouton de confirmation (jamais une simple case à cocher) ; annuler (ne pas confirmer, changer de page)
+  ne modifie rien, car `preview_update` seul n'écrit jamais.
+- **Atomicité et isolation** : `commit_update` applique tout dans **une seule transaction** SQLite, bornée
+  par `WHERE project_id = <cible>` sur chaque écriture — jamais un autre projet touché, tout ou rien en cas
+  d'erreur (voir `test_atomic_rollback_on_concurrent_name_collision_leaves_nothing_partial`).
+- **Hors périmètre** : fusion interactive champ par champ, restauration automatique d'une ancienne version,
+  suppression physique d'assets, modification des snapshots historiques (voir le ticket #66).
 
 ## Source de vérité unique
 
