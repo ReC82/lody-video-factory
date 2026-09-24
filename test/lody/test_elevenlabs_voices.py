@@ -112,6 +112,33 @@ def test_search_voices_filters_by_name_case_insensitively():
     assert ev.search_voices(voices, "zzz") == []
 
 
+# -- recherche étendue : voice_id et labels (#59) -------------------------------------------------------------------
+def test_search_voices_matches_the_full_voice_id():
+    voices = [ev.VoiceInfo("goccsFDjQ0kcbRoOsQ2r", "Eli"), ev.VoiceInfo("otherId000", "Zoe")]
+    assert [v.name for v in ev.search_voices(voices, "goccsFDjQ0kcbRoOsQ2r")] == ["Eli"]
+    assert [v.name for v in ev.search_voices(voices, "goccs")] == ["Eli"]  # sous-chaîne partielle
+
+
+def test_search_voices_matches_label_values_language_gender_accent():
+    voices = [
+        ev.VoiceInfo("v1", "Eli", labels={"language": "fr", "gender": "male", "age": "middle_aged"}),
+        ev.VoiceInfo("v2", "Zoe", labels={"language": "en", "gender": "female", "accent": "irish"}),
+    ]
+    assert [v.name for v in ev.search_voices(voices, "fr")] == ["Eli"]
+    assert [v.name for v in ev.search_voices(voices, "irish")] == ["Zoe"]
+    assert [v.name for v in ev.search_voices(voices, "MIDDLE_AGED")] == ["Eli"]  # insensible à la casse aussi ici
+
+
+def test_search_voices_matches_label_keys_too():
+    voices = [ev.VoiceInfo("v1", "Eli", labels={"use_case": "narration"})]
+    assert [v.name for v in ev.search_voices(voices, "use_case")] == ["Eli"]
+
+
+def test_search_voices_partial_text_works_across_all_fields():
+    voices = [ev.VoiceInfo("abc123def", "Rachel", labels={"accent": "american"})]
+    assert ev.search_voices(voices, "123") and ev.search_voices(voices, "rach") and ev.search_voices(voices, "meric")
+
+
 # -- timeout, 401, 403, 429, erreur serveur, erreur réseau ---------------------------------------------------------
 def test_401_raises_auth_error_with_a_safe_message():
     transport = _json_transport([(401, {}, {})])

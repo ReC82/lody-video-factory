@@ -82,13 +82,15 @@ def provider_select(prefix: str, field: str, label: str, options, current: str, 
     def display(value: str) -> str:
         return catalog.label(options, value) + _SUFFIX.get(states.get((kind, value), CS.READY), "")
 
-    st.selectbox(
-        label,
-        values,
-        index=values.index(current) if current in values else 0,
-        format_func=display,
-        key=f"{prefix}_{field}",
-    )
+    key = f"{prefix}_{field}"
+    # setdefault (jamais index=) : si un autre composant a déjà pré-rempli cette clé avant que ce widget ne
+    # soit instancié (ex. #59 : sélection d'une voix ElevenLabs qui doit aussi renseigner voice_provider),
+    # passer index= EN PLUS d'une valeur déjà présente dans session_state est ambigu pour Streamlit — la
+    # valeur réellement soumise au submit suit alors index=, pas la pré-sélection (vérifié : le formulaire
+    # enregistrait la voix précédente malgré un widget affichant la bonne valeur). setdefault ne touche rien
+    # quand la clé existe déjà, donc ce changement est un no-op pour tout appelant qui n'en pré-remplit pas.
+    st.session_state.setdefault(key, current if current in values else values[0])
+    st.selectbox(label, values, format_func=display, key=key)
     chosen = st.session_state.get(f"{prefix}_{field}", current)
     state = states.get((kind, chosen), CS.READY)
     if state not in _USABLE:

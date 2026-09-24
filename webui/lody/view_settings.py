@@ -190,10 +190,11 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
             unsafe_allow_html=True,
         )
 
-    # #55 : hors du formulaire ci-dessous (un st.button n'y est pas autorisé) — une sélection pré-remplit les
-    # champs manuels de l'onglet Voix (mêmes clés session_state), à enregistrer ensuite normalement.
+    # #55/#59 : hors du formulaire ci-dessous (un st.button n'y est pas autorisé) — une sélection pré-remplit
+    # les champs manuels de l'onglet Voix (mêmes clés session_state), à enregistrer ensuite normalement.
     if project.voice_provider == "elevenlabs":
-        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_voice_id")
+        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_voice_id",
+                           current_voice_id=current["voice_id"])
 
     with st.container(key="form_card"):
         with st.form(f"{p}_form", border=False):
@@ -286,10 +287,14 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
             with tab_voice:
                 provider_select(p, "voice_provider", "Fournisseur de voix", catalog.VOICE_PROVIDERS,
                                 project.voice_provider, states)
-                st.text_input("Voix ElevenLabs", value=project.voice_name, max_chars=80, key=f"{p}_voice_name",
+                # setdefault (jamais value=) : voir le commentaire de provider_select — une sélection dans le
+                # catalogue ElevenLabs (#59) pré-remplit ces clés avant que ces widgets ne soient instanciés.
+                st.session_state.setdefault(f"{p}_voice_name", project.voice_name)
+                st.text_input("Voix ElevenLabs", max_chars=80, key=f"{p}_voice_name",
                               placeholder="Ex. Kev - Young, Dynamic and Bright")
                 error_under("voice_name")
-                st.text_input("Identifiant de la voix", value=current["voice_id"], max_chars=40, key=f"{p}_voice_id",
+                st.session_state.setdefault(f"{p}_voice_id", current["voice_id"])
+                st.text_input("Identifiant de la voix", max_chars=40, key=f"{p}_voice_id",
                               help="Repris depuis la bibliothèque de voix ElevenLabs. Ce n’est pas une clé d’accès.")
                 error_under("brief.voice_id")
                 paces = catalog.values(brief_lib.NARRATION_PACES)

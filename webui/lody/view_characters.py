@@ -174,12 +174,13 @@ def _render_form(repo: CharacterRepository, project: Project, target: str | None
     p = _prefix(project.id, target)
     title = f"Modifier « {current.name} »" if current else "Nouveau personnage"
 
-    # #55 : hors du formulaire (un st.button n'y est pas autorisé) — une sélection pré-remplit les champs
+    # #55/#59 : hors du formulaire (un st.button n'y est pas autorisé) — une sélection pré-remplit les champs
     # manuels ci-dessous (mêmes clés session_state), à enregistrer ensuite normalement. Affiché aussi pour un
     # nouveau personnage (le fournisseur n'est pas encore choisi) ; masqué seulement si un fournisseur déjà
     # enregistré et différent d'ElevenLabs est connu.
     if current is None or current.voice_provider in ("", "elevenlabs"):
-        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id")
+        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id",
+                           current_voice_id=current.external_voice_id if current else "")
 
     with st.container(key="form_card"):
         st.markdown(f'<p class="card-eyebrow">{esc(title)}</p>', unsafe_allow_html=True)
@@ -217,17 +218,23 @@ def _render_form(repo: CharacterRepository, project: Project, target: str | None
             with st.expander("Voix (facultatif)"):
                 providers = ("",) + catalog.values(catalog.VOICE_PROVIDERS)
                 chosen = current.voice_provider if current else ""
+                # setdefault (jamais index=/value=) : voir le commentaire équivalent de provider_select — une
+                # sélection dans le catalogue ElevenLabs (#59) pré-remplit ces clés avant que ces widgets ne
+                # soient instanciés ; passer index=/value= EN PLUS d'une valeur déjà en session_state est
+                # ambigu pour Streamlit et fait gagner l'ancienne valeur à l'enregistrement.
+                st.session_state.setdefault(f"{p}_voice_provider", chosen if chosen in providers else providers[0])
                 st.selectbox(
                     "Fournisseur de voix", providers,
-                    index=providers.index(chosen) if chosen in providers else 0,
                     format_func=lambda value: catalog.label(catalog.VOICE_PROVIDERS, value) if value else "Aucune voix propre",
                     key=f"{p}_voice_provider",
                 )
                 _error_under("voice_provider")
-                st.text_input("Nom de la voix", value=current.voice_name if current else "", max_chars=80,
+                st.session_state.setdefault(f"{p}_voice_name", current.voice_name if current else "")
+                st.text_input("Nom de la voix", max_chars=80,
                               key=f"{p}_voice_name", placeholder="Ex. Kev - Young, Dynamic and Bright")
                 _error_under("voice_name")
-                st.text_input("Identifiant de voix chez le fournisseur", value=current.external_voice_id if current else "",
+                st.session_state.setdefault(f"{p}_external_voice_id", current.external_voice_id if current else "")
+                st.text_input("Identifiant de voix chez le fournisseur",
                               max_chars=100, key=f"{p}_external_voice_id",
                               help="Repris depuis la bibliothèque de voix du fournisseur. Ce n’est jamais une clé d’accès : "
                                    "une valeur qui y ressemble est refusée.")

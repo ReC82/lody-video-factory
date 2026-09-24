@@ -228,11 +228,17 @@ def fetch_all(api_key: str, *, page_size: int = DEFAULT_PAGE_SIZE, max_pages: in
 
 # -- recherche côté client (catalogue déjà en cache, aucun appel réseau) ------------------------------------------
 def search_voices(voices: Iterable[VoiceInfo], query: str) -> list[VoiceInfo]:
-    """Filtre par nom (insensible à la casse/accents grossièrement), pour la recherche mobile instantanée."""
+    """Filtre côté client (catalogue déjà résolu, aucun appel réseau), insensible à la casse. Cherche au
+    minimum dans le nom, le ``voice_id`` complet, et les labels disponibles (clés et valeurs : langue, âge,
+    genre, accent…) — ticket #59. Un texte partiel suffit (sous-chaîne, pas un préfixe)."""
     needle = " ".join(query.split()).casefold()
     if not needle:
         return list(voices)
-    return [voice for voice in voices if needle in voice.name.casefold()]
+
+    def haystacks(voice: VoiceInfo) -> list[str]:
+        return [voice.name, voice.voice_id, *voice.labels.keys(), *voice.labels.values()]
+
+    return [voice for voice in voices if any(needle in str(item).casefold() for item in haystacks(voice))]
 
 
 # -- résultat exposé à l'interface (ne connaît jamais la clé) -------------------------------------------------------
