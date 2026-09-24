@@ -122,6 +122,33 @@ def test_blank_template_contains_no_real_secret():
     assert find_secret_path(blank_template()) is None
 
 
+def test_blank_template_uses_the_technical_voice_provider_value():
+    """#63 : le modèle téléchargeable montre l'identifiant TECHNIQUE attendu (« elevenlabs »), pas le libellé
+    affiché dans l'interface (« ElevenLabs »), directement issu de catalog.VOICE_PROVIDERS."""
+    template = blank_template()
+    assert template["characters"][0]["voice_provider"] == "elevenlabs"
+
+
+def test_complete_import_accepts_the_ui_label_for_voice_provider(db_path):
+    """#63 : un import complet (#44) reprenant le libellé affiché dans l'interface (« ElevenLabs ») au lieu de
+    l'identifiant technique est accepté et normalisé vers celui-ci."""
+    payload = _payload()
+    payload["characters"] = [{"name": "Gaston", "voice_provider": "ElevenLabs"}]
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    created = commit_import(db_path, preview)
+    characters_repo = CharacterRepository(db_path)
+    assert [c.voice_provider for c in characters_repo.list_for_project(created.id)] == ["elevenlabs"]
+
+
+def test_complete_import_refuses_an_unknown_voice_provider_with_the_accepted_values():
+    payload = _payload(voice_provider="myspace-voice")
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert not preview.is_valid
+    joined_issues = " ".join(issue.message for issue in preview.errors)
+    assert '"elevenlabs"' in joined_issues and '"edge"' in joined_issues
+
+
 # -- aperçu sans écriture -------------------------------------------------------------------------------------------
 def test_preview_does_not_write_anything(db_path):
     projects = ProjectRepository(db_path)

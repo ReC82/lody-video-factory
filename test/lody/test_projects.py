@@ -5,6 +5,7 @@ import sqlite3
 
 import pytest
 
+from lody import catalog
 from lody.projects import (
     STATUS_ACTIVE,
     STATUS_ARCHIVED,
@@ -56,6 +57,43 @@ def test_unknown_choices_are_refused(repo, field):
     with pytest.raises(ProjectValidationError) as error:
         repo.create(name="Test", **{field: "inconnu"})
     assert field in error.value.errors
+
+
+def test_unknown_voice_provider_message_lists_accepted_values(repo):
+    """#63 : le message doit indiquer les identifiants techniques acceptés."""
+    with pytest.raises(ProjectValidationError) as error:
+        repo.create(name="Test", voice_provider="inconnu")
+    assert '"elevenlabs"' in error.value.errors["voice_provider"]
+    assert '"edge"' in error.value.errors["voice_provider"]
+
+
+@pytest.mark.parametrize("technical_value", ["elevenlabs", "edge"])
+def test_technical_voice_provider_is_accepted(repo, technical_value):
+    project = repo.create(name="Test", voice_provider=technical_value)
+    assert project.voice_provider == technical_value
+
+
+@pytest.mark.parametrize(
+    ("field", "raw_label", "expected_technical_value"),
+    [
+        ("voice_provider", "ElevenLabs", "elevenlabs"),
+        ("voice_provider", "Voix gratuite (Edge)", "edge"),
+        ("text_provider", "OpenAI", "openai"),
+        ("visual_provider", "Images IA (OpenAI)", "openai_image"),
+    ],
+)
+def test_ui_label_is_normalized_to_the_technical_value(repo, field, raw_label, expected_technical_value):
+    """#63 : un import JSON reprenant le libellé affiché dans l'interface (ex. « ElevenLabs ») est accepté et
+    normalisé vers l'identifiant technique attendu, pour tous les champs de type catalogue."""
+    project = repo.create(name="Test", **{field: raw_label})
+    assert getattr(project, field) == expected_technical_value
+
+
+def test_choice_validation_uses_the_catalog_as_single_source_of_truth():
+    """#63 : la validation ne duplique pas les listes de choix — elle consomme catalog.CATALOGS."""
+    for field, options in catalog.CATALOGS.items():
+        for option in options:
+            assert catalog.normalize(options, option.label) == option.value
 
 
 def test_unknown_platform_is_refused(repo):

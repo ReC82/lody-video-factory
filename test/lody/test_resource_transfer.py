@@ -130,6 +130,31 @@ def test_character_template_is_importable_as_is(db_path, project):
     assert [c.name for c in created] == ["Personnage principal", "Personnage secondaire"]
 
 
+def test_character_template_uses_the_technical_voice_provider_value():
+    """#63 : le modèle téléchargeable montre l'identifiant TECHNIQUE attendu (« elevenlabs »), pas le libellé
+    affiché dans l'interface (« ElevenLabs »), directement issu de catalog.VOICE_PROVIDERS."""
+    template = character_template()
+    assert template["characters"][0]["voice_provider"] == "elevenlabs"
+
+
+def test_partial_import_accepts_the_ui_label_for_voice_provider(db_path, project):
+    """#63 : un import partiel (#57) reprenant le libellé affiché dans l'interface (« ElevenLabs ») au lieu de
+    l'identifiant technique est accepté et normalisé, exactement comme un import complet (#44)."""
+    payload = _char_payload("Gaston", voice_provider="ElevenLabs")
+    preview = preview_character_import(json.dumps(payload).encode("utf-8"), existing_names=[])
+    assert preview.is_valid, preview.errors
+    created = commit_character_import(db_path, project.id, preview)
+    assert created[0].voice_provider == "elevenlabs"
+
+
+def test_partial_import_refuses_an_unknown_voice_provider_with_the_accepted_values(db_path, project):
+    payload = _char_payload("Gaston", voice_provider="myspace-voice")
+    preview = preview_character_import(json.dumps(payload).encode("utf-8"), existing_names=[])
+    assert not preview.is_valid
+    joined_issues = " ".join(issue.message for issue in preview.errors)
+    assert '"elevenlabs"' in joined_issues and '"edge"' in joined_issues
+
+
 def test_location_template_is_importable_as_is(db_path, project):
     template = location_template()
     preview = preview_location_import(json.dumps(template).encode("utf-8"), existing_names=[])
