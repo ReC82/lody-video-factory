@@ -1,12 +1,16 @@
 """Catalogue de voix ElevenLabs (#55) : client HTTP simulé (aucun appel réseau réel), pagination, recherche,
-cache et actualisation, erreurs (401/403/429/5xx/timeout/réseau), catalogue vide, résolution config/rapport,
-absence de fuite de la clé, génération du rapport côté hôte."""
+résolution du rapport assaini (valide/absent/périmé/invalide/vide), rechargement après remplacement
+atomique, erreurs (401/403/429/5xx/timeout/réseau), absence de fuite de la clé, génération du rapport côté
+hôte. Le conteneur Lody ne doit JAMAIS ouvrir config.toml pour cette fonctionnalité (voir les tests dédiés)."""
 
 from __future__ import annotations
 
+import inspect
 import json
+import os
 import tomllib
 import urllib.error
+from pathlib import Path
 
 import pytest
 
@@ -64,6 +68,23 @@ def test_voice_object_exposes_category_labels_and_preview_url():
     assert voices[0].category == "premade"
     assert voices[0].labels == {"gender": "female", "accent": "american"}
     assert voices[0].preview_url == "https://cdn.elevenlabs.io/rachel.mp3"
+
+
+@pytest.mark.parametrize("unsafe", ["javascript:alert(1)", "http://insecure.example/x.mp3",
+                                    "data:audio/mp3;base64,AAAA", "not-a-url-at-all", ""])
+def test_unsafe_or_non_https_preview_urls_are_stripped_not_forwarded(unsafe):
+    transport = _json_transport([(200, {"voices": [_voice("v1", "Rachel", preview_url=unsafe)],
+                                        "has_more": False}, {})])
+    voices = ev.fetch_all(SECRET_KEY, transport=transport)
+    assert voices[0].preview_url == ""
+
+
+def test_https_preview_url_is_kept_as_is():
+    transport = _json_transport([(200, {"voices": [_voice("v1", "Rachel",
+                                                           preview_url="https://cdn.elevenlabs.io/a.mp3")],
+                                        "has_more": False}, {})])
+    voices = ev.fetch_all(SECRET_KEY, transport=transport)
+    assert voices[0].preview_url == "https://cdn.elevenlabs.io/a.mp3"
 
 
 def test_incomplete_voice_entries_are_skipped_not_fatal():
@@ -168,128 +189,127 @@ def test_second_page_failure_does_not_return_a_partial_catalog():
         ev.fetch_all(SECRET_KEY, transport=transport)
 
 
-# -- cache et actualisation --------------------------------------------------------------------------------------
-def test_cache_reuses_result_within_ttl_and_refetches_after_expiry():
-    clock = {"t": 0.0}
-    calls = {"n": 0}
-
-    def fetch():
-        calls["n"] += 1
-        return [ev.VoiceInfo("v1", "Rachel")]
-
-    cache = ev.CatalogCache(ttl_seconds=10, clock=lambda: clock["t"])
-    first = cache.get(fetch)
-    second = cache.get(fetch)
-    assert calls["n"] == 1 and first.source == "live" and second is first
-    clock["t"] = 11
-    cache.get(fetch)
-    assert calls["n"] == 2
-
-
-def test_explicit_refresh_bypasses_the_cache_even_within_ttl():
-    calls = {"n": 0}
-
-    def fetch():
-        calls["n"] += 1
-        return [ev.VoiceInfo("v1", "Rachel")]
-
-    cache = ev.CatalogCache(ttl_seconds=999)
-    cache.get(fetch)
-    cache.get(fetch, force_refresh=True)
-    assert calls["n"] == 2
-
-
-def test_cache_falls_back_to_stale_result_on_error_rather_than_nothing():
-    cache = ev.CatalogCache(ttl_seconds=0)  # toujours périmé : force un refetch à chaque appel
-    cache.get(lambda: [ev.VoiceInfo("v1", "Rachel")])
-
-    def failing():
-        raise ev.VoiceCatalogUnavailable("panne réseau")
-
-    result = cache.get(failing)
-    assert result.stale is True and result.error == "panne réseau"
-    assert [v.name for v in result.voices] == ["Rachel"]
-
-
-def test_cache_with_no_prior_success_and_a_failure_returns_empty_with_error():
-    cache = ev.CatalogCache()
-
-    def failing():
-        raise ev.VoiceCatalogAuthError(401)
-
-    result = cache.get(failing)
-    assert result.voices == () and not result.available and result.error
-
-
-# -- résolution : config lisible vs rapport assaini, jamais de fuite de la clé -------------------------------------
-def test_resolve_catalog_uses_report_when_config_is_unreadable(tmp_path):
+# -- résolution : LIT UNIQUEMENT le rapport assaini, jamais config.toml, jamais la clé ------------------------------
+def test_resolve_catalog_reads_a_valid_report(tmp_path):
+    now = ev._now_iso()
     report = tmp_path / "voices.json"
-    report.write_text(json.dumps({"version": 1, "generated_at": "2026-01-01T00:00:00+00:00",
+    report.write_text(json.dumps({"version": 1, "generated_at": now,
                                   "voices": [_voice("v1", "Rachel")]}), encoding="utf-8")
-    result = ev.resolve_catalog(config_path=tmp_path / "absent.toml", report_path=report)
-    assert result.source == "report" and [v.name for v in result.voices] == ["Rachel"]
+    result = ev.resolve_catalog(report_path=report)
+    assert result.source == "report" and result.available and not result.stale and not result.empty
+    assert [v.name for v in result.voices] == ["Rachel"]
+    assert result.generated_at == now
 
 
-def test_resolve_catalog_with_no_config_and_no_report_gives_a_clear_manual_fallback_message(tmp_path):
-    result = ev.resolve_catalog(config_path=tmp_path / "absent.toml", report_path=tmp_path / "absent.json")
-    assert not result.available and "manuelle" in result.error.lower()
+def test_resolve_catalog_with_no_report_gives_a_clear_manual_fallback_message(tmp_path):
+    result = ev.resolve_catalog(report_path=tmp_path / "absent.json")
+    assert not result.available and result.error and "manuelle" in result.error.lower()
 
 
-def test_resolve_catalog_report_with_wrong_version_is_treated_as_unavailable(tmp_path):
+def test_resolve_catalog_report_with_wrong_version_is_treated_as_invalid(tmp_path):
     report = tmp_path / "voices.json"
     report.write_text(json.dumps({"version": 99, "voices": []}), encoding="utf-8")
-    result = ev.resolve_catalog(config_path=tmp_path / "absent.toml", report_path=report)
+    result = ev.resolve_catalog(report_path=report)
     assert not result.available and result.error
 
 
-def test_resolve_catalog_uses_direct_config_when_readable_and_never_leaks_the_key(tmp_path, monkeypatch):
-    config = tmp_path / "config.toml"
-    config.write_text(f'[elevenlabs]\napi_key = "{SECRET_KEY}"\n', encoding="utf-8")
-    captured = {}
-
-    def spy_fetch_all(api_key, **kwargs):
-        captured["key"] = api_key
-        return [ev.VoiceInfo("v1", "Rachel")]
-
-    monkeypatch.setattr(ev, "fetch_all", spy_fetch_all)
-    result = ev.resolve_catalog(config_path=config, report_path=tmp_path / "unused.json",
-                                cache=ev.CatalogCache())
-    assert captured["key"] == SECRET_KEY  # la clé a bien atteint le client HTTP...
-    assert result.source == "live"
-    # ... mais ne ressort JAMAIS dans le résultat exposé à l'interface.
-    dumped = json.dumps({"voices": [v.to_dict() for v in result.voices], "error": result.error,
-                         "fetched_at": result.fetched_at, "source": result.source})
-    assert SECRET_KEY not in dumped
-
-
-def test_resolve_catalog_force_refresh_is_forwarded_on_the_direct_config_path(tmp_path, monkeypatch):
-    """Régression : le bouton « Actualiser » doit forcer un nouvel appel même quand config.toml est lisible
-    directement — pas seulement en mode rapport."""
-    config = tmp_path / "config.toml"
-    config.write_text(f'[elevenlabs]\napi_key = "{SECRET_KEY}"\n', encoding="utf-8")
-    calls = {"n": 0}
-
-    def counting_fetch_all(api_key, **kwargs):
-        calls["n"] += 1
-        return [ev.VoiceInfo("v1", "Rachel")]
-
-    monkeypatch.setattr(ev, "fetch_all", counting_fetch_all)
-    shared_cache = ev.CatalogCache(ttl_seconds=999)
-    ev.resolve_catalog(config_path=config, cache=shared_cache)
-    ev.resolve_catalog(config_path=config, cache=shared_cache)  # dans le TTL : ne doit pas réappeler
-    assert calls["n"] == 1
-    ev.resolve_catalog(config_path=config, cache=shared_cache, force_refresh=True)
-    assert calls["n"] == 2
-
-
-def test_resolve_catalog_falls_back_to_report_when_config_has_no_elevenlabs_key(tmp_path):
-    config = tmp_path / "config.toml"
-    config.write_text('[app]\nllm_provider = "openai"\n', encoding="utf-8")
+def test_resolve_catalog_report_with_malformed_json_is_treated_as_invalid(tmp_path):
     report = tmp_path / "voices.json"
-    report.write_text(json.dumps({"version": 1, "generated_at": "t", "voices": [_voice("v1", "Rachel")]}),
+    report.write_text("not json at all {{{", encoding="utf-8")
+    result = ev.resolve_catalog(report_path=report)
+    assert not result.available and result.error
+
+
+def test_resolve_catalog_report_with_voices_not_a_list_is_treated_as_invalid(tmp_path):
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "voices": "not-a-list"}), encoding="utf-8")
+    result = ev.resolve_catalog(report_path=report)
+    assert not result.available and result.error
+
+
+def test_resolve_catalog_empty_report_is_distinct_from_a_missing_report(tmp_path):
+    """Un compte sans aucune voix n'est pas une erreur : message différent d'un rapport absent/cassé."""
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "generated_at": "2026-01-01T00:00:00+00:00", "voices": []}),
                       encoding="utf-8")
-    result = ev.resolve_catalog(config_path=config, report_path=report)
-    assert result.source == "report"
+    result = ev.resolve_catalog(report_path=report)
+    assert result.empty is True and not result.available
+    assert result.error is None  # PAS un message d'erreur : un catalogue valide, juste vide
+
+
+def test_resolve_catalog_marks_an_old_report_as_stale_but_still_shows_it(tmp_path):
+    import datetime as dt
+
+    old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=40)).isoformat(timespec="seconds")
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "generated_at": old, "voices": [_voice("v1", "Rachel")]}),
+                      encoding="utf-8")
+    result = ev.resolve_catalog(report_path=report)
+    assert result.available and result.stale is True
+
+
+def test_resolve_catalog_recent_report_is_not_stale(tmp_path):
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "generated_at": ev._now_iso(),
+                                  "voices": [_voice("v1", "Rachel")]}), encoding="utf-8")
+    result = ev.resolve_catalog(report_path=report)
+    assert result.stale is False
+
+
+def test_resolve_catalog_with_missing_generated_at_is_treated_as_stale(tmp_path):
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "voices": [_voice("v1", "Rachel")]}), encoding="utf-8")
+    result = ev.resolve_catalog(report_path=report)
+    assert result.stale is True  # date absente : jamais présumée fraîche
+
+
+def test_resolve_catalog_never_opens_config_toml_even_if_present_next_to_the_report(tmp_path, monkeypatch):
+    """Le conteneur Lody ne doit JAMAIS tenter de lire config.toml pour cette fonctionnalité — même si un
+    fichier de ce nom existe par ailleurs. On le prouve en faisant échouer toute tentative d'ouverture."""
+    (tmp_path / "config.toml").write_text(f'[elevenlabs]\napi_key = "{SECRET_KEY}"\n', encoding="utf-8")
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "generated_at": ev._now_iso(),
+                                  "voices": [_voice("v1", "Rachel")]}), encoding="utf-8")
+
+    real_open = Path.open
+
+    def guarded_open(self, *args, **kwargs):
+        if self.name == "config.toml":
+            raise AssertionError("resolve_catalog a ouvert config.toml : violation de l'architecture #55")
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+    result = ev.resolve_catalog(report_path=report)
+    assert result.available  # le rapport, lui, est bien lu normalement
+
+
+def test_resolve_catalog_function_source_never_references_config_path_or_tomllib():
+    """Preuve statique complémentaire (même style que test_characters.py) : le CODE de la fonction (hors
+    docstring, qui peut légitimement expliquer ce qu'elle ne fait pas) ne contient aucun appel à tomllib, aucune
+    ouverture de config.toml, aucune variable de clé — pas seulement « ça marche » avec les données du test,
+    mais « ça ne PEUT PAS » structurellement."""
+    full_source = inspect.getsource(ev.resolve_catalog)
+    body_only = full_source.split('"""', 2)[-1]  # retire le docstring (délimité par les deux premiers """)
+    for forbidden in ("config_path", "tomllib", "api_key", ".open(", "elevenlabs.io"):
+        assert forbidden not in body_only, forbidden
+
+
+def test_resolve_catalog_reload_reflects_an_atomic_file_replacement(tmp_path):
+    """Le fichier peut être remplacé atomiquement (os.replace, comme write_report) par le script hôte à tout
+    moment : le prochain appel doit refléter le nouveau contenu sans redémarrage ni cache à invalider."""
+    report = tmp_path / "voices.json"
+    report.write_text(json.dumps({"version": 1, "generated_at": ev._now_iso(),
+                                  "voices": [_voice("v1", "Ancienne Voix")]}), encoding="utf-8")
+    before = ev.resolve_catalog(report_path=report)
+    assert [v.name for v in before.voices] == ["Ancienne Voix"]
+
+    replacement = tmp_path / "voices.json.tmp"
+    replacement.write_text(json.dumps({"version": 1, "generated_at": ev._now_iso(),
+                                       "voices": [_voice("v2", "Nouvelle Voix")]}), encoding="utf-8")
+    os.replace(replacement, report)  # même mécanisme que ev._write_atomic
+
+    after = ev.resolve_catalog(report_path=report)
+    assert [v.name for v in after.voices] == ["Nouvelle Voix"]
 
 
 # -- génération du rapport côté hôte (aucun secret dans le fichier écrit) -------------------------------------------
@@ -327,6 +347,31 @@ def test_write_report_produces_a_world_readable_file_containing_no_secret(tmp_pa
     assert SECRET_KEY not in content
     data = json.loads(content)
     assert data["voices"] == [{"voice_id": "v1", "name": "Rachel", "category": "", "labels": {}, "preview_url": ""}]
+
+
+def test_write_report_permissions_allow_read_only_not_write_by_group_or_others(tmp_path, monkeypatch):
+    """Requirement #55 : « permissions permettant uniquement la lecture du rapport par Lody »."""
+    import stat
+
+    config = tmp_path / "config.toml"
+    config.write_text(f'[elevenlabs]\napi_key = "{SECRET_KEY}"\n', encoding="utf-8")
+    out = tmp_path / "elevenlabs-voices.json"
+    monkeypatch.setattr(ev, "fetch_all", lambda api_key, **kwargs: [ev.VoiceInfo("v1", "Rachel")])
+    ev.write_report(config, out)
+    mode = stat.S_IMODE(out.stat().st_mode)
+    assert mode == 0o644
+    assert not (mode & stat.S_IWGRP) and not (mode & stat.S_IWOTH)  # jamais inscriptible par le groupe/le reste
+
+
+def test_write_report_strips_an_unsafe_preview_url(tmp_path, monkeypatch):
+    config = tmp_path / "config.toml"
+    config.write_text(f'[elevenlabs]\napi_key = "{SECRET_KEY}"\n', encoding="utf-8")
+    out = tmp_path / "elevenlabs-voices.json"
+    monkeypatch.setattr(ev, "fetch_all",
+                        lambda api_key, **kwargs: [ev.VoiceInfo("v1", "Rachel", preview_url="javascript:alert(1)")])
+    ev.write_report(config, out)
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["voices"][0]["preview_url"] == ""
 
 
 def test_main_cli_writes_report_and_prints_count(tmp_path, monkeypatch, capsys):

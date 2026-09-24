@@ -178,17 +178,38 @@ def test_clear_message_when_no_catalog_is_available(engine, _no_catalog_by_defau
     ProjectRepository(settings.db_path()).update(project.id, voice_provider="elevenlabs")
     app = _settings(project)
     text = _text(app)
-    assert "indisponible" in text.lower() or "aucune clé" in text.lower()
+    assert "aucun catalogue" in text.lower() and "manuelle" in text.lower()
 
 
-def test_refresh_button_is_present_and_clickable_without_error(engine, _no_catalog_by_default):  # noqa: F811
-    _write_report(_no_catalog_by_default, [ev.VoiceInfo("v1", "Rachel")])
+def test_clear_message_distinguishes_an_empty_account_from_a_missing_report(engine, _no_catalog_by_default):  # noqa: F811
+    """Un compte sans aucune voix (rapport valide, 0 voix) affiche un message différent d'un rapport absent."""
+    _write_report(_no_catalog_by_default, [])
     project = _project()
     ProjectRepository(settings.db_path()).update(project.id, voice_provider="elevenlabs")
     app = _settings(project)
+    text = _text(app).lower()
+    assert "aucune voix" in text and "manuelle" in text
+    assert "aucun catalogue de voix elevenlabs n" not in text  # message de rapport absent, pas celui-ci
+
+
+def test_refresh_button_reloads_the_file_from_disk_after_an_atomic_replacement(engine, _no_catalog_by_default):  # noqa: F811
+    """Le bouton ne contacte jamais ElevenLabs : il doit au minimum voir un fichier remplacé entre-temps par
+    le script hôte, sans redémarrage ni cache Streamlit à invalider."""
+    _write_report(_no_catalog_by_default, [ev.VoiceInfo("v1", "Ancienne Voix")])
+    project = _project()
+    ProjectRepository(settings.db_path()).update(project.id, voice_provider="elevenlabs")
+    app = _settings(project)
+    assert "Ancienne Voix" in _text(app)
+
+    # Le script hôte remplace le fichier atomiquement (comme _write_atomic : tmp + os.replace) pendant que
+    # la page reste ouverte, SANS action de notre part sur Lody.
+    _write_report(_no_catalog_by_default, [ev.VoiceInfo("v2", "Nouvelle Voix")])
+
     assert "Actualiser les voix" in _labels(app)
     app = _button(app, "Actualiser les voix").click().run()
     assert not app.exception
+    assert "Nouvelle Voix" in _text(app) and "Ancienne Voix" not in _text(app)
+    assert "Fichier relu à l’instant." in _all_text(app)
 
 
 def test_no_huge_list_results_are_capped_for_a_broad_search(engine, _no_catalog_by_default):  # noqa: F811
@@ -203,13 +224,20 @@ def test_no_huge_list_results_are_capped_for_a_broad_search(engine, _no_catalog_
 
 
 # -- absence de fuite de la clé dans le HTML rendu -------------------------------------------------------------------
-def test_api_key_never_appears_in_the_rendered_settings_page(engine, tmp_path, monkeypatch):  # noqa: F811
+def test_api_key_never_appears_in_the_rendered_settings_page_even_if_config_toml_has_one(
+    engine, _no_catalog_by_default, tmp_path, monkeypatch,  # noqa: F811
+):
+    """Preuve de l'architecture #55 : même si config.toml existe ET contient une vraie clé à côté, la page
+    ne l'affiche jamais — parce que resolve_catalog() ne l'ouvre tout simplement jamais (voir
+    test_elevenlabs_voices.py::test_resolve_catalog_never_opens_config_toml_...). Le catalogue affiché ici
+    provient UNIQUEMENT du rapport assaini."""
     config = tmp_path / "config.toml"
     config.write_text(f'[elevenlabs]\napi_key = "{SECRET_KEY}"\n', encoding="utf-8")
     monkeypatch.setenv("LODY_CONFIG_PATH", str(config))
-    monkeypatch.setattr(ev, "fetch_all", lambda api_key, **kwargs: [ev.VoiceInfo("v1", "Rachel")])
+    _write_report(_no_catalog_by_default, [ev.VoiceInfo("v1", "Rachel")])
     project = _project()
     ProjectRepository(settings.db_path()).update(project.id, voice_provider="elevenlabs")
     app = _settings(project)
+    assert "Rachel" in _text(app)  # le catalogue (du rapport) s'affiche bien...
     rendered = _text(app) + " ".join(str(getattr(el, "value", "")) for el in app.text_input)
-    assert SECRET_KEY not in rendered
+    assert SECRET_KEY not in rendered  # ... mais jamais la clé présente dans config.toml à côté
