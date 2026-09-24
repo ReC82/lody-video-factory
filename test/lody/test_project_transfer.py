@@ -22,8 +22,10 @@ from lody.project_transfer import (
     TransferError,
     blank_template,
     commit_import,
+    commit_update,
     export_project,
     preview_import,
+    preview_update,
 )
 from lody.projects import Project, ProjectRepository
 
@@ -549,3 +551,292 @@ def test_full_round_trip_with_multiple_characters_and_locations_preserves_every_
         assert new.id != old.id and new.project_id == created.id
         for field in LOCATION_FIELDS:
             assert getattr(new, field) == getattr(old, field), f"locations[{name}].{field}"
+
+
+# ======================================================================================================================
+# -- mise à jour volontaire d'un projet existant (#66) -----------------------------------------------------------------
+# ======================================================================================================================
+
+def _update_payload(target_name, **project_overrides):
+    return {"schema_version": SCHEMA_VERSION, "project": {"name": target_name, **project_overrides},
+            "characters": [], "locations": []}
+
+
+def test_round_trip_export_modify_update_applies_to_the_same_project(projects, db_path):
+    project = projects.create(name="PNJ", tone="Pédagogique et dynamique",
+                              settings={"brief": {"audience": "Débutants"}})
+    payload = export_project(project, [], [])
+    payload["project"]["tone"] = "Sérieux et posé"
+    payload["project"]["settings"]["brief"]["audience"] = "Experts"
+
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=[], target_locations=[], other_project_names=[])
+    assert preview.is_valid, preview.errors
+    assert preview.project_changes["tone"] == ("Pédagogique et dynamique", "Sérieux et posé")
+    assert "settings" in preview.project_changes  # le brief est PORTÉ par settings, jamais ignoré (#66)
+
+    updated = commit_update(db_path, preview)
+    assert updated.id == project.id  # identifiant conservé
+    assert updated.tone == "Sérieux et posé"
+    assert updated.settings["brief"]["audience"] == "Experts"
+
+
+def test_settings_and_brief_are_never_ignored_by_the_round_trip(projects, db_path):
+    """Exigence explicite du ticket #66 : les réglages complets (dont le brief) doivent être conservés ET
+    mis à jour, pas seulement les champs visibles au premier niveau."""
+    project = projects.create(name="Avec brief complet", settings={
+        "brief": {"audience": "Ados", "structure": ["Accroche", "Chute"], "standing_instructions": "Reste bref."},
+        "custom_extra": "conservé aussi",
+    })
+    payload = export_project(project, [], [])
+    assert payload["project"]["settings"] == project.settings  # déjà présent dans l'export (EDITABLE_FIELDS)
+    payload["project"]["settings"]["brief"]["audience"] = "Adultes"
+
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=[], target_locations=[], other_project_names=[])
+    assert preview.is_valid, preview.errors
+    updated = commit_update(db_path, preview)
+    assert updated.settings["brief"]["audience"] == "Adultes"
+    assert updated.settings["brief"]["structure"] == ["Accroche", "Chute"]
+    assert updated.settings["custom_extra"] == "conservé aussi"
+
+
+def test_project_id_and_production_history_survive_an_update(projects, db_path):
+    project = projects.create(name="Historique")
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        "INSERT INTO productions (id, project_id, root_production_id, version, subject, provider, idempotency_key,"
+        " status, created_at, updated_at, script) VALUES ('prd_old', ?, 'prd_old', 1, 'Sujet', 'p', 'k',"
+        " 'TERMINEE', 'x', 'x', 'Script historique.')", (project.id,))
+    connection.commit()
+    connection.close()
+
+    payload = export_project(project, [], [])
+    payload["project"]["tone"] = "Nouveau ton"
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=[], target_locations=[], other_project_names=[])
+    updated = commit_update(db_path, preview)
+
+    assert updated.id == project.id
+    connection = sqlite3.connect(db_path)
+    row = connection.execute("SELECT script, status FROM productions WHERE id = 'prd_old'").fetchone()
+    assert row == ("Script historique.", "TERMINEE")
+
+
+def test_characters_and_locations_are_added_modified_and_deactivated(projects, characters, locations, db_path):
+    project = projects.create(name="PNJ")
+    gaston = characters.create(project.id, name="Gaston", role="Ancien rôle")
+    zoe = characters.create(project.id, name="Zoé", role="Sera désactivée")
+    atelier = locations.create(project.id, name="Atelier", location_type="Intérieur")
+    extra = locations.create(project.id, name="Extérieur", location_type="Extérieur")
+
+    payload = export_project(project, characters.list_for_project(project.id), locations.list_for_project(project.id))
+    # Zoé et Extérieur absents du fichier ; Gaston modifié ; Atelier inchangé ; Théo et Studio nouveaux.
+    payload["characters"] = [c for c in payload["characters"] if c["name"] != "Zoé"]
+    payload["characters"][0]["role"] = "Nouveau rôle"
+    payload["characters"].append({"name": "Théo", "role": "Petit nouveau"})
+    payload["locations"] = [loc for loc in payload["locations"] if loc["name"] != "Extérieur"]
+    payload["locations"].append({"name": "Studio", "location_type": "Intérieur"})
+
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=characters.list_for_project(project.id),
+                             target_locations=locations.list_for_project(project.id), other_project_names=[])
+    assert preview.is_valid, preview.errors
+    assert preview.characters_added == ["Théo"]
+    assert preview.characters_modified == ["Gaston"]
+    assert preview.characters_unchanged == []
+    assert preview.characters_deactivated == ["Zoé"]
+    assert preview.locations_added == ["Studio"]
+    assert preview.locations_unchanged == ["Atelier"]
+    assert preview.locations_deactivated == ["Extérieur"]
+
+    commit_update(db_path, preview)
+
+    by_name = {c.name: c for c in characters.list_for_project(project.id)}
+    assert by_name["Gaston"].id == gaston.id and by_name["Gaston"].role == "Nouveau rôle" and by_name["Gaston"].is_active
+    assert by_name["Zoé"].id == zoe.id and by_name["Zoé"].is_active is False  # désactivée, jamais supprimée
+    assert by_name["Théo"].is_active and by_name["Théo"].role == "Petit nouveau"
+
+    loc_by_name = {loc.name: loc for loc in locations.list_for_project(project.id)}
+    assert loc_by_name["Atelier"].id == atelier.id  # inchangé : même identifiant
+    assert loc_by_name["Extérieur"].id == extra.id and loc_by_name["Extérieur"].is_active is False
+    assert loc_by_name["Studio"].is_active
+
+
+def test_already_inactive_character_absent_from_file_is_not_re_announced(projects, characters, db_path):
+    project = projects.create(name="PNJ")
+    characters.create(project.id, name="Gaston")
+    dormant = characters.create(project.id, name="Dormant")
+    characters.deactivate(project.id, dormant.id)
+
+    payload = export_project(project, [c for c in characters.list_for_project(project.id) if c.name == "Gaston"], [])
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=characters.list_for_project(project.id),
+                             target_locations=[], other_project_names=[])
+    assert preview.is_valid
+    assert preview.characters_deactivated == []  # déjà inactif : rien de nouveau à annoncer
+    assert preview.characters_unchanged == ["Gaston"]
+
+
+def test_reference_image_of_a_matched_character_is_never_touched_by_an_update(projects, characters, db_path):
+    """#38 : reference_image est hors EDITABLE_FIELDS — un import complet ne peut ni l'écraser ni la lire
+    depuis le fichier (elle n'y figure jamais), donc une mise à jour ne la modifie jamais non plus."""
+    project = projects.create(name="PNJ")
+    gaston = characters.create(project.id, name="Gaston")
+    assert gaston.reference_image == ""  # aucune image dans ce test : on vérifie juste qu'elle n'est pas touchée
+
+    payload = export_project(project, characters.list_for_project(project.id), [])
+    payload["characters"][0]["role"] = "Changé"
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=characters.list_for_project(project.id),
+                             target_locations=[], other_project_names=[])
+    commit_update(db_path, preview)
+    assert characters.get(project.id, gaston.id).reference_image == ""
+
+
+def test_duplicate_name_within_the_uploaded_file_is_blocked_like_creation(projects, db_path):
+    project = projects.create(name="PNJ")
+    payload = export_project(project, [], [])
+    payload["characters"] = [{"name": "Gaston"}, {"name": "GASTON"}]
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=[], target_locations=[], other_project_names=[])
+    assert not preview.is_valid
+    assert any("characters[1].name" in issue.path for issue in preview.errors)
+
+
+def test_invalid_json_file_is_refused_with_nothing_changed(projects, db_path):
+    project = projects.create(name="PNJ", tone="Ton original")
+    preview = preview_update(b"{not valid json", target=project, target_characters=[], target_locations=[],
+                             other_project_names=[])
+    assert not preview.is_valid
+    assert projects.get(project.id).tone == "Ton original"
+
+
+def test_target_name_colliding_with_another_project_is_refused(projects, db_path):
+    project = projects.create(name="PNJ")
+    other = projects.create(name="Déjà pris")
+    payload = _update_payload("Déjà pris")
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project, target_characters=[],
+                             target_locations=[], other_project_names=[other.name])
+    assert not preview.is_valid
+    assert any(issue.path == "project.name" for issue in preview.errors)
+    assert projects.get(project.id).name == "PNJ"  # rien n'a changé
+
+
+def test_renaming_the_target_project_to_its_own_current_name_is_not_a_collision(projects, db_path):
+    project = projects.create(name="PNJ")
+    payload = _update_payload("PNJ", tone="Nouveau ton")
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project, target_characters=[],
+                             target_locations=[], other_project_names=[])
+    assert preview.is_valid, preview.errors
+    updated = commit_update(db_path, preview)
+    assert updated.name == "PNJ" and updated.tone == "Nouveau ton"
+
+
+def test_not_calling_commit_leaves_the_project_untouched(projects, db_path):
+    """« Annuler la confirmation ne modifie rien » : ``preview_update`` seul n'écrit jamais — c'est vrai par
+    construction (aucune connexion en écriture n'est ouverte avant ``commit_update``), vérifié ici."""
+    project = projects.create(name="PNJ", tone="Ton original")
+    payload = export_project(project, [], [])
+    payload["project"]["tone"] = "Ton jamais appliqué"
+    preview_update(json.dumps(payload).encode("utf-8"), target=project, target_characters=[], target_locations=[],
+                   other_project_names=[])
+    assert projects.get(project.id).tone == "Ton original"
+
+
+def test_atomic_rollback_on_concurrent_name_collision_leaves_nothing_partial(projects, characters, db_path):
+    project = projects.create(name="PNJ")
+    characters.create(project.id, name="Gaston")
+    payload = export_project(project, characters.list_for_project(project.id), [])
+    payload["project"]["name"] = "Nom pris entre-temps"
+    payload["characters"][0]["role"] = "Ne doit jamais être écrit"
+    payload["characters"].append({"name": "Nouveau, ne doit jamais être créé"})
+
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project,
+                             target_characters=characters.list_for_project(project.id),
+                             target_locations=[], other_project_names=[])
+    assert preview.is_valid, preview.errors
+    projects.create(name="Nom pris entre-temps")  # collision créée APRÈS l'aperçu, AVANT la confirmation
+
+    with pytest.raises(TransferError):
+        commit_update(db_path, preview)
+
+    # Rien n'a bougé : ni le projet cible, ni son personnage.
+    assert projects.get(project.id).name == "PNJ"
+    assert characters.list_for_project(project.id)[0].role != "Ne doit jamais être écrit"
+    assert len(characters.list_for_project(project.id)) == 1  # aucun personnage ajouté
+
+
+def test_isolation_updating_one_project_never_touches_another(projects, characters, locations, db_path):
+    target = projects.create(name="Cible")
+    other = projects.create(name="Autre projet intact")
+    other_char = characters.create(other.id, name="Personnage de l'autre projet", role="Ne doit jamais changer")
+    other_loc = locations.create(other.id, name="Lieu de l'autre projet")
+
+    payload = export_project(target, [], [])
+    payload["project"]["tone"] = "Changé"
+    payload["characters"] = [{"name": "Nouveau perso"}]
+    payload["locations"] = [{"name": "Nouveau lieu"}]
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=target, target_characters=[],
+                             target_locations=[], other_project_names=[other.name])
+    commit_update(db_path, preview)
+
+    assert characters.get(other.id, other_char.id).role == "Ne doit jamais changer"
+    assert locations.get(other.id, other_loc.id).name == "Lieu de l'autre projet"
+    assert projects.get(other.id).tone != "Changé"
+    assert len(characters.list_for_project(other.id)) == 1  # le nouveau perso a rejoint la CIBLE, pas l'autre
+    assert len(characters.list_for_project(target.id)) == 1
+
+
+def test_matching_by_name_never_crosses_into_another_projects_character(projects, characters, db_path):
+    """Deux personnages du même nom dans deux projets différents ne doivent jamais se confondre : la
+    correspondance de #66 ne regarde que les éléments du projet CIBLE."""
+    target = projects.create(name="Cible")
+    other = projects.create(name="Autre")
+    target_gaston = characters.create(target.id, name="Gaston", role="Rôle cible")
+    other_gaston = characters.create(other.id, name="Gaston", role="Rôle de l'autre projet")
+
+    payload = export_project(target, characters.list_for_project(target.id), [])
+    payload["characters"][0]["role"] = "Rôle mis à jour"
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=target,
+                             target_characters=characters.list_for_project(target.id),
+                             target_locations=[], other_project_names=[other.name])
+    commit_update(db_path, preview)
+
+    assert characters.get(target.id, target_gaston.id).role == "Rôle mis à jour"
+    assert characters.get(other.id, other_gaston.id).role == "Rôle de l'autre projet"  # jamais touché
+
+
+def test_commit_update_refuses_an_invalid_preview_without_touching_the_database(projects, db_path):
+    project = projects.create(name="PNJ", tone="Ton original")
+    invalid_preview = preview_update(b"{not json", target=project, target_characters=[], target_locations=[])
+    with pytest.raises(TransferError):
+        commit_update(db_path, invalid_preview)
+    assert projects.get(project.id).tone == "Ton original"
+
+
+def test_commit_update_refuses_when_the_target_project_no_longer_exists(projects, db_path):
+    project = projects.create(name="PNJ")
+    payload = export_project(project, [], [])
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=project, target_characters=[],
+                             target_locations=[], other_project_names=[])
+    connection = sqlite3.connect(db_path)
+    connection.execute("DELETE FROM projects WHERE id = ?", (project.id,))
+    connection.commit()
+    connection.close()
+    with pytest.raises(TransferError):
+        commit_update(db_path, preview)
+
+
+# -- non-régression : le mode création (#44) reste inchangé -------------------------------------------------------
+def test_create_mode_still_renames_on_collision_after_66(projects, db_path):
+    projects.create(name="Existe déjà")
+    payload = _payload("Existe déjà")
+    preview = preview_import(json.dumps(payload).encode("utf-8"),
+                             existing_project_names=[p.name for p in projects.list_projects()])
+    assert preview.is_valid and preview.name_was_renamed
+    created = commit_import(db_path, preview)
+    assert created.name != "Existe déjà"
+    names = {p.name for p in projects.list_projects()}
+    assert "Existe déjà" in names and created.name in names  # le projet existant n'a pas bougé, le nouveau s'ajoute
+    assert len(projects.list_projects()) == 2
