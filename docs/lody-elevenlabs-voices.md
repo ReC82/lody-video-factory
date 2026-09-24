@@ -86,14 +86,15 @@ chaque rotation d'une autre clé) :
 (`settings.voice_catalog_report_path()`) : rien à changer opérationnellement, ce mécanisme existant est
 réutilisé tel quel plutôt que dupliqué.
 
-## Ce que fait vraiment le bouton « Actualiser les voix »
+## Actualisation du catalogue affiché
 
-Il **ne contacte jamais ElevenLabs** — le conteneur Lody ne peut techniquement pas le faire (il n'a pas la
-clé). Il relit le fichier de rapport depuis le disque : comme `resolve_catalog()` n'utilise aucun cache
-Python/Streamlit et relit déjà ce petit fichier JSON à chaque rendu de la page, le bouton confirme
-simplement visuellement (« Fichier relu à l'instant. ») qu'un remplacement atomique récent (script hôte,
-ou rotation de clé) est bien pris en compte. Un vrai nouveau contenu exige de relancer le script hôte —
-manuellement ou via une rotation de clé (voir ci-dessus).
+Depuis #62, le sélecteur vit **à l'intérieur** de la section « Voix » des formulaires (projet et
+personnage) — un `st.button()` n'étant pas autorisé dans un `st.form()` Streamlit, il n'y a plus de bouton
+dédié « Actualiser ». Ce n'est pas une perte de fonctionnalité : `resolve_catalog()` n'utilise aucun cache
+Python/Streamlit et relit déjà ce petit fichier JSON à chaque rendu de la page — toute interaction avec le
+formulaire (recherche, filtre, sélection) montre donc déjà le contenu le plus récent du fichier. Comme
+avant, le catalogue **ne contacte jamais ElevenLabs** au rendu : un vrai nouveau contenu exige de relancer
+le script hôte, manuellement ou via une rotation de clé (voir ci-dessus).
 
 ## Cas gérés par l'interface
 

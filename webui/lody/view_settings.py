@@ -190,12 +190,6 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
             unsafe_allow_html=True,
         )
 
-    # #55/#59 : hors du formulaire ci-dessous (un st.button n'y est pas autorisé) — une sélection pré-remplit
-    # les champs manuels de l'onglet Voix (mêmes clés session_state), à enregistrer ensuite normalement.
-    if project.voice_provider == "elevenlabs":
-        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_voice_id",
-                           current_voice_id=current["voice_id"])
-
     with st.container(key="form_card"):
         with st.form(f"{p}_form", border=False):
             tab_general, tab_content, tab_visual, tab_voice = st.tabs(
@@ -285,18 +279,36 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
                 st.caption("Une scène = un visuel affiché avant de passer au suivant.")
 
             with tab_voice:
-                provider_select(p, "voice_provider", "Fournisseur de voix", catalog.VOICE_PROVIDERS,
-                                project.voice_provider, states)
-                # setdefault (jamais value=) : voir le commentaire de provider_select — une sélection dans le
-                # catalogue ElevenLabs (#59) pré-remplit ces clés avant que ces widgets ne soient instanciés.
-                st.session_state.setdefault(f"{p}_voice_name", project.voice_name)
-                st.text_input("Voix ElevenLabs", max_chars=80, key=f"{p}_voice_name",
-                              placeholder="Ex. Kev - Young, Dynamic and Bright")
-                error_under("voice_name")
-                st.session_state.setdefault(f"{p}_voice_id", current["voice_id"])
-                st.text_input("Identifiant de la voix", max_chars=40, key=f"{p}_voice_id",
-                              help="Repris depuis la bibliothèque de voix ElevenLabs. Ce n’est pas une clé d’accès.")
-                error_under("brief.voice_id")
+                # #62 : catalogue ElevenLabs intégré ICI (plus de bloc séparé au-dessus du formulaire, plus de
+                # duplication de la voix sélectionnée). Affiché seulement si le fournisseur ENREGISTRÉ est déjà
+                # ElevenLabs (comme #55/#59) : sinon la saisie manuelle ci-dessous est le seul chemin.
+                show_catalog = project.voice_provider == "elevenlabs"
+                picker = voice_picker.render(
+                    p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_voice_id",
+                    current_voice_id=current["voice_id"],
+                ) if show_catalog else voice_picker.PickerResult(available=False, matched=False)
+
+                has_existing_value = bool(project.voice_name or current["voice_id"])
+                # Repliée seulement quand le catalogue a clairement pris le relais (correspondance trouvée) ;
+                # dépliée dans tous les autres cas pour ne jamais cacher silencieusement une voix déjà
+                # configurée — voir le docstring #62.
+                manual_expanded = not picker.matched and (has_existing_value or not picker.available)
+                with st.expander("Saisie manuelle", expanded=manual_expanded):
+                    st.caption("Pour une voix absente du catalogue, un ancien identifiant encore valide, ou un "
+                              "autre fournisseur.")
+                    provider_select(p, "voice_provider", "Fournisseur de voix", catalog.VOICE_PROVIDERS,
+                                    project.voice_provider, states)
+                    # setdefault (jamais value=) : voir le commentaire de provider_select — une sélection dans le
+                    # catalogue ElevenLabs (#59) pré-remplit ces clés avant que ces widgets ne soient instanciés.
+                    st.session_state.setdefault(f"{p}_voice_name", project.voice_name)
+                    st.text_input("Voix ElevenLabs", max_chars=80, key=f"{p}_voice_name",
+                                  placeholder="Ex. Kev - Young, Dynamic and Bright")
+                    error_under("voice_name")
+                    st.session_state.setdefault(f"{p}_voice_id", current["voice_id"])
+                    st.text_input("Identifiant de la voix", max_chars=40, key=f"{p}_voice_id",
+                                  help="Repris depuis la bibliothèque de voix ElevenLabs. Ce n’est pas une clé "
+                                       "d’accès.")
+                    error_under("brief.voice_id")
                 paces = catalog.values(brief_lib.NARRATION_PACES)
                 st.segmented_control(
                     "Rythme de narration", paces, default=current["narration_pace"],

@@ -177,14 +177,6 @@ def _render_form(repo: CharacterRepository, project: Project, target: str | None
     p = _prefix(project.id, target)
     title = f"Modifier « {current.name} »" if current else "Nouveau personnage"
 
-    # #55/#59 : hors du formulaire (un st.button n'y est pas autorisé) — une sélection pré-remplit les champs
-    # manuels ci-dessous (mêmes clés session_state), à enregistrer ensuite normalement. Affiché aussi pour un
-    # nouveau personnage (le fournisseur n'est pas encore choisi) ; masqué seulement si un fournisseur déjà
-    # enregistré et différent d'ElevenLabs est connu.
-    if current is None or current.voice_provider in ("", "elevenlabs"):
-        voice_picker.render(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id",
-                           current_voice_id=current.external_voice_id if current else "")
-
     with st.container(key="form_card"):
         st.markdown(f'<p class="card-eyebrow">{esc(title)}</p>', unsafe_allow_html=True)
         with st.form(f"{p}_form", border=False):
@@ -219,29 +211,48 @@ def _render_form(repo: CharacterRepository, project: Project, target: str | None
             _error_under("continuity_notes")
 
             with st.expander("Voix (facultatif)"):
-                providers = ("",) + catalog.values(catalog.VOICE_PROVIDERS)
-                chosen = current.voice_provider if current else ""
-                # setdefault (jamais index=/value=) : voir le commentaire équivalent de provider_select — une
-                # sélection dans le catalogue ElevenLabs (#59) pré-remplit ces clés avant que ces widgets ne
-                # soient instanciés ; passer index=/value= EN PLUS d'une valeur déjà en session_state est
-                # ambigu pour Streamlit et fait gagner l'ancienne valeur à l'enregistrement.
-                st.session_state.setdefault(f"{p}_voice_provider", chosen if chosen in providers else providers[0])
-                st.selectbox(
-                    "Fournisseur de voix", providers,
-                    format_func=lambda value: catalog.label(catalog.VOICE_PROVIDERS, value) if value else "Aucune voix propre",
-                    key=f"{p}_voice_provider",
-                )
-                _error_under("voice_provider")
-                st.session_state.setdefault(f"{p}_voice_name", current.voice_name if current else "")
-                st.text_input("Nom de la voix", max_chars=80,
-                              key=f"{p}_voice_name", placeholder="Ex. Kev - Young, Dynamic and Bright")
-                _error_under("voice_name")
-                st.session_state.setdefault(f"{p}_external_voice_id", current.external_voice_id if current else "")
-                st.text_input("Identifiant de voix chez le fournisseur",
-                              max_chars=100, key=f"{p}_external_voice_id",
-                              help="Repris depuis la bibliothèque de voix du fournisseur. Ce n’est jamais une clé d’accès : "
-                                   "une valeur qui y ressemble est refusée.")
-                _error_under("external_voice_id")
+                # #62 : catalogue ElevenLabs intégré ICI (plus de bloc séparé au-dessus du formulaire, plus de
+                # duplication de la voix sélectionnée). Affiché aussi pour un nouveau personnage (le
+                # fournisseur n'est pas encore choisi) ; masqué seulement si un fournisseur déjà enregistré et
+                # différent d'ElevenLabs est connu — dans ce cas, la saisie manuelle est le seul chemin.
+                show_catalog = current is None or current.voice_provider in ("", "elevenlabs")
+                picker = voice_picker.render(
+                    p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id",
+                    current_voice_id=current.external_voice_id if current else "",
+                ) if show_catalog else voice_picker.PickerResult(available=False, matched=False)
+
+                has_existing_value = bool((current.voice_name if current else "")
+                                          or (current.external_voice_id if current else ""))
+                # Repliée seulement quand le catalogue a clairement pris le relais (correspondance trouvée) ;
+                # dépliée dans tous les autres cas (catalogue indisponible, absent, ou valeur non représentée)
+                # pour ne jamais cacher silencieusement une voix déjà configurée — voir le docstring #62.
+                manual_expanded = not picker.matched and (has_existing_value or not picker.available)
+                with st.expander("Saisie manuelle", expanded=manual_expanded):
+                    st.caption("Pour une voix absente du catalogue, un ancien identifiant encore valide, ou un "
+                              "autre fournisseur.")
+                    providers = ("",) + catalog.values(catalog.VOICE_PROVIDERS)
+                    chosen = current.voice_provider if current else ""
+                    # setdefault (jamais index=/value=) : voir le commentaire équivalent de provider_select — une
+                    # sélection dans le catalogue ElevenLabs (#59) pré-remplit ces clés avant que ces widgets ne
+                    # soient instanciés ; passer index=/value= EN PLUS d'une valeur déjà en session_state est
+                    # ambigu pour Streamlit et fait gagner l'ancienne valeur à l'enregistrement.
+                    st.session_state.setdefault(f"{p}_voice_provider", chosen if chosen in providers else providers[0])
+                    st.selectbox(
+                        "Fournisseur de voix", providers,
+                        format_func=lambda value: catalog.label(catalog.VOICE_PROVIDERS, value) if value else "Aucune voix propre",
+                        key=f"{p}_voice_provider",
+                    )
+                    _error_under("voice_provider")
+                    st.session_state.setdefault(f"{p}_voice_name", current.voice_name if current else "")
+                    st.text_input("Nom de la voix", max_chars=80,
+                                  key=f"{p}_voice_name", placeholder="Ex. Kev - Young, Dynamic and Bright")
+                    _error_under("voice_name")
+                    st.session_state.setdefault(f"{p}_external_voice_id", current.external_voice_id if current else "")
+                    st.text_input("Identifiant de voix chez le fournisseur",
+                                  max_chars=100, key=f"{p}_external_voice_id",
+                                  help="Repris depuis la bibliothèque de voix du fournisseur. Ce n’est jamais une "
+                                       "clé d’accès : une valeur qui y ressemble est refusée.")
+                    _error_under("external_voice_id")
 
             st.checkbox("Personnage principal", value=current.is_primary if current else False,
                         key=f"{p}_is_primary", help="Purement indicatif : plusieurs personnages peuvent être principaux.")
