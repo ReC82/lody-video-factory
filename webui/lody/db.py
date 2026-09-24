@@ -165,12 +165,21 @@ def _productions_isolation(connection: sqlite3.Connection) -> None:
     })
 
 
+def _reference_images(connection: sqlite3.Connection) -> None:
+    """v6 (#38) : référence (chemin relatif déjà validé, voir ``lody.reference_images``) d'une image de
+    référence facultative — les octets vivent hors SQLite. Chaîne vide (valeur par défaut) = aucune image :
+    comportement inchangé pour tout personnage/lieu existant tant que rien n'est téléversé."""
+    _add_columns(connection, "characters", {"reference_image": "TEXT NOT NULL DEFAULT ''"})
+    _add_columns(connection, "locations", {"reference_image": "TEXT NOT NULL DEFAULT ''"})
+
+
 MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
     (3, _productions_isolation),
     (4, KITS_SCHEMA),
     (5, CHARACTERS_SCHEMA + LOCATIONS_SCHEMA),
+    (6, _reference_images),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 

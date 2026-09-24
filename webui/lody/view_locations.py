@@ -11,7 +11,7 @@ import json
 
 import streamlit as st
 
-from lody import nav, resource_transfer
+from lody import nav, reference_images, resource_transfer
 from lody.components import EMPTY_ICON_SVG
 from lody.generation.publication import slugify
 from lody.locations import Location, LocationNotFound, LocationRepository, LocationValidationError
@@ -99,6 +99,17 @@ def _submit(repo: LocationRepository, project_id: str, target: str | None) -> No
         description=ss.get(f"{p}_description", ""), reference_prompt=ss.get(f"{p}_reference_prompt", ""),
         continuity_notes=ss.get(f"{p}_continuity_notes", ""), is_primary=bool(ss.get(f"{p}_is_primary")),
     )
+    # #38 : validée AVANT tout enregistrement — un envoi invalide ne doit ni créer/modifier le lieu à moitié,
+    # ni laisser croire qu'une image a été prise en compte.
+    uploaded = ss.get(f"{p}_reference_image")
+    image_bytes = uploaded.getvalue() if uploaded is not None else None
+    remove_image = bool(ss.get(f"{p}_reference_image_remove"))
+    if image_bytes is not None:
+        try:
+            reference_images.validate(image_bytes)
+        except reference_images.ReferenceImageError as error:
+            ss[ERRORS_KEY] = {"reference_image": str(error)}
+            return
     try:
         if target:
             location = repo.update(project_id, target, **fields)
@@ -113,6 +124,16 @@ def _submit(repo: LocationRepository, project_id: str, target: str | None) -> No
         nav.flash("error", "Ce lieu n’existe plus.")
         _cancel_form(project_id)
         return
+    if image_bytes is not None:
+        try:
+            repo.set_reference_image(project_id, location.id, image_bytes)
+        except LocationValidationError as error:
+            _cancel_form(project_id)
+            nav.flash("error", f"{message} L’image n’a pas pu être enregistrée : "
+                               f"{error.errors.get('reference_image', 'erreur inconnue')}")
+            return
+    elif remove_image:
+        repo.clear_reference_image(project_id, location.id)
     _cancel_form(project_id)
     nav.flash("success", message)
 
@@ -188,6 +209,23 @@ def _render_form(repo: LocationRepository, project: Project, target: str | None,
                          max_chars=500, key=f"{p}_continuity_notes",
                          placeholder="Ce qu’il faut retenir pour rester cohérent d’une vidéo à l’autre.")
             _error_under("continuity_notes")
+
+            with st.expander("Image de référence (facultatif)"):
+                st.caption("PNG, JPEG ou WEBP, 8 Mo maximum, 64 à 4096 pixels de côté. Utilisée seulement par "
+                          "les générateurs d’images qui savent réellement s’appuyer sur une référence — les "
+                          "autres continuent de fonctionner sans elle, à partir des descriptions ci-dessus.")
+                if current and current.reference_image:
+                    try:
+                        data = reference_images.read_bytes(current.reference_image, project.id, "locations",
+                                                            current.id)
+                    except ValueError:
+                        st.caption("L’image enregistrée est introuvable.")
+                    else:
+                        st.image(data, width=160)
+                    st.checkbox("Retirer l’image actuelle", key=f"{p}_reference_image_remove")
+                st.file_uploader("Remplacer l’image" if (current and current.reference_image) else "Image",
+                                 type=["png", "jpg", "jpeg", "webp"], key=f"{p}_reference_image")
+                _error_under("reference_image")
 
             st.checkbox("Lieu principal", value=current.is_primary if current else False,
                         key=f"{p}_is_primary", help="Purement indicatif : plusieurs lieux peuvent être principaux.")

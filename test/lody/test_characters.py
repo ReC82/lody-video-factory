@@ -3,11 +3,13 @@ FK, et non-régression du pipeline de génération classique. Aucun fournisseur,
 
 from __future__ import annotations
 
+import io
 import sqlite3
 
 import pytest
+from PIL import Image
 
-from lody import catalog, db
+from lody import catalog, db, reference_images
 from lody.characters import (
     CharacterNotFound,
     CharacterRepository,
@@ -40,7 +42,7 @@ def test_fresh_database_has_zero_characters_and_reaches_the_latest_schema(tmp_pa
     assert repo.list_for_project(project.id) == []
     assert repo.count_for_project(project.id) == 0
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 5
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 6
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
 
@@ -69,7 +71,7 @@ def test_upgrade_from_currently_deployed_schema_v4_keeps_existing_data(tmp_path)
     assert repo.list_for_project("prj_old") == []  # zéro personnage par défaut, même pour un projet ancien
 
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 6
     # Rien de préexistant n'a bougé.
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT script FROM productions WHERE id = 'prd_old'").fetchone() == \
@@ -83,7 +85,7 @@ def test_migration_replayed_is_a_no_op(tmp_path):
     CharacterRepository(path)  # rejeu explicite
     CharacterRepository(path)  # une troisième fois, pour faire bonne mesure
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
     assert connection.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 0
 
 
@@ -446,3 +448,89 @@ def test_only_the_snapshot_wiring_references_characters_or_locations_not_the_scr
         if path.name not in allowed and any(pattern.search(path.read_text(encoding="utf-8")) for pattern in patterns)
     ]
     assert offenders == []
+
+
+# -- image de référence (#38) -----------------------------------------------------------------------------------
+def _png(color=(255, 0, 0)) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (120, 120), color=color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_reference_storage(tmp_path, monkeypatch):
+    """Un dossier de références DISTINCT de la base SQLite du test (``repo``/``projects`` utilisent ``tmp_path``
+    directement) : prouve que le stockage des images ne dépend d'aucun état partagé avec la base."""
+    monkeypatch.setenv("LODY_DATA_DIR", str(tmp_path / "ref_storage"))
+
+
+def test_new_character_has_no_reference_image_by_default(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    assert character.reference_image == ""
+
+
+def test_set_reference_image_stores_a_validated_reference_not_bytes(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    updated = repo.set_reference_image(project.id, character.id, _png())
+    assert updated.reference_image.startswith(f"references/{project.id}/characters/{character.id}/")
+    path = reference_images.resolve(updated.reference_image, project.id, "characters", character.id)
+    assert path.read_bytes() != b""
+
+
+def test_set_reference_image_does_not_change_other_fields(repo, project):
+    character = repo.create(project.id, name="Gaston", role="Guide")
+    updated = repo.set_reference_image(project.id, character.id, _png())
+    assert updated.name == "Gaston" and updated.role == "Guide"
+
+
+def test_set_reference_image_rejects_an_invalid_image_and_leaves_the_character_untouched(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    with pytest.raises(CharacterValidationError) as error:
+        repo.set_reference_image(project.id, character.id, b"pas une image")
+    assert "reference_image" in error.value.errors
+    assert repo.get(project.id, character.id).reference_image == ""
+
+
+def test_set_reference_image_on_an_unknown_character_raises_not_found(repo, project):
+    with pytest.raises(CharacterNotFound):
+        repo.set_reference_image(project.id, "chr_doesnotexist0", _png())
+
+
+def test_set_reference_image_never_writes_into_another_projects_character(repo, projects, project):
+    other_project = projects.create(name="Autre projet")
+    character = repo.create(other_project.id, name="Gaston")
+    with pytest.raises(CharacterNotFound):
+        repo.set_reference_image(project.id, character.id, _png())  # mauvais projet pour cet id
+
+
+def test_clear_reference_image_resets_the_column_but_keeps_the_file_on_disk(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    with_image = repo.set_reference_image(project.id, character.id, _png())
+    path = reference_images.resolve(with_image.reference_image, project.id, "characters", character.id)
+    cleared = repo.clear_reference_image(project.id, character.id)
+    assert cleared.reference_image == ""
+    assert path.exists()  # jamais de suppression destructive (voir reference_images.py)
+
+
+def test_replacing_a_reference_image_keeps_the_previous_file_resolvable(repo, project):
+    """Une production déjà préparée peut avoir copié l'ancienne référence dans son snapshot (#38) : elle doit
+    rester valide même après un remplacement."""
+    character = repo.create(project.id, name="Gaston")
+    first = repo.set_reference_image(project.id, character.id, _png(color=(255, 0, 0))).reference_image
+    second = repo.set_reference_image(project.id, character.id, _png(color=(0, 255, 0))).reference_image
+    assert first != second
+    assert reference_images.resolve(first, project.id, "characters", character.id).exists()
+    assert repo.get(project.id, character.id).reference_image == second
+
+
+def test_reference_image_is_excluded_from_editable_fields_and_generic_update(repo, project):
+    """#38 : jamais settable via ``update`` générique (donc jamais via l'import JSON #44/#57, qui réutilise
+    exactement ce chemin) — seuls set_reference_image/clear_reference_image le peuvent."""
+    from lody.characters import EDITABLE_FIELDS
+
+    assert "reference_image" not in EDITABLE_FIELDS
+    character = repo.create(project.id, name="Gaston")
+    with pytest.raises(CharacterValidationError) as error:
+        repo.update(project.id, character.id, reference_image="references/evil/path")
+    assert "Champ inconnu" in str(error.value)
+    assert repo.get(project.id, character.id).reference_image == ""

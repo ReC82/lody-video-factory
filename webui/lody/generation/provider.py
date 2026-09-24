@@ -65,6 +65,12 @@ class VideoGenerationProvider(ABC):
     #: vrai si le moteur sait générer UNE image seule (fond de miniature dédié, payant). Faux pour le moteur historique
     #: (son API n'expose aucune génération d'image isolée) : la miniature utilise alors une image de scène existante.
     supports_thumbnail_background: bool = False
+    #: vrai si le moteur sait réellement recevoir une image de référence pour la génération visuelle (#38).
+    #: Faux par défaut : ni le moteur historique (``mpt_connector``) ni la simulation (``demo``) ne le
+    #: permettent aujourd'hui — une sélection avec image de référence bascule alors explicitement sur le texte
+    #: seul (voir ``narrative_context.reference_images_status``), jamais une transmission silencieusement
+    #: ignorée mais présentée comme utilisée.
+    supports_reference_images: bool = False
 
     def plan_units(self, request: GenerationRequest) -> SceneUnits:
         units = estimate_units(request)

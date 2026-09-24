@@ -2,8 +2,14 @@
 
 Entièrement facultatif : un projet sans personnage fonctionne exactement comme avant ce ticket. Aucun écran
 Streamlit, aucun brief, aucun storyboard, aucun payload de génération ne lit cette table ici — ce sera l'objet
-de tickets ultérieurs (#32 pour l'administration, #34+ pour la sélection). Aucune image de référence n'est
-stockée (voir #38) ; aucune clé API (voir ``secrets_guard`` : appliqué à tous les champs texte).
+de tickets ultérieurs (#32 pour l'administration, #34+ pour la sélection). Aucune clé API (voir
+``secrets_guard`` : appliqué à tous les champs texte).
+
+Image de référence facultative (#38) : ``reference_image`` porte une référence de fichier déjà validée par
+``lody.reference_images`` (jamais des octets bruts). Volontairement HORS de ``EDITABLE_FIELDS`` — donc hors de
+``validate_fields``/``update`` génériques et de l'import/export JSON (#44/#57) : accepter cette valeur depuis
+un JSON arbitraire reviendrait à faire confiance à un chemin non validé. Seuls ``set_reference_image`` et
+``clear_reference_image`` (plus bas) peuvent la modifier.
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lody import catalog, db
+from lody import catalog, db, reference_images
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
 logger = logging.getLogger("lody.characters")
@@ -78,6 +84,7 @@ class Character:
     external_voice_id: str
     permanent_elements: str
     continuity_notes: str
+    reference_image: str
     is_primary: bool
     is_active: bool
     created_at: str
@@ -291,3 +298,36 @@ class CharacterRepository:
         """Désactivation, jamais de suppression destructive dans ce MVP (voir le critère d'acceptation #30) :
         l'historique (snapshots de productions passées) reste cohérent même si le personnage n'est plus proposé."""
         return self._set_active(project_id, character_id, False)
+
+    # -- image de référence (#38) ---------------------------------------------------------------------------------
+    def set_reference_image(self, project_id: str, character_id: str, data: bytes) -> Character:
+        """Valide puis enregistre l'image de référence de CE personnage. Ne touche à aucun autre champ.
+
+        Lève ``CharacterNotFound`` si l'identifiant n'existe pas ou appartient à un autre projet (jamais
+        d'écriture croisée) ; ``CharacterValidationError`` si l'image est invalide (voir
+        ``reference_images.save`` : taille, type réel, dimensions)."""
+        self.get(project_id, character_id)
+        try:
+            stored = reference_images.save(project_id, "characters", character_id, data)
+        except reference_images.ReferenceImageError as error:
+            raise CharacterValidationError({"reference_image": str(error)}) from error
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE characters SET reference_image = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+                (stored.ref, self._clock(), character_id, project_id),
+            )
+        logger.info("image de référence enregistrée : %s", character_id)
+        return self.get(project_id, character_id)
+
+    def clear_reference_image(self, project_id: str, character_id: str) -> Character:
+        """Retire la référence enregistrée. Le fichier reste sur disque (voir le docstring de
+        ``lody.reference_images`` : jamais de suppression destructive, une production déjà préparée peut
+        toujours résoudre l'ancienne référence copiée dans son snapshot)."""
+        self.get(project_id, character_id)
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE characters SET reference_image = '', updated_at = ? WHERE id = ? AND project_id = ?",
+                (self._clock(), character_id, project_id),
+            )
+        logger.info("image de référence retirée : %s", character_id)
+        return self.get(project_id, character_id)
