@@ -147,6 +147,11 @@ CHARACTER_EXAMPLE_PRIMARY = {
     "visual_description": "Silhouette simple, couleurs vives, sans texte ni logo.",
     "reference_prompt": "portrait stylisé, univers coloré, cohérent d'une scène à l'autre",
     "speech_style": "Phrases courtes, ton chaleureux.",
+    # #63 : exemple réaliste de l'identifiant TECHNIQUE attendu (voir catalog.VOICE_PROVIDERS) — jamais le
+    # libellé affiché dans l'interface (« ElevenLabs »). Rend ce champ immédiatement visible dans le modèle
+    # téléchargeable, plutôt que vide comme avant.
+    "voice_provider": "elevenlabs", "voice_name": "Ex. Kev - Young, Dynamic and Bright",
+    "external_voice_id": "21m00Tcm4TlvDq8ikWAM",
     "permanent_elements": "Porte toujours le même carnet.",
     "continuity_notes": "Reste cohérent d'une vidéo à l'autre.",
     "is_primary": True,

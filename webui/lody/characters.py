@@ -122,9 +122,22 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
          f"Les notes de continuité sont trop longues ({CONTINUITY_NOTES_MAX} caractères maximum).")
 
     raw_provider = " ".join(str(fields.get("voice_provider", "") or "").split())
-    if raw_provider and raw_provider not in catalog.values(catalog.VOICE_PROVIDERS):
-        errors["voice_provider"] = "Choisis un fournisseur de voix dans la liste, ou laisse vide."
-    clean["voice_provider"] = raw_provider
+    if not raw_provider:
+        clean["voice_provider"] = ""
+    else:
+        # #63 : accepte aussi le libellé affiché dans l'interface (ex. « ElevenLabs »), pas seulement
+        # l'identifiant technique (« elevenlabs ») — normalisation exacte et insensible à la casse
+        # uniquement, voir catalog.normalize(). Jamais d'ambiguïté : chaque option est unique dans ce
+        # catalogue.
+        normalized = catalog.normalize(catalog.VOICE_PROVIDERS, raw_provider)
+        if normalized is None:
+            errors["voice_provider"] = (
+                "Choisis un fournisseur de voix parmi : "
+                f"{catalog.allowed_values_text(catalog.VOICE_PROVIDERS)} (ou laisse vide)."
+            )
+            clean["voice_provider"] = raw_provider
+        else:
+            clean["voice_provider"] = normalized
 
     clean["is_primary"] = bool(fields.get("is_primary", DEFAULTS["is_primary"]))
     clean["is_active"] = bool(fields.get("is_active", DEFAULTS["is_active"]))
