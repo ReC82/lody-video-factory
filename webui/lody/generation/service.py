@@ -52,6 +52,7 @@ from lody.generation.narrative_context import (
 )
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import sanitize
+from lody.generation.script_guard import validate_spoken_script
 from lody.generation.storyboard import MAX_SCENES, build_storyboard
 from lody.generation.store import Production, ProductionRepository
 from lody.locations import LocationRepository
@@ -453,6 +454,10 @@ class ProductionService:
                     provider.write_script(request, narrative_block).strip(), request.language)
                 if not script:
                     raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script reçu est vide.", stage="script")
+                # #76 : AVANT tout écriture — un texte qui ressemble encore à une consigne de production
+                # (titre d'épisode, liste de scènes, durée/format technique, reprise du brief...) est refusé
+                # ICI, avant le storyboard et avant que ce texte ne devienne la version officielle du script.
+                validate_spoken_script(script, production)
                 request = request.with_updates(script=script)
                 # Fusionne (jamais un écrasement complet) : préserve les clés de diagnostic déjà posées par
                 # prepare() — "reference_images" (#38), "voice_resolution" (#70) — qu'aucun appel ultérieur
@@ -460,6 +465,9 @@ class ProductionService:
                 self.repo.update(production_id, script=script, script_source="generated",
                                  params={**production.params, "request": request.to_dict(),
                                         "engine": production.params.get("engine", {})})
+            else:
+                # #76 : script fourni manuellement — même frontière, jamais de traitement de faveur.
+                validate_spoken_script(request.script, production)
             self.repo.update(production_id, current_step="Préparation des scènes")
             scenes = build_storyboard(request.script, self._scene_count(provider, request),
                                       visual_style=request.visual_style, aspect=request.aspect,
@@ -476,6 +484,10 @@ class ProductionService:
             # _assert_voice_unchanged. Placée AVANT provider.submit() : une divergence bloque l'envoi,
             # aucun appel n'est jamais effectué avec la mauvaise voix.
             self._assert_voice_unchanged(production, request)
+            # #76 : de nouveau, juste avant l'envoi — défense en profondeur (le texte n'a pas changé depuis
+            # le contrôle ci-dessus, mais cette frontière doit rester valable même si un futur changement du
+            # pipeline modifiait request.script entre les deux points).
+            validate_spoken_script(request.script, production)
             self.repo.update(
                 production_id, storyboard=[scene.to_dict() for scene in scenes],
                 visual_prompts=list(request.visual_prompts), current_step="Envoi au moteur",
