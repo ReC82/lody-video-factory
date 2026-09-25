@@ -14,6 +14,7 @@ interrompue avant l'envoi devient ECHEC et se relance par une nouvelle confirmat
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
 from collections.abc import Callable, Sequence
@@ -372,6 +373,24 @@ class ProductionService:
         if sent != project_part(snapshot.get("request", {})):
             raise LaunchError("Les paramètres à envoyer diffèrent de l’instantané du projet : lancement refusé.")
 
+    @staticmethod
+    def _assert_voice_unchanged(production: Production, request: GenerationRequest) -> None:
+        """#75 : aucune divergence tolérée entre la voix figée dans l'instantané à la préparation (résolue
+        UNE SEULE FOIS, #70 — personnage principal sélectionné, sinon repli sur la voix du projet) et la
+        voix sur le point d'être transmise au moteur, juste avant l'envoi.
+
+        Purement défensif : l'architecture actuelle garantit déjà cette égalité par construction (la voix
+        n'est jamais retouchée entre ``prepare()`` et ``submit()``, et ``_check_isolation`` compare déjà
+        l'ensemble des paramètres « projet » — voix comprise — entre ``params.request`` et
+        ``snapshot.request``). Cette vérification, VOIX-SPÉCIFIQUE, bloque néanmoins toute régression
+        future avant qu'elle ne produise une vidéo avec la mauvaise voix — exactement ce qui s'est produit
+        sur le projet PNJ avant #70 (voir le ticket #75)."""
+        frozen = (production.snapshot.get("request") or {}).get("voice") or {}
+        if dataclasses.asdict(request.voice) != frozen:
+            raise LaunchError(
+                "Divergence détectée entre la voix figée à la préparation et la voix sur le point d’être "
+                "envoyée : lancement refusé par sécurité, aucune vidéo générée avec la mauvaise voix.")
+
     # -- confirmation unique -----------------------------------------------------
     def confirm(self, production_id: str, *, accept_partial: bool = False) -> Production:
         """Lance la génération. Idempotent : rappelée sur une production déjà lancée, elle ne relance rien."""
@@ -453,6 +472,10 @@ class ProductionService:
             # sélection ou snapshot antérieur à #35 : storyboard/prompts strictement inchangés (voir docstring).
             scenes = enrich_visual_prompts(scenes, production.snapshot.get("narrative_context"))
             request = request.with_updates(visual_prompts=[scene.prompt for scene in scenes])
+            # #75 : dernière vérification, juste avant d'écrire la trace et d'envoyer — voir
+            # _assert_voice_unchanged. Placée AVANT provider.submit() : une divergence bloque l'envoi,
+            # aucun appel n'est jamais effectué avec la mauvaise voix.
+            self._assert_voice_unchanged(production, request)
             self.repo.update(
                 production_id, storyboard=[scene.to_dict() for scene in scenes],
                 visual_prompts=list(request.visual_prompts), current_step="Envoi au moteur",
@@ -468,6 +491,8 @@ class ProductionService:
             self._initial_thumbnail_background(production_id, provider, request)
         except ProviderError as error:
             self._fail(production_id, error.kind, error.message)
+        except LaunchError as error:  # #75 : divergence de voix détectée — message précis, jamais générique
+            self._fail(production_id, ErrorKind.REJECTED, error.message)
         except Exception as error:  # jamais de trace brute vers l'utilisateur ; détail nettoyé dans les logs
             logger.error("production %s : erreur inattendue (%s) %s", production_id, type(error).__name__, sanitize(error))
             self._fail(production_id, ErrorKind.PROVIDER, "Une erreur inattendue est survenue pendant la préparation.")
@@ -507,6 +532,11 @@ class ProductionService:
         if narrative_present:
             script_origin += " ; personnages et lieu sélectionnés — instantané de production (#34/#35/#36)"
             scene_origin += " ; continuité visuelle des personnages/lieu présents — instantané de production (#34/#35/#37)"
+        # #75 : origine RÉELLE de la voix (personnage ou projet), jamais un « projet » générique et
+        # potentiellement faux — voir narrative_context.resolve_voice, consignée par prepare() dans
+        # params["voice_resolution"] et reprise ici telle quelle (jamais recalculée).
+        voice_origin_info = production.params.get("voice_resolution") or {}
+        voice_origin_text = voice_origin_info.get("reason") or "projet"
         origins = [
             {"item": "Prompt éditorial du script", "origin": script_origin
              if script_request else "script fourni ou repris : aucun appel texte"},
@@ -514,12 +544,19 @@ class ProductionService:
             {"item": "Prompts de scène (envoyés par Lody)", "origin": scene_origin},
             {"item": "Gabarit d'images du moteur", "origin": engine_template.get("origin", "aucun")},
             {"item": "Police et réglages de sous-titres", "origin": "plateforme (connecteur) et moteur (section [ui] de la configuration)"},
-            {"item": "Voix, langue, format, durée", "origin": "projet"},
+            {"item": "Voix", "origin": voice_origin_text},
+            {"item": "Langue, format, durée", "origin": "projet"},
         ]
         return {"recorded_at": self._clock(), "project": production.snapshot.get("project", {}),
                 "snapshot_version": production.snapshot.get("version", ""), "script_request": script_request,
                 "scenes": detail.get("scenes", []), "image_template": engine_template,
-                "engine_params": provider.describe_params(request), "origins": origins}
+                "engine_params": provider.describe_params(request), "origins": origins,
+                # #75 : fournisseur/nom/identifiant/origine/repli de la voix RÉELLEMENT envoyée — jamais un
+                # secret (voir lody.reference_images/secrets_guard : un identifiant de voix ElevenLabs n'en
+                # est pas un), toujours contrôlable indépendamment de "params" (voir _assert_voice_unchanged).
+                "voice": {"provider": request.voice.provider, "name": request.voice.name,
+                         "voice_id": request.voice.voice_id, "source": voice_origin_info.get("source", ""),
+                         "fallback": voice_origin_info.get("fallback", False), "reason": voice_origin_text}}
 
     def _fail(self, production_id: str, kind: ErrorKind, message: str) -> None:
         self.repo.transition(
