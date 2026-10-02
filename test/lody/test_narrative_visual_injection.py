@@ -5,6 +5,14 @@ le prompt du SCRIPT par test_narrative_script_injection.py (#36). Ce fichier ne 
 des prompts VISUELS : ``enrich_visual_prompts`` (fonction pure, sur un storyboard déjà construit) et
 l'intégration bout-en-bout via ``ProductionService.confirm()``/``run()`` avec un faux connecteur (aucun
 appel réseau, aucun appel payant).
+
+Depuis le diagnostic du ticket #92 : ``always_present_character_id``/le paramètre ``always_present_id``
+d'``enrich_visual_prompts`` garantissent la présence du personnage de référence du mode dialogue (#77) dans
+CHAQUE scène, même quand son nom n'est jamais prononcé dans sa propre réplique (cause établie du défaut
+« Eli change de vêtements et de couleur des yeux entre les images » — voir le docstring de
+``always_present_character_id``). Les tests dédiés plus bas utilisent systématiquement DEUX personnages aux
+traits différents (jamais un seul cas particulier) pour vérifier que le correctif dépend des données
+(id, description) et non d'un nom ou d'une caractéristique codée en dur.
 """
 
 from __future__ import annotations
@@ -13,7 +21,7 @@ import copy
 
 import pytest
 
-from lody.generation.narrative_context import VISUAL_BLOCK_MAX, enrich_visual_prompts
+from lody.generation.narrative_context import VISUAL_BLOCK_MAX, always_present_character_id, enrich_visual_prompts
 from lody.generation.storyboard import Scene
 from lody.generation.store import ProductionRepository
 from lody.projects import DEFAULTS
@@ -266,3 +274,141 @@ def test_trace_records_the_visual_continuity_for_audit(env):  # noqa: F811
     stored = ProductionRepository(env.path).get(launched.id)
     origins = {item["item"]: item["origin"] for item in stored.trace["origins"]}
     assert "instantané de production" in origins["Prompts de scène (envoyés par Lody)"]
+
+
+# ======================================================================================================================
+# -- #92 : personnage de référence du mode dialogue toujours présent, même sans jamais prononcer son nom -----------
+# ======================================================================================================================
+# Deux personnages, DEUX JEUX DE TRAITS complètement différents et arbitraires (jamais une seule caractéristique
+# d'un cas particulier) : si le correctif dépendait d'un nom ou d'un trait précis, un seul des deux échouerait.
+_TRAITS_A = {"name": "Nova", "visual_description": "Cheveux violets en pics, combinaison argentée, yeux ambrés.",
+            "permanent_elements": "Combinaison argentée et gants métalliques.", "continuity_notes": "Ne jamais changer la couleur des cheveux."}
+_TRAITS_B = {"name": "Theo", "visual_description": "Crâne rasé, long manteau kaki élimé, cicatrice sur la joue gauche.",
+            "permanent_elements": "Manteau kaki et cicatrice visible.", "continuity_notes": "La cicatrice doit rester visible à chaque plan."}
+
+# Réplique à la première personne qui NE PRONONCE JAMAIS le nom du personnage qui parle (exactement la
+# situation réelle diagnostiquée en #92 : le mode dialogue, #77, écrit toujours à la première personne).
+# Assez de mots pour que l'estimation de scènes (durée du script / rythme) en produise PLUSIEURS, afin de
+# vérifier la continuité sur un vrai storyboard à plusieurs scènes, pas un seul bloc générique.
+_FIRST_PERSON_NO_SELF_NAME = (
+    "Attends, tu sautes encore devant moi, juste là, sans rien dire du tout ? "
+    "Bonjour, est-ce que tu m’entends vraiment, ou bien tu regardes ailleurs ? "
+    "Je reste calme pour l’instant, mais ça commence sérieusement à devenir étrange. "
+    "Est-ce que tu sais seulement marcher normalement, ou c’est un jeu entre nous deux ? "
+    "Franchement, je commence vraiment à me poser des questions sur tout ce qui se passe ici depuis ce matin. "
+    "Personne ne répond jamais à mes questions les plus simples, et ça devient franchement inquiétant pour moi."
+)
+
+
+def test_always_present_character_id_is_empty_without_any_reference_character():
+    assert always_present_character_id(None) == ""
+    assert always_present_character_id({}) == ""
+    assert always_present_character_id({"characters": []}) == ""
+
+
+def test_always_present_character_id_resolves_the_sole_selected_character():
+    narrative = {"characters": [{"id": "chr_a", **_TRAITS_A}]}
+    assert always_present_character_id(narrative) == "chr_a"
+
+
+def test_always_present_character_id_resolves_the_unique_primary_among_several():
+    narrative = {"characters": [{"id": "chr_a", "is_primary": True, **_TRAITS_A},
+                                {"id": "chr_b", "is_primary": False, **_TRAITS_B}]}
+    assert always_present_character_id(narrative) == "chr_a"
+
+
+def test_always_present_character_id_is_empty_with_several_characters_and_no_unique_primary():
+    """Ambiguïté volontairement non résolue (#39, multi-locuteurs hors scope) : jamais une présence forcée
+    arbitraire quand aucun personnage de référence unique n'est déterminable."""
+    narrative = {"characters": [{"id": "chr_a", "is_primary": False, **_TRAITS_A},
+                                {"id": "chr_b", "is_primary": False, **_TRAITS_B}]}
+    assert always_present_character_id(narrative) == ""
+
+
+@pytest.mark.parametrize("traits", [_TRAITS_A, _TRAITS_B], ids=["traits-A", "traits-B"])
+def test_enrich_visual_prompts_injects_the_always_present_character_even_when_never_named(traits):
+    """Le cœur du correctif #92, vérifié avec DEUX jeux de traits différents (paramétré) : si le mécanisme
+    dépendait d'un nom ou d'une caractéristique précise plutôt que de l'id transmis, un des deux échouerait."""
+    character = {"id": "chr_ref", **traits}
+    narrative = {"characters": [character], "location": None}
+    scenes = [Scene(1, "Toi, devant mon stand, tu sautes. Encore. Bonjour ?", "prompt 1", 4.0),
+             Scene(2, "Je reste calme.", "prompt 2", 3.0)]
+    # Sans le correctif (always_present_id="") : le nom n'étant jamais prononcé, AUCUNE scène ne recevrait le bloc.
+    unfixed = enrich_visual_prompts(scenes, narrative, always_present_id="")
+    assert all(MARKER not in s.prompt for s in unfixed)
+
+    fixed = enrich_visual_prompts(scenes, narrative, always_present_id="chr_ref")
+    assert all(MARKER in s.prompt for s in fixed)
+    assert all(traits["visual_description"] in s.prompt or "déjà décrit" in s.prompt for s in fixed)
+    assert traits["visual_description"] in fixed[0].prompt  # description complète à la première apparition
+
+
+def test_enrich_visual_prompts_still_only_adds_a_non_reference_character_where_actually_mentioned():
+    """La présence forcée ne s'applique QU'au personnage de référence transmis : un autre personnage
+    sélectionné (mode narration, pas de personnage de référence unique ici) reste soumis à la détection par
+    mention — jamais introduit dans une scène où il est absent (exigence explicite du ticket #92)."""
+    nova = {"id": "chr_a", **_TRAITS_A}
+    theo = {"id": "chr_b", **_TRAITS_B}
+    narrative = {"characters": [nova, theo], "location": None}
+    scenes = [Scene(1, "Nova observe la scène en silence.", "prompt 1", 4.0),
+             Scene(2, "Un trampoline apparaît sans aucune raison.", "prompt 2", 3.0)]
+    # Aucun personnage de référence unique (deux personnages, aucun principal) : always_present_id="".
+    result = enrich_visual_prompts(scenes, narrative, always_present_id="")
+    assert "Nova" in result[0].prompt and _TRAITS_A["visual_description"] in result[0].prompt
+    assert "Theo" not in result[0].prompt and _TRAITS_B["visual_description"] not in result[0].prompt
+    assert MARKER not in result[1].prompt  # ni Nova ni Theo ne sont mentionnés : rien n'est inventé
+
+
+def test_enrich_visual_prompts_ignores_an_always_present_id_absent_from_the_character_list():
+    """Identifiant orphelin (ex. incohérence de données) : aucun crash, aucune présence forcée inventée —
+    se comporte exactement comme ``always_present_id=""``."""
+    narrative = {"characters": [{"id": "chr_a", **_TRAITS_A}], "location": None}
+    scenes = [Scene(1, "Un texte qui ne nomme personne.", "prompt", 4.0)]
+    result = enrich_visual_prompts(scenes, narrative, always_present_id="chr_does_not_exist")
+    assert MARKER not in result[0].prompt
+
+
+# -- intégration bout-en-bout : script de dialogue réaliste qui ne prononce jamais le nom du personnage ------------
+@pytest.mark.parametrize("traits", [_TRAITS_A, _TRAITS_B], ids=["traits-A", "traits-B"])
+def test_end_to_end_dialogue_mode_keeps_visual_continuity_in_every_scene_without_self_naming(env, traits):  # noqa: F811
+    """Reproduction fidèle du scénario réel du ticket #92 : un seul personnage sélectionné (donc mode
+    dialogue, #77), un script à la première personne qui ne mentionne jamais son propre nom. AVANT le
+    correctif, aucune scène ne recevait la continuité visuelle de ce personnage — son apparence (couleur des
+    yeux, tenue...) n'était donc jamais transmise au générateur d'images, quelle que soit la scène."""
+    character = env.add_character(**traits)
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=_FIRST_PERSON_NO_SELF_NAME,
+                                character_ids=[character.id])
+    env.service.confirm(draft.id, accept_partial=True)
+    submitted_prompts = env.connector.submitted[-1].visual_prompts
+    assert len(submitted_prompts) >= 2  # plusieurs scènes réellement distinctes (pas un seul bloc générique)
+    for prompt in submitted_prompts:
+        assert MARKER in prompt
+        assert traits["visual_description"] in prompt or "déjà décrit" in prompt
+    # L'action/le cadrage varient bien scène par scène : les prompts ne sont pas identiques entre eux.
+    assert len(set(submitted_prompts)) == len(submitted_prompts)
+
+
+def test_end_to_end_two_characters_no_primary_never_introduces_either_into_an_unrelated_scene(env):  # noqa: F811
+    """Garde-fou de non-régression : avec plusieurs personnages sans principal unique (mode narration,
+    aucune présence forcée), une scène qui ne nomme ni l'un ni l'autre ne doit jamais en recevoir un."""
+    nova = env.add_character(**_TRAITS_A)
+    theo = env.add_character(**_TRAITS_B)
+    # Assez de mots PAR PHRASE pour que l'estimation de scènes en produise une par phrase (vérifié : 66 mots,
+    # 3 phrases => 3 scènes, une phrase par scène) — sinon la phrase neutre du milieu pourrait être regroupée
+    # avec une phrase qui nomme un personnage, et le test ne prouverait plus rien.
+    script = (
+        "Nova avance très prudemment le long de ce couloir désert et parfaitement silencieux, l'oreille aux "
+        "aguets, prête à réagir au moindre petit signe suspect. "
+        "Un bruit sourd et particulièrement inquiétant résonne soudain au loin, sans la moindre explication "
+        "valable pour l'instant présent dans ce couloir. "
+        "Theo apparaît enfin tout au bout du couloir, visiblement soulagé de retrouver Nova parfaitement "
+        "saine et sauve après cette frayeur inattendue."
+    )
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=script,
+                                character_ids=[nova.id, theo.id])
+    env.service.confirm(draft.id, accept_partial=True)
+    submitted_prompts = env.connector.submitted[-1].visual_prompts
+    # La scène du milieu ne nomme ni Nova ni Theo : elle ne doit recevoir aucun des deux.
+    middle = next(p for p in submitted_prompts if "bruit sourd" in p)
+    assert "Nova" not in middle and "Theo" not in middle
+    assert _TRAITS_A["visual_description"] not in middle and _TRAITS_B["visual_description"] not in middle
