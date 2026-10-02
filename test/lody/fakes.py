@@ -51,6 +51,7 @@ class ScriptedConnector(VideoGenerationProvider):
         self.submitted: list[GenerationRequest] = []
         self.snapshots: list[TaskSnapshot | ProviderError] = []
         self.script_error: ProviderError | None = None
+        self.script_text: str | None = None  # #76 : surcharge le texte renvoyé par write_script() ; None = SCRIPT
         self.submit_error: ProviderError | None = None
         self.recover_result: GenerationResult | None = None
         self.write_video = True
@@ -109,7 +110,7 @@ class ScriptedConnector(VideoGenerationProvider):
         self.narrative_blocks_received.append(narrative_block)
         if self.script_error:
             raise self.script_error
-        return SCRIPT
+        return self.script_text if self.script_text is not None else SCRIPT
 
     def submit(self, request, idempotency_key):
         self.calls.append("submit")

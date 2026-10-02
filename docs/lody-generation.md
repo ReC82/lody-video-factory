@@ -198,6 +198,27 @@ quelle même une fois la production réellement lancée (voir la fusion de `para
 _run()`, jamais un écrasement complet), et affichée avant confirmation (`view_estimate.py`) et dans le
 diagnostic (`view_tracking.py`).
 
+### Frontière script → TTS (#76)
+
+Lors d'un test réel (projet PNJ), le texte envoyé au TTS reprenait presque directement le brief et des
+consignes de production (« Épisode 0 — Le réveil d'Eli », « Utiliser principalement Eli », « Images fixes
+uniquement »...). Avant #76, le seul contrôle du texte candidat (généré par le connecteur OU fourni
+manuellement) était sa non-vacuité.
+
+`generation/script_guard.py::validate_spoken_script(script, production)` reconnaît, par motif (jamais une
+analyse linguistique complète — hors scope du ticket) : titre d'épisode (`Épisode N —`), liste de scènes
+numérotées, durée/format technique, une liste de phrases d'instruction connues (« utiliser principalement »,
+« images fixes uniquement »...), et une reprise verbatim substantielle (≥ 40 caractères contigus) d'un champ
+du brief **ou** de la sélection narrative figée de CETTE production — jamais une liste figée pour un seul
+projet. Le sujet demandé (`brief["demande"]`) est volontairement EXCLU de cette dernière vérification : un
+script est censé parler de son sujet, parfois en le citant presque mot pour mot.
+
+Appelée à DEUX points de `ProductionService._run()` — juste après acceptation du script (avant
+`build_storyboard()`) et de nouveau juste avant `provider.submit()` (défense en profondeur, comme
+`_assert_voice_unchanged`, #75) — et lève `ProviderError(ErrorKind.INVALID_RESPONSE)`, déjà géré par le
+mécanisme d'échec existant : aucun appel TTS ni image n'a lieu, aucun retry payant automatique (une nouvelle
+tentative exige une nouvelle confirmation explicite de l'utilisateur).
+
 ## Sous-titres français : apostrophes et police
 
 Incident V7 : « mais l’  idée de base est simple » à l'écran, alors que le script, le texte envoyé au moteur, le
