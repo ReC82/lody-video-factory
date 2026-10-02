@@ -35,6 +35,14 @@ personnage sélectionné marqué principal ; sinon, si un seul personnage est s�
 voix du projet est conservée. N'utilise QUE les champs voix déjà copiés dans le ``narrative_context`` figé
 (jamais la fiche personnage actuelle) : une voix incomplète ou un fournisseur non reconnu déclenche un repli
 sûr vers la voix du projet, toujours consigné (jamais silencieux, voir le dict d'origine renvoyé).
+
+``script_mode`` (#77, MVP mono-personnage) choisit, avec EXACTEMENT la même règle de sélection que
+``resolve_voice`` (voir ``_reference_character``), entre deux modes d'écriture du script : narration externe
+(historique, inchangé sans sélection ou avec une sélection ambiguë) ou dialogue joué à la première personne
+par le personnage de référence. Ne change ni la voix (#70) ni le payload envoyé au moteur : seule
+l'instruction donnée pour ÉCRIRE le script en dépend (voir ``mpt_connector.script_prompt``) ; le texte
+produit reste soumis, comme avant, au garde-fou brief/script (#76) avant d'être retenu. Mode TOUJOURS
+consigné dans ``production.trace`` (jamais silencieux), pour distinguer les deux dans le diagnostic.
 """
 
 from __future__ import annotations
@@ -395,6 +403,29 @@ def visual_injection_applied(narrative_context: dict[str, Any] | None, sent_prom
 
 # -- voix MVP mono-voix (#70, prérequis technique de #39) -----------------------------------------------------------
 
+def _reference_character(characters: Sequence[dict[str, Any]]) -> tuple[dict[str, Any] | None, str]:
+    """Au maximum UN personnage de référence parmi les personnages SÉLECTIONNÉS (jamais tous les personnages
+    du projet, jamais un lieu), dans cet ordre :
+
+    1. le personnage sélectionné marqué ``is_primary`` — seulement s'il y en a EXACTEMENT un ;
+    2. sinon, si un seul personnage est sélectionné, celui-ci ;
+    3. sinon (aucun personnage sélectionné, ou plusieurs sans principal unique) : aucun (``None``).
+
+    Règle de sélection UNIQUE, partagée par ``resolve_voice`` (#70) et ``script_mode`` (#77) : la voix
+    effective et le mode d'écriture du script portent toujours sur le MÊME personnage, jamais deux règles
+    qui pourraient diverger. Plusieurs personnages sans principal unique reste une ambiguïté volontairement
+    non résolue ici (voir #39, multi-locuteurs) — ``None`` dans ce cas, jamais un choix arbitraire.
+    """
+    if not characters:
+        return None, "aucun personnage sélectionné"
+    primaries = [character for character in characters if character.get("is_primary")]
+    if len(primaries) == 1:
+        return primaries[0], "personnage principal sélectionné"
+    if len(characters) == 1:
+        return characters[0], "seul personnage sélectionné"
+    return None, "plusieurs personnages sélectionnés, aucun principal unique"
+
+
 def resolve_voice(project_voice: VoiceSpec, narrative_context: dict[str, Any] | None) -> tuple[VoiceSpec, dict[str, Any]]:
     """(voix effective, informations d'origine — jamais un secret, pour l'aperçu et le diagnostic).
 
@@ -416,18 +447,9 @@ def resolve_voice(project_voice: VoiceSpec, narrative_context: dict[str, Any] | 
     après le lancement — le contrat d'immuabilité du snapshot s'applique ici exactement comme ailleurs.
     """
     characters = (narrative_context or {}).get("characters") or []
-    if not characters:
-        return project_voice, {"source": "project", "fallback": False, "character_name": "",
-                               "reason": "aucun personnage sélectionné"}
-
-    primaries = [character for character in characters if character.get("is_primary")]
-    if len(primaries) == 1:
-        reference, why = primaries[0], "personnage principal sélectionné"
-    elif len(characters) == 1:
-        reference, why = characters[0], "seul personnage sélectionné"
-    else:
-        return project_voice, {"source": "project", "fallback": False, "character_name": "",
-                               "reason": "plusieurs personnages sélectionnés, aucun principal unique"}
+    reference, why = _reference_character(characters)
+    if reference is None:
+        return project_voice, {"source": "project", "fallback": False, "character_name": "", "reason": why}
 
     name = str(reference.get("name") or "")
     provider_raw = str(reference.get("voice_provider") or "")
@@ -446,6 +468,37 @@ def resolve_voice(project_voice: VoiceSpec, narrative_context: dict[str, Any] | 
                                 name=str(reference.get("voice_name") or ""), model=project_voice.model)
     return character_voice, {"source": "character", "fallback": False, "character_name": name,
                              "reason": f"voix de {name} ({why})"}
+
+
+# -- mode d'écriture du script : narration externe ou dialogue mono-personnage (#77, MVP) -----------------------
+
+# Deux modes seulement — jamais un troisième inventé ici : le multi-locuteur (plusieurs voix distinctes,
+# narrateur séparé du personnage) reste hors scope (#39). Chaînes stables : consignées dans ``production.trace``
+# (voir ``generation/service.py._trace``), donc jamais renommées sans y penser.
+MODE_NARRATION = "narration"
+MODE_CHARACTER_DIALOGUE = "dialogue_personnage"
+
+
+def script_mode(narrative_context: dict[str, Any] | None) -> dict[str, Any]:
+    """Mode d'écriture du script pour CETTE production (#77) : narration externe (comportement historique,
+    inchangé) ou dialogue joué à la première personne par le personnage de référence.
+
+    Personnage de référence : EXACTEMENT celui que choisirait ``resolve_voice`` (#70, voir
+    ``_reference_character`` ci-dessus) — jamais une seconde règle de sélection qui pourrait diverger. Reste
+    délibérément en narration (MVP, #77) si plusieurs personnages sont sélectionnés sans principal unique :
+    aucune invention arbitraire de qui doit parler tant que #39 (multi-locuteurs) n'existe pas.
+
+    Renvoie toujours ``{"mode": ..., "character_name": "", "reason": ...}`` — jamais un secret, jamais une
+    référence à la fiche personnage actuelle (seulement ce qui est déjà dans ``narrative_context`` figé).
+    Fonction pure, sans effet sur la résolution de voix (#70) ni sur le payload envoyé (``build_payload``) :
+    seule l'INSTRUCTION donnée pour écrire le script en dépend (voir ``mpt_connector.script_prompt``).
+    """
+    characters = (narrative_context or {}).get("characters") or []
+    reference, why = _reference_character(characters)
+    if reference is None:
+        return {"mode": MODE_NARRATION, "character_name": "", "reason": why}
+    name = str(reference.get("name") or "")
+    return {"mode": MODE_CHARACTER_DIALOGUE, "character_name": name, "reason": f"{name} ({why})"}
 
 
 def scene_mentioned_characters(narration: str, characters: Sequence[dict[str, Any]]) -> list[str]:
