@@ -19,6 +19,17 @@ ARG PIP_USE_OFFICIAL=0
 # 导致 git/ffmpeg 未安装时仍生成不可用镜像。这里把“写入软件源”“安装”
 # 和“三次重试”拆成边界清晰的 shell 函数，并用函数返回值决定是否继续。
 # 所有软件源统一使用 HTTPS，避免部分网络环境直接拦截明文 HTTP 请求。
+#
+# Dernier recours si les trois mirrors ci-dessus échouent tous : bullseye (Debian 11) est en fin de vie,
+# et son dépôt "security" peut référencer dans son index (Packages.gz) des paquets déjà retirés du pool
+# live sur TOUS les mirrors (deb.debian.org, Aliyun, Tsinghua) — pas un problème d'un mirror en
+# particulier, confirmé en vérifiant les trois directement. snapshot.debian.org fige un instantané
+# complet et jamais modifié : toujours disponible, quel que soit l'état futur des mirrors live.
+# Horodatage choisi après coup, vérifié manuellement disponible pour git/ffmpeg et leurs dépendances.
+# Acquire::Check-Valid-Until=false est nécessaire ET SUFFISANT ici : un instantané figé a, par
+# construction, un Release expiré dès qu'on l'utilise après sa date de validité — ignorer cette
+# expiration est le contrat normal d'usage de snapshot.debian.org pour un build reproductible, jamais
+# une désactivation générale des vérifications d'intégrité (la signature elle-même reste vérifiée).
 RUN set -u; \
     write_debian_sources() { \
         main_url="$1"; \
@@ -27,9 +38,22 @@ RUN set -u; \
             "$main_url" "$main_url" "$security_url" > /etc/apt/sources.list; \
         rm -rf /var/lib/apt/lists/*; \
     }; \
+    write_debian_snapshot_sources() { \
+        printf 'deb %s bullseye main\ndeb %s bullseye-security main\n' \
+            "https://snapshot.debian.org/archive/debian/20260116T221412Z" \
+            "https://snapshot.debian.org/archive/debian-security/20260116T221412Z" \
+            > /etc/apt/sources.list; \
+        rm -rf /var/lib/apt/lists/*; \
+    }; \
     install_system_dependencies() { \
         apt-get update && \
         apt-get install -y --no-install-recommends git ffmpeg; \
+    }; \
+    try_snapshot_fallback() { \
+        echo "All live mirrors failed, falling back to snapshot.debian.org" >&2; \
+        write_debian_snapshot_sources; \
+        apt-get -o Acquire::Check-Valid-Until=false update && \
+            apt-get install -y --no-install-recommends git ffmpeg; \
     }; \
     retry_system_dependencies() { \
         attempt=1; \
@@ -63,7 +87,9 @@ RUN set -u; \
                     "https://deb.debian.org/debian-security"; \
                 if ! install_system_dependencies; then \
                     echo "Failed to install system dependencies from all configured mirrors" >&2; \
-                    exit 1; \
+                    if ! try_snapshot_fallback; then \
+                        exit 1; \
+                    fi; \
                 fi; \
             fi; \
         fi; \
@@ -74,7 +100,9 @@ RUN set -u; \
             "https://deb.debian.org/debian-security"; \
         if ! retry_system_dependencies; then \
             echo "Failed to install system dependencies from the default Debian mirror" >&2; \
-            exit 1; \
+            if ! try_snapshot_fallback; then \
+                exit 1; \
+            fi; \
         fi; \
     fi; \
     rm -rf /var/lib/apt/lists/*
