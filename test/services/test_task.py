@@ -718,6 +718,149 @@ class TestTaskService(unittest.TestCase):
         self.assertIsNone(sub_maker)
         tts.assert_not_called()
 
+    def test_generate_audio_uses_audio_asset_reference_when_present(self):
+        """#86 (prérequis multi-locuteurs #39) : une référence valide est utilisée directement, sans
+        appel TTS — exactement comme custom_audio_file, mais résolue via le registre audio_assets."""
+        task_id = "test-audio-asset-happy-path"
+        task_dir = utils.task_dir(task_id)
+        from app.services import audio_assets
+
+        params = VideoParams(
+            video_subject="audio asset",
+            video_script="",
+            custom_audio_asset_id="asset-ref-123",
+            audio_asset_scope="scope-value",
+            voice_name="test-voice",
+        )
+        try:
+            with (
+                patch.object(tm.voice, "tts") as tts,
+                patch.object(tm.voice, "get_audio_duration", return_value=9),
+                patch.object(
+                    audio_assets, "resolve_audio_asset", return_value="/resolved/segment.mp3"
+                ) as resolve,
+            ):
+                audio_file, audio_duration, sub_maker = tm.generate_audio(
+                    task_id, params, "script"
+                )
+        finally:
+            shutil.rmtree(task_dir, ignore_errors=True)
+
+        resolve.assert_called_once_with("asset-ref-123", "scope-value")
+        self.assertEqual(audio_file, "/resolved/segment.mp3")
+        self.assertEqual(audio_duration, 9)
+        self.assertIsNone(sub_maker)
+        tts.assert_not_called()
+
+    def test_generate_audio_rejects_invalid_audio_asset_reference_without_tts_fallback(self):
+        """Une référence invalide/expirée ne doit JAMAIS retomber silencieusement sur le TTS
+        historique ni sur custom_audio_file : l'étape audio échoue explicitement."""
+        task_id = "test-audio-asset-invalid-reference"
+        task_dir = utils.task_dir(task_id)
+        state = MemoryState()
+        from app.services import audio_assets
+
+        params = VideoParams(
+            video_subject="audio asset",
+            video_script="",
+            custom_audio_asset_id="unknown-or-expired",
+            audio_asset_scope="scope-value",
+            voice_name="test-voice",
+        )
+        try:
+            with (
+                patch.object(tm.voice, "tts") as tts,
+                patch.object(tm.voice, "get_audio_duration") as get_duration,
+                patch.object(tm.sm, "state", state),
+                patch.object(
+                    audio_assets,
+                    "resolve_audio_asset",
+                    side_effect=audio_assets.AudioAssetError(
+                        "unknown or expired audio asset reference"
+                    ),
+                ),
+            ):
+                audio_file, audio_duration, sub_maker = tm.generate_audio(
+                    task_id, params, "script"
+                )
+        finally:
+            shutil.rmtree(task_dir, ignore_errors=True)
+
+        self.assertIsNone(audio_file)
+        self.assertIsNone(audio_duration)
+        self.assertIsNone(sub_maker)
+        tts.assert_not_called()
+        get_duration.assert_not_called()
+        failed_task = state.get_task(task_id)
+        self.assertEqual(failed_task["failed_stage"], "audio")
+        self.assertIn("unknown or expired audio asset reference", failed_task["error"])
+
+    def test_generate_audio_asset_reference_takes_priority_over_custom_audio_file(self):
+        """Les deux mécanismes sont séparés et jamais combinés : si une référence d'asset est fournie,
+        elle est utilisée EXCLUSIVEMENT, même si custom_audio_file est aussi renseigné."""
+        task_id = "test-audio-asset-priority"
+        task_dir = utils.task_dir(task_id)
+        from app.services import audio_assets
+
+        params = VideoParams(
+            video_subject="audio asset",
+            video_script="",
+            custom_audio_asset_id="asset-ref-456",
+            audio_asset_scope="scope-value",
+            custom_audio_file="irrelevant.mp3",
+            voice_name="test-voice",
+        )
+        try:
+            with (
+                patch.object(tm.voice, "tts") as tts,
+                patch.object(tm.voice, "get_audio_duration", return_value=5),
+                patch.object(
+                    audio_assets, "resolve_audio_asset", return_value="/resolved/segment.mp3"
+                ) as resolve,
+                patch.object(tm, "resolve_custom_audio_file") as legacy_resolve,
+            ):
+                audio_file, _audio_duration, _sub_maker = tm.generate_audio(
+                    task_id, params, "script"
+                )
+        finally:
+            shutil.rmtree(task_dir, ignore_errors=True)
+
+        resolve.assert_called_once()
+        legacy_resolve.assert_not_called()
+        self.assertEqual(audio_file, "/resolved/segment.mp3")
+        tts.assert_not_called()
+
+    def test_generate_audio_historical_mono_voice_path_unaffected_without_asset_reference(self):
+        """Compatibilité stricte (#86) : sans custom_audio_asset_id, le chemin mono-voix historique
+        (TTS classique) reste identique au caractère près — aucune des deux nouvelles clés n'est lue."""
+        task_id = "test-audio-asset-absent-mono-voice"
+        task_dir = utils.task_dir(task_id)
+        from app.services import audio_assets
+
+        params = VideoParams(
+            video_subject="mono voice", video_script="", voice_name="test-voice",
+        )
+        audio_path = os.path.join(task_dir, "audio.mp3")
+        try:
+            with (
+                patch.object(
+                    tm.voice, "tts", return_value=MagicMock(cues=[MagicMock(end=1.0)])
+                ) as tts,
+                patch.object(tm.voice, "get_audio_duration", return_value=3),
+                patch.object(audio_assets, "resolve_audio_asset") as resolve,
+            ):
+                audio_file, audio_duration, sub_maker = tm.generate_audio(
+                    task_id, params, "script"
+                )
+        finally:
+            shutil.rmtree(task_dir, ignore_errors=True)
+
+        resolve.assert_not_called()
+        tts.assert_called_once()
+        self.assertEqual(audio_file, audio_path)
+        self.assertEqual(audio_duration, 3)
+        self.assertIsNotNone(sub_maker)
+
     def test_generate_audio_rejects_server_side_custom_file_by_default(self):
         task_id = "test-custom-audio-untrusted-server-side"
         task_dir = utils.task_dir(task_id)
