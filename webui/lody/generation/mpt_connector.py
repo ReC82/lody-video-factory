@@ -114,17 +114,36 @@ def apply_image_template(template: str, term: str) -> str:
     return template.replace("{term}", term)
 
 
-def script_prompt(request: GenerationRequest, narrative_block: str = "", limit: int = 2000) -> str:
+_NARRATION_INSTRUCTION = "Écris uniquement le texte parlé de la narration : pas de titre, pas d’indication de scène, pas de liste."
+
+
+def _dialogue_instruction(character_name: str) -> str:
+    """Instruction de tête en mode dialogue mono-personnage (#77) : remplace ``_NARRATION_INSTRUCTION``,
+    jamais cumulée avec elle. Demande explicitement des répliques jouées à la première personne — jamais
+    une description du personnage à la troisième personne (voir le garde-fou #76, qui reste la frontière
+    de défense même si cette instruction échoue à être suivie)."""
+    return (f"Écris uniquement les répliques de {character_name}, dites à la première personne par "
+           f"{character_name} lui-même/elle-même : pas de titre, pas d’indication de scène, pas de liste, "
+           f"pas de description de {character_name} à la troisième personne, pas de didascalie.")
+
+
+def script_prompt(request: GenerationRequest, narrative_block: str = "", dialogue_character: str = "",
+                  limit: int = 2000) -> str:
     """Consignes envoyées au moteur pour écrire le script (borné à la limite du moteur).
 
     ``narrative_block`` (#36) : bloc narratif déjà rendu depuis le snapshot de production (voir
     ``narrative_context.render_prompt_block``), ajouté à la fin, séparé du reste. Chaîne vide par défaut :
     le prompt reste alors identique à avant #36 (aucune sélection, ou production antérieure à #35).
+
+    ``dialogue_character`` (#77) : nom du personnage de référence en mode dialogue mono-personnage (voir
+    ``narrative_context.script_mode``), ou chaîne vide (par défaut) pour la narration externe historique —
+    le prompt reste alors identique à avant #77. Change UNIQUEMENT la première ligne d'instruction ; le
+    reste (durée, ton, structure, contexte narratif) est inchangé.
     """
     words = tuple(round(seconds / 60 * WORDS_PER_MINUTE.get(request.narration_pace, 155))
                   for seconds in (request.duration_min, request.duration_max))
     head = [
-        "Écris uniquement le texte parlé de la narration : pas de titre, pas d’indication de scène, pas de liste.",
+        _dialogue_instruction(dialogue_character) if dialogue_character else _NARRATION_INSTRUCTION,
         f"Durée cible : {request.duration_min} à {request.duration_max} secondes, soit environ {words[0]} à {words[1]} mots.",
     ]
     for label, value in (("Ton", request.tone), ("Public", request.audience), ("Orientation", request.orientation)):
@@ -426,10 +445,11 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             return CapabilityStatus(C, St.UNAVAILABLE, music, "elevenlabs", message=blocked, fix="platform", admin=details)
         return CapabilityStatus(C, St.READY, music, "elevenlabs", message="Musique générée par le fournisseur choisi.", admin=details)
 
-    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "") -> dict[str, Any]:
+    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "",
+                                dialogue_character: str = "") -> dict[str, Any]:
         """Requête d'écriture du script (POST /api/v1/scripts) : aucun prompt système personnalisé n'est envoyé."""
         return {"video_subject": request.subject, "video_language": request.language, "paragraph_number": 1,
-                "video_script_prompt": script_prompt(request, narrative_block),
+                "video_script_prompt": script_prompt(request, narrative_block, dialogue_character),
                 "custom_system_prompt": "(non envoyé : prompt système par défaut du moteur)"}
 
     def trace_prompts(self, request: GenerationRequest) -> dict[str, Any]:
@@ -445,8 +465,9 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             "origin": "moteur — config.toml, gabarit GLOBAL partagé par tous les projets" if applied
             else ("inconnu (configuration du moteur non vérifiable)" if not facts.known else "aucun")}}
 
-    def write_script(self, request: GenerationRequest, narrative_block: str = "") -> str:
-        payload = {key: value for key, value in self.describe_script_request(request, narrative_block).items()
+    def write_script(self, request: GenerationRequest, narrative_block: str = "", dialogue_character: str = "") -> str:
+        payload = {key: value for key, value in
+                  self.describe_script_request(request, narrative_block, dialogue_character).items()
                   if key != "custom_system_prompt"}
         status, envelope = self._call("POST", "/api/v1/scripts", payload, timeout=240.0)
         self._raise_for_status(status, envelope, "script")

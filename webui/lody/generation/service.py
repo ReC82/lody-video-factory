@@ -43,12 +43,14 @@ from lody.generation.models import (
     VoiceSpec,
 )
 from lody.generation.narrative_context import (
+    MODE_CHARACTER_DIALOGUE,
     NarrativeContextError,
     enrich_visual_prompts,
     reference_images_status,
     render_prompt_block,
     resolve_narrative_context,
     resolve_voice,
+    script_mode,
 )
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import sanitize
@@ -448,10 +450,16 @@ class ProductionService:
             # à #35 — le prompt reste alors identique à avant #36 (voir render_prompt_block). N'affecte ni la
             # voix ni les prompts d'images : seul script_request/write_script le reçoit, jamais build_payload.
             narrative_block = render_prompt_block(production.snapshot.get("narrative_context"))
-            script_request = provider.describe_script_request(request, narrative_block) if not request.script else None
+            # #77 : MÊME personnage de référence que resolve_voice (#70, voir narrative_context.
+            # _reference_character) — jamais une seconde règle de sélection qui pourrait diverger. Chaîne
+            # vide hors mode dialogue : le prompt écrit reste alors identique à avant #77.
+            mode_info = script_mode(production.snapshot.get("narrative_context"))
+            dialogue_character = mode_info["character_name"] if mode_info["mode"] == MODE_CHARACTER_DIALOGUE else ""
+            script_request = (provider.describe_script_request(request, narrative_block, dialogue_character)
+                             if not request.script else None)
             if not request.script:
                 script = typography.normalize_for_language(
-                    provider.write_script(request, narrative_block).strip(), request.language)
+                    provider.write_script(request, narrative_block, dialogue_character).strip(), request.language)
                 if not script:
                     raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script reçu est vide.", stage="script")
                 # #76 : AVANT tout écriture — un texte qui ressemble encore à une consigne de production
@@ -568,7 +576,11 @@ class ProductionService:
                 # est pas un), toujours contrôlable indépendamment de "params" (voir _assert_voice_unchanged).
                 "voice": {"provider": request.voice.provider, "name": request.voice.name,
                          "voice_id": request.voice.voice_id, "source": voice_origin_info.get("source", ""),
-                         "fallback": voice_origin_info.get("fallback", False), "reason": voice_origin_text}}
+                         "fallback": voice_origin_info.get("fallback", False), "reason": voice_origin_text},
+                # #77 : mode d'écriture du script RÉELLEMENT utilisé (narration externe ou dialogue
+                # mono-personnage) — recalculé depuis le même narrative_context déjà figé (jamais un
+                # secret), pour que le diagnostic distingue toujours les deux, jamais silencieusement.
+                "script_mode": script_mode(production.snapshot.get("narrative_context"))}
 
     def _fail(self, production_id: str, kind: ErrorKind, message: str) -> None:
         self.repo.transition(
