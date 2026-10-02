@@ -289,15 +289,19 @@ def _mentions(narration: str, name: str) -> bool:
 
 
 def _scene_visual_lines(narration: str, characters: Sequence[dict[str, Any]], location: dict[str, Any] | None,
-                        first_seen: dict[str, int], scene_index: int) -> list[str]:
-    """Lignes de continuité pour UNE scène : personnages mentionnés dans sa narration, puis le lieu (s'il existe,
-    dans TOUTES les scènes — il représente le cadre de toute la vidéo, comme le style visuel du projet).
+                        first_seen: dict[str, int], scene_index: int,
+                        always_present_id: str = "") -> list[str]:
+    """Lignes de continuité pour UNE scène : personnages mentionnés dans sa narration (ou le personnage de
+    référence en mode dialogue, voir ``always_present_character_id``/#92), puis le lieu (s'il existe, dans
+    TOUTES les scènes — il représente le cadre de toute la vidéo, comme le style visuel du projet).
 
     Description complète à la première apparition d'un élément (``scene_index`` le plus bas où il est utilisé),
     rappel bref ensuite — pour ne jamais répéter inutilement un long bloc (voir le ticket #37).
     """
     lines: list[str] = []
-    present = [character for character in characters if _mentions(narration, character.get("name", ""))]
+    present = [character for character in characters
+              if _mentions(narration, character.get("name", ""))
+              or (always_present_id and character.get("id") == always_present_id)]
     for character in present:
         key = character.get("id") or character.get("name", "")
         if key in first_seen:
@@ -318,7 +322,31 @@ def _scene_visual_lines(narration: str, characters: Sequence[dict[str, Any]], lo
     return lines
 
 
-def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str, Any] | None) -> list["Scene"]:
+def always_present_character_id(narrative_context: dict[str, Any] | None) -> str:
+    """Identifiant du personnage à considérer comme PRÉSENT DANS CHAQUE SCÈNE, sans dépendre de la mention de
+    son nom dans la narration — uniquement le personnage de référence du mode dialogue (#77, EXACTEMENT la
+    même résolution que ``resolve_voice``/``script_mode``, voir ``_reference_character`` : jamais une
+    seconde règle qui pourrait diverger).
+
+    Cause établie du ticket #92 : en mode dialogue, le script est écrit comme les propres répliques du
+    personnage à la première personne — il ne prononce donc, par construction, jamais son propre nom.
+    ``_mentions`` (la détection par nom, #37) ne le voyait donc JAMAIS, dans AUCUNE scène, quel que soit le
+    personnage ou le projet : la continuité visuelle entière (apparence, tenue, couleurs...) restait non
+    transmise au générateur d'images, pour n'importe quelle production en mode dialogue mono-personnage.
+
+    Renvoie ``""`` dans tous les autres cas (mode narration, aucune sélection, ou plusieurs personnages
+    sélectionnés sans principal unique) : AUCUNE inférence de présence au-delà de ce qui est honnêtement su
+    — en narration, une scène peut tout à fait ne pas montrer le personnage de référence, et
+    ``enrich_visual_prompts`` continue alors à n'ajouter ce personnage qu'aux scènes qui le nomment (jamais
+    introduit dans une scène où il est absent).
+    """
+    characters = (narrative_context or {}).get("characters") or []
+    reference, _ = _reference_character(characters)
+    return str(reference.get("id") or "") if reference else ""
+
+
+def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str, Any] | None,
+                          always_present_id: str = "") -> list["Scene"]:
     """Ajoute un bloc « Continuité visuelle », clairement délimité, aux prompts d'un storyboard DÉJÀ CONSTRUIT
     (voir ``storyboard.build_storyboard``) — ne change JAMAIS leur nombre, leur ordre, ni leur narration
     (seul ``Scene.prompt`` est modifié) : le nombre de scènes et l'estimation de coût restent donc inchangés.
@@ -330,9 +358,11 @@ def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str
     ``narrative_context`` est ``None``, absent, ou ``{}`` : c'est le cas de toute production sans sélection
     (#34), et de toute production antérieure à #35 qui n'a jamais eu ce bloc dans son snapshot.
 
-    Un personnage n'est ajouté qu'aux scènes dont la narration mentionne son nom — jamais injecté aveuglément
-    dans toute la distribution. Le lieu s'applique à toutes les scènes. Taille bornée par ``VISUAL_BLOCK_MAX``
-    (troncature nette entre éléments), ordre stable (celui déjà figé dans le snapshot).
+    Un personnage n'est ajouté qu'aux scènes dont la narration mentionne son nom, SAUF le personnage désigné
+    par ``always_present_character_id`` (voir la fonction du même nom ci-dessus, #92) qui est ajouté à TOUTES
+    les scènes — jamais injecté aveuglément au-delà de ce cas précis et justifié. Le lieu s'applique à toutes
+    les scènes. Taille bornée par ``VISUAL_BLOCK_MAX`` (troncature nette entre éléments), ordre stable (celui
+    déjà figé dans le snapshot).
     """
     if not narrative_context:
         return list(scenes)
@@ -344,7 +374,8 @@ def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str
     first_seen: dict[str, int] = {}
     enriched: list[Scene] = []
     for scene in scenes:
-        lines = _scene_visual_lines(scene.narration, characters, location, first_seen, scene.index)
+        lines = _scene_visual_lines(scene.narration, characters, location, first_seen, scene.index,
+                                    always_present_id)
         if not lines:
             enriched.append(scene)
             continue

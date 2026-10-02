@@ -45,6 +45,7 @@ from lody.generation.models import (
 from lody.generation.narrative_context import (
     MODE_CHARACTER_DIALOGUE,
     NarrativeContextError,
+    always_present_character_id,
     enrich_visual_prompts,
     reference_images_status,
     render_prompt_block,
@@ -497,7 +498,12 @@ class ProductionService:
             # #37 : enrichit les prompts d'image des scènes déjà construites (mêmes scènes, même narration,
             # même nombre — donc même estimation de coût) avec la continuité visuelle du snapshot. "" sans
             # sélection ou snapshot antérieur à #35 : storyboard/prompts strictement inchangés (voir docstring).
-            scenes = enrich_visual_prompts(scenes, production.snapshot.get("narrative_context"))
+            # #92 : en mode dialogue (#77), le personnage de référence ne prononce jamais son propre nom —
+            # la détection par mention seule ne le verrait donc jamais présent dans AUCUNE scène. Voir
+            # narrative_context.always_present_character_id.
+            narrative_context = production.snapshot.get("narrative_context")
+            scenes = enrich_visual_prompts(scenes, narrative_context,
+                                           always_present_id=always_present_character_id(narrative_context))
             request = request.with_updates(visual_prompts=[scene.prompt for scene in scenes])
             # #75 : dernière vérification, juste avant d'écrire la trace et d'envoyer — voir
             # _assert_voice_unchanged. Placée AVANT provider.submit() : une divergence bloque l'envoi,
