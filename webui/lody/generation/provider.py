@@ -88,11 +88,16 @@ class VideoGenerationProvider(ABC):
         """Génère UNE image de fond sans texte (payant). Lève ``ProviderError`` si le moteur ne le permet pas."""
         raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer une image de fond de miniature.")
 
-    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "") -> dict:
+    def describe_script_request(self, request: GenerationRequest, narrative_block: str = "",
+                                dialogue_character: str = "") -> dict:
         """Ce qui est envoyé au fournisseur pour ÉCRIRE le script (sujet, langue, prompt éditorial) — pour archivage.
 
         ``narrative_block`` (#36) : contexte narratif déjà rendu (voir ``narrative_context.render_prompt_block``),
         ou chaîne vide sans sélection — auquel cas le comportement est strictement celui d'avant #36.
+
+        ``dialogue_character`` (#77) : nom du personnage de référence en mode dialogue mono-personnage (voir
+        ``narrative_context.script_mode``), ou chaîne vide (par défaut) pour la narration externe historique
+        — un connecteur qui ignore ce paramètre se comporte exactement comme avant #77.
         """
         return {}
 
@@ -119,11 +124,12 @@ class VideoGenerationProvider(ABC):
         return self.preflight(request).to_issues()
 
     @abstractmethod
-    def write_script(self, request: GenerationRequest, narrative_block: str = "") -> str:
+    def write_script(self, request: GenerationRequest, narrative_block: str = "", dialogue_character: str = "") -> str:
         """Écrit le script (appel texte). Lève ``ProviderError``.
 
-        ``narrative_block`` (#36) : voir ``describe_script_request``. Un connecteur qui ignore ce paramètre
-        se comporte exactement comme avant #36 (aucune obligation de l'utiliser)."""
+        ``narrative_block``/``dialogue_character`` (#36/#77) : voir ``describe_script_request``. Un
+        connecteur qui ignore ces paramètres se comporte exactement comme avant #36/#77 (aucune obligation
+        de les utiliser)."""
 
     @abstractmethod
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:

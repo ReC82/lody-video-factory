@@ -407,7 +407,7 @@ def test_a_failed_initial_background_never_blocks_the_video(env):
 # -- isolation entre projets ---------------------------------------------------------------------------------------------------------------------------
 def test_kits_of_two_projects_share_nothing(env):
     crypto = env.kits.ensure_kit(env.finish("LodyCrypto", SUBJECT_C).id)
-    env.connector.write_script = lambda request, narrative_block="": (
+    env.connector.write_script = lambda request, narrative_block="", dialogue_character="": (
         "Le Fill est le signal d’image et le Key est le signal de découpe. La régie les combine "
         "pour incruster un graphisme à l’antenne. Le pupitre de la régie envoie le résultat final.")
     av_production = env.finish("Audiovisuel", SUBJECT_A)

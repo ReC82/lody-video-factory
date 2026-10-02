@@ -423,7 +423,7 @@ def test_end_to_end_with_the_real_connector_leaks_no_secret_to_database_or_logs(
 
 # -- typographie du script : « l’ idée » ne doit jamais atteindre le TTS ni les sous-titres ---------------------------------
 def test_generated_script_is_normalised_before_storage_and_sending(env):
-    env.connector.write_script = lambda request, narrative_block="": (
+    env.connector.write_script = lambda request, narrative_block="", dialogue_character="": (
         "Mais l’  idée de base est simple, c’ est un registre. Aujourd’ hui, qu’ il n’ y a rien.")
     running = env.service.confirm(_prepare(env).id)
     stored = env.service.repo.get(running.id)

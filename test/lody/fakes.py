@@ -60,6 +60,7 @@ class ScriptedConnector(VideoGenerationProvider):
         self.background_bytes: bytes | None = None
         self.background_error: ProviderError | None = None
         self.narrative_blocks_received: list[str] = []  # #36 : ce que write_script a réellement reçu, dans l'ordre
+        self.dialogue_characters_received: list[str] = []  # #77 : idem, pour le mode dialogue mono-personnage
 
     # -- scénario -----------------------------------------------------------
     def queue(self, *items: TaskSnapshot | ProviderError) -> None:
@@ -101,13 +102,18 @@ class ScriptedConnector(VideoGenerationProvider):
             items[capability] = CapabilityStatus(capability, state, message=issue.message, fix="platform")
         return PreflightReport(tuple(items.values()))
 
-    def describe_script_request(self, request, narrative_block=""):
+    def describe_script_request(self, request, narrative_block="", dialogue_character=""):
+        # #77 : dialogue_character accepté pour respecter l'interface, jamais ajouté comme clé ici (voir
+        # write_script ci-dessous, qui est la seule source — dialogue_characters_received — utilisée par
+        # les tests ; un faux dict figé ne doit jamais gagner un champ que le VRAI connecteur n'expose pas
+        # tel quel, voir mpt_connector.describe_script_request qui le replie dans video_script_prompt).
         return {"video_subject": request.subject, "video_language": request.language,
                 "video_script_prompt": narrative_block or "(aucun bloc narratif)"}
 
-    def write_script(self, request, narrative_block=""):
+    def write_script(self, request, narrative_block="", dialogue_character=""):
         self.calls.append("write_script")
         self.narrative_blocks_received.append(narrative_block)
+        self.dialogue_characters_received.append(dialogue_character)  # #77 : ce qui a été réellement transmis
         if self.script_error:
             raise self.script_error
         return self.script_text if self.script_text is not None else SCRIPT
