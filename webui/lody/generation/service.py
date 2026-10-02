@@ -442,10 +442,20 @@ class ProductionService:
         lorsque l'étape rapportée par le moteur diffère de la précédente)."""
         return {**base, "current_step_started_at": self._clock()}
 
+    def _log_event(self, trace: dict[str, Any], label: str, **detail: Any) -> dict[str, Any]:
+        """Ajoute un événement horodaté à ``trace["events"]`` (#91) — additif seulement : chaque appel
+        repart de la trace la plus à jour déjà connue par l'appelant et ne retire jamais un événement déjà
+        enregistré. Jamais de secret ici : ``detail`` ne doit porter que des identifiants/valeurs déjà
+        considérés sûrs ailleurs (ids, noms de modèle, durées, codes d'erreur — jamais une clé), et
+        ``lody.generation.export`` ré-applique de toute façon ``redact`` en défense en profondeur."""
+        events = [*(trace.get("events") or []), {"at": self._clock(), "event": label,
+                                                 **({"detail": detail} if detail else {})}]
+        return {**trace, "events": events}
+
     def _run(self, production_id: str) -> None:
         if not self.repo.transition(production_id, [ProductionStatus.CONFIRMEE], status=ProductionStatus.EN_COURS,
                                     started_at=self._clock(), current_step="Écriture du script", progress=None,
-                                    trace=self._step_trace({})):
+                                    trace=self._step_trace(self._log_event({}, "traitement démarré (confirmée → en cours)"))):
             return
         production = self.repo.get(production_id)
         provider = self.provider(production.provider)
@@ -484,11 +494,14 @@ class ProductionService:
                 self.repo.update(production_id, script=script, script_source="generated",
                                  params={**production.params, "request": request.to_dict(),
                                         "engine": production.params.get("engine", {})})
+                event_detail = {"source": "generated", "longueur_mots": len(script.split())}
             else:
                 # #76 : script fourni manuellement — même frontière, jamais de traitement de faveur.
                 validate_spoken_script(request.script, production)
+                event_detail = {"source": "manual", "longueur_mots": len(request.script.split())}
             self.repo.update(production_id, current_step="Préparation des scènes",
-                             trace=self._step_trace(self.repo.get(production_id).trace))
+                             trace=self._step_trace(self._log_event(
+                                 self.repo.get(production_id).trace, "script écrit et validé", **event_detail)))
             scenes = build_storyboard(request.script, self._scene_count(provider, request),
                                       visual_style=request.visual_style, aspect=request.aspect,
                                       narration_pace=request.narration_pace, visual_rules=request.visual_rules,
@@ -522,11 +535,17 @@ class ProductionService:
                 # réécrites une première fois).
                 params={**production.params, "request": request.to_dict(), "engine": provider.describe_params(request)},
                 # avant l'envoi : conservée même en cas d'échec
-                trace=self._step_trace(self._trace(production, provider, request, script_request)))
+                trace=self._step_trace(self._log_event(
+                    self._trace(production, provider, request, script_request), "storyboard construit et continuité visuelle appliquée",
+                    scenes=len(scenes))))
             task = provider.submit(request, production.idempotency_key)
+            # L'identifiant de tâche n'est JAMAIS dupliqué ici : il est déjà sa propre colonne
+            # (``production.external_task_id``, voir l'export #91) ; un id opaque (UUID...) dans ``trace``
+            # déclencherait à tort le garde-fou secrets (``store.GUARDED``, détection de jeton opaque).
             self.repo.update(production_id, external_task_id=task.task_id, status=ProductionStatus.EN_FILE,
                              current_step="Dans la file du moteur", progress=0, last_polled_at=self._clock(),
-                             trace=self._step_trace(self.repo.get(production_id).trace))
+                             trace=self._step_trace(self._log_event(
+                                 self.repo.get(production_id).trace, "tâche moteur créée")))
             self._initial_thumbnail_background(production_id, provider, request)
         except ProviderError as error:
             self._fail(production_id, error.kind, error.message)
@@ -606,11 +625,12 @@ class ProductionService:
         # devienne « Échec » — sans ce champ, le suivi par étapes ne saurait jamais laquelle marquer en
         # erreur (voir lody.generation.progress._active_label).
         production = self.repo.get(production_id)
+        trace = self._log_event({**production.trace, "failed_at_step": production.current_step},
+                                "échec", code=kind.value, etape=production.current_step)
         self.repo.transition(
             production_id, [ProductionStatus.CONFIRMEE, ProductionStatus.EN_COURS, ProductionStatus.EN_FILE],
             status=ProductionStatus.ECHEC, error_code=kind.value, error_message=sanitize(message),
-            finished_at=self._clock(), current_step="Échec",
-            trace={**production.trace, "failed_at_step": production.current_step})
+            finished_at=self._clock(), current_step="Échec", trace=trace)
 
     # -- suivi ---------------------------------------------------------------------
     def refresh(self, production_id: str) -> Production:
@@ -634,7 +654,9 @@ class ProductionService:
         except ProviderError as error:
             # Moteur injoignable, délai, réponse invalide : la production n'est PAS perdue.
             self.repo.update(production.id, last_polled_at=self._clock(), error_code=error.kind.value,
-                             error_message=sanitize(error.message))
+                             error_message=sanitize(error.message),
+                             trace=self._log_event(production.trace, "sondage du moteur en échec, nouvelle tentative automatique",
+                                                   code=error.kind.value))
             return self.repo.get(production.id)
         except Exception as error:
             logger.error("suivi %s : erreur inattendue (%s)", production.id, type(error).__name__)
@@ -664,7 +686,11 @@ class ProductionService:
             # sondage — jamais à chaque appel (toutes les 4 s pendant un suivi actif), sinon le temps
             # écoulé dans l'étape resterait toujours proche de zéro, aussi faussement « figé » que l'était
             # l'ancien pourcentage.
-            trace = self._step_trace(production.trace) if new_step != production.current_step else production.trace
+            if new_step != production.current_step:
+                trace = self._step_trace(self._log_event(production.trace, "étape changée (rapportée par le moteur)",
+                                                          de=production.current_step, vers=new_step, progression=snapshot.progress))
+            else:
+                trace = production.trace
             self.repo.transition(production.id, ACTIVE_STATUSES, status=status, progress=snapshot.progress,
                                  current_step=new_step, trace=trace,
                                  warnings=list(dict.fromkeys([*production.warnings, *snapshot.warnings])), **common)
@@ -685,7 +711,8 @@ class ProductionService:
             video_ref=result.video_ref, video_duration=result.duration_seconds,
             assets=[*(dict(asset) for asset in production.assets if asset.get("kind") == "thumbnail_background"),
                     *(dict(asset) for asset in result.assets)],
-            warnings=list(dict.fromkeys([*production.warnings, *warnings])))
+            warnings=list(dict.fromkeys([*production.warnings, *warnings])),
+            trace=self._log_event(production.trace, "terminée", duree_s=result.duration_seconds))
         return self.repo.get(production.id)
 
     def resume_active(self) -> list[Production]:
