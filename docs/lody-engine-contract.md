@@ -31,6 +31,7 @@
 | Lister les tâches | `GET /api/v1/tasks?page=&page_size=` | `{"data":{"tasks":[…],"total","page","page_size"}}` |
 | Supprimer | `DELETE /api/v1/tasks/{task_id}` | `409` si la tâche tourne encore |
 | Fichiers finaux | `GET /tasks/<task_id>/final-1.mp4` (statique), `/api/v1/stream/…`, `/api/v1/download/…` | vidéo, chemins confinés au dossier des tâches |
+| Audio pré-synthétisé (#86, prérequis multi-locuteurs #39) | `POST /api/v1/audio_assets` (`multipart/form-data` : `file` + `production_scope`) | `200 {"status":200,"data":{"asset_id":"<32 caractères hex>"}}` — voir « Audio pré-synthétisé » ci-dessous |
 
 Enveloppe : `{"status": <int>, "message"?: str, "data"?: …}` ; `data` est **omis** quand il est vide.
 Erreurs HTTP : `400` (validation, `message: "field required"`), `401` (clé), `404`, `409`,
@@ -40,6 +41,33 @@ Erreurs HTTP : `400` (validation, `message: "field required"`), `401` (clé), `4
 
 Il n'existe **aucun endpoint d'annulation** : `DELETE` refuse les tâches occupées (`409`). Le statut
 interne `ANNULEE` est donc réservé au schéma mais **non exposé** (`supports_cancel = False`).
+
+### Audio pré-synthétisé (`/api/v1/audio_assets`, #86)
+
+Mécanisme séparé de `video_script`/TTS : permet à un appelant HTTP authentifié de faire aboutir un audio
+**déjà synthétisé** (potentiellement multi-voix, voir #39) jusqu'au montage d'une vidéo, sans jamais
+refaire le TTS côté moteur. Hors scope de #86 : l'assemblage multi-segments lui-même reste à faire (#87).
+
+- **Upload** (`POST /api/v1/audio_assets`) : `production_scope` (16 à 256 caractères, un jeton OPAQUE
+  choisi par l'appelant — jamais un `production_id` Lody, déjà visible dans les URLs/journaux côté
+  Lody) + `file` (MP3, M4A, AAC, WAV, FLAC, OGG, OPUS ou WMA, 50 Mo maximum, décodage FFmpeg réel
+  vérifié avant stockage — jamais seulement l'extension ou un en-tête). Renvoie un `asset_id` opaque et
+  imprévisible (`uuid4().hex`), jamais dérivé du nom de fichier ni de `production_scope`.
+- **Consommation** : poser `custom_audio_asset_id` (l'`asset_id` reçu) et `audio_asset_scope`
+  (EXACTEMENT le même `production_scope` qu'à l'upload) dans `TaskVideoRequest` — voir le tableau des
+  paramètres ci-dessous. Prioritaire sur `custom_audio_file` si les deux sont fournis ; les deux
+  mécanismes restent séparés (jamais combinés). Consommation **unique** : une référence déjà utilisée,
+  inconnue, expirée, ou dont le `production_scope` ne correspond pas est refusée (même message générique
+  dans tous les cas — jamais de distinction qui laisserait deviner lequel de ces cas s'est produit),
+  **jamais** un repli silencieux vers `custom_audio_file` ni vers le TTS historique.
+- **Cycle de vie** : réservé 30 minutes si jamais consommé ; supprimé 10 minutes après consommation.
+  Métadonnées (`production_scope`, horodatages) persistées à côté de l'audio (`<asset_id>.meta.json`,
+  écriture atomique) : survit à un redémarrage du moteur (registre en mémoire reconstruit depuis le
+  disque à la demande), contrairement à l'état des tâches (voir plus bas, `MemoryState`).
+- **Limites connues** : registre tenu par le PROCESSUS en cours ; un déploiement à plusieurs workers
+  concurrents n'est pas couvert (le déploiement observé est mono-processus, voir « Déploiement
+  observé » — `uvicorn.run()` sans `workers=`). Aucun endpoint de lecture/suppression manuelle d'un
+  asset : seule la consommation via `/videos` ou l'expiration automatique le retirent.
 
 ## Statuts et progression
 
@@ -85,6 +113,7 @@ avant de conclure.
 | Prompts visuels | `video_terms` (liste ou chaîne séparée par virgules). **Si fournis, le moteur ne les régénère pas** ; sinon il les demande au LLM : *1 à 3 mots, en anglais*, 5 (ou 8 avec `match_materials_to_script`) |
 | Images / vidéo | `video_source` (`pexels`, `pixabay`, `coverr`, `openai_image`, `local`, …), `video_aspect` (`9:16`, `16:9`, `1:1`), `video_clip_duration` (durée max d'un clip, s), `video_concat_mode` (`random`\|`sequential`), `match_materials_to_script`, `video_transition_mode`, `video_count` |
 | Voix | `voice_name` (`elevenlabs:<voice_id>:<nom>`), `voice_rate`, `voice_volume` ; le modèle ElevenLabs vient de `[elevenlabs].model_id` (config) |
+| Audio pré-synthétisé (#86) | `custom_audio_asset_id`, `audio_asset_scope` — optionnels, absents par défaut (payload mono-voix historique inchangé) ; voir « Audio pré-synthétisé » ci-dessus |
 | Musique | `bgm_type` (`""` = aucune, `random` = bibliothèque, `elevenlabs`, `sonilo`), `bgm_volume`, `video_music_prompt` |
 | Sous-titres | `subtitle_enabled`, `subtitle_display_mode` (`sentence`\|`word_by_word`), `subtitle_animation`, `subtitle_position`, `font_name`, `font_size`, couleurs, contour, fond |
 
