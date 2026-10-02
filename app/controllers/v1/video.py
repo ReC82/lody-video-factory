@@ -4,7 +4,7 @@ import pathlib
 import shutil
 from typing import Union
 
-from fastapi import BackgroundTasks, Depends, Path, Query, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, Form, Path, Query, Request, UploadFile
 from fastapi.params import File
 from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
@@ -17,6 +17,7 @@ from app.controllers.manager.redis_manager import RedisTaskManager
 from app.controllers.v1.base import new_router
 from app.models.exception import HttpException
 from app.models.schema import (
+    AudioAssetUploadResponse,
     AudioRequest,
     BgmRetrieveResponse,
     BgmUploadResponse,
@@ -30,6 +31,7 @@ from app.models.schema import (
     VideoMaterialUploadResponse,
     VideoMaterialRetrieveResponse
 )
+from app.services import audio_assets as audio_assets_service
 from app.services import bgm as bgm_service
 from app.services import material_upload as material_upload_service
 from app.services import state as sm
@@ -384,6 +386,58 @@ def upload_bgm_file(request: Request, file: UploadFile = File(...)):
 
     response = {"file": safe_filename}
     return utils.get_response(200, response)
+
+
+@router.post(
+    "/audio_assets",
+    response_model=AudioAssetUploadResponse,
+    summary="Upload a pre-synthesized audio track for a later video creation",
+    description=(
+        "Validate an MP3, M4A, AAC, WAV, FLAC, OGG, OPUS, or WMA file up to 50 MB and store it under an "
+        "opaque, time-limited reference (#86, multi-speaker prerequisite for #39). The SAME "
+        "production_scope value must be supplied again as audio_asset_scope when creating a video with "
+        "custom_audio_asset_id, or the reference is rejected. The reference is consumed on first use, "
+        "expires if unused, and is never derived from the uploaded filename."
+    ),
+    responses={
+        400: {"description": "The filename, format, size, audio stream, or production_scope is invalid"},
+        500: {"description": "FFmpeg validation or persistent storage is unavailable"},
+    },
+)
+def create_audio_asset(
+    request: Request,
+    file: UploadFile = File(...),
+    production_scope: str = Form(...),
+):
+    request_id = base.get_task_id(request)
+    try:
+        asset_id = audio_assets_service.save_audio_asset_upload(
+            file.filename, file.file, production_scope
+        )
+    except audio_assets_service.AudioAssetError as exc:
+        # 与 BGM 上传一致：记录 request_id 和明确原因，但绝不输出文件内容、
+        # production_scope 或服务器路径，避免日志泄露调用方数据。
+        logger.warning(
+            f"audio asset upload rejected: request_id={request_id}, error={str(exc)}"
+        )
+        raise HttpException(
+            task_id=request_id,
+            status_code=400,
+            message=f"{request_id}: {str(exc)}",
+        )
+    except audio_assets_service.AudioAssetServiceError as exc:
+        logger.error(
+            f"audio asset upload failed: request_id={request_id}, error={str(exc)}"
+        )
+        raise HttpException(
+            task_id=request_id,
+            status_code=500,
+            message=f"{request_id}: audio asset validation is unavailable",
+        )
+
+    response = {"asset_id": asset_id}
+    return utils.get_response(200, response)
+
 
 @router.get(
     "/video_materials", response_model=VideoMaterialRetrieveResponse, summary="Retrieve local video materials"

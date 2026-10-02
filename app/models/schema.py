@@ -123,6 +123,15 @@ class VideoParams(BaseModel):
     custom_audio_file: Optional[str] = (
         None  # Custom audio file path, will ignore TTS and can still use Whisper subtitles
     )
+    # Pre-synthesized audio reference from POST /api/v1/audio_assets (#86, multi-speaker prerequisite
+    # for #39). Separate from custom_audio_file on purpose: that field is confined to local CLI use
+    # (allow_server_file_input) and must never be relaxed for HTTP callers. custom_audio_asset_id is
+    # resolved through the audio_assets registry instead, which enforces that audio_asset_scope matches
+    # exactly what was supplied at upload time. Ignored (and never silently substituted) unless both are
+    # set; if set but invalid/expired/mismatched, the task fails at the audio stage rather than falling
+    # back to TTS.
+    custom_audio_asset_id: Optional[str] = Field(default=None, max_length=64)
+    audio_asset_scope: Optional[str] = Field(default=None, max_length=256)
     video_language: Optional[str] = ""  # auto detect
 
     voice_name: Optional[str] = ""
@@ -342,6 +351,10 @@ class BgmUploadData(BaseModel):
     file: str
 
 
+class AudioAssetUploadData(BaseModel):
+    asset_id: str
+
+
 class VideoMaterialRetrieveData(BaseModel):
     files: List[FileData]
 
@@ -528,6 +541,20 @@ class BgmUploadResponse(BaseResponse):
                 "status": 200,
                 "message": "success",
                 "data": {"file": "4fca18fce7344f3aa824777a40d45c8c.mp3"},
+            },
+        }
+    )
+
+
+class AudioAssetUploadResponse(BaseResponse):
+    data: AudioAssetUploadData
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": 200,
+                "message": "success",
+                "data": {"asset_id": "cb9bde8aad994c8ab60270d34a2006cc"},
             },
         }
     )

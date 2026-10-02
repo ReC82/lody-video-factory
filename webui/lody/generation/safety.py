@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 from pathlib import Path
 
 from lody.generation.models import ErrorKind
@@ -101,3 +102,14 @@ def resolve_within(root: Path | str, relative: str, *, prefix: str = "", suffixe
     if not target.is_file():
         raise ValueError("fichier introuvable")
     return target
+
+
+def new_audio_asset_scope() -> str:
+    """Jeton opaque, de haute entropie, dédié à l'autorisation d'un audio pré-synthétisé (#86, prérequis
+    multi-locuteurs #39) — JAMAIS le ``production_id`` lui-même : celui-ci est déjà visible dans l'URL et
+    les journaux (voir les vues ``?production=prd_...``), donc pas un secret, alors que ce jeton doit en
+    être un (il autorise la consommation d'une référence d'asset côté moteur, voir
+    ``mpt_connector.upload_audio_asset``/``build_payload``). À conserver uniquement dans ``params``
+    (jamais affiché) ; #87 décidera quand générer et transmettre cette valeur.
+    """
+    return secrets.token_hex(32)  # 256 bits d'entropie, 64 caractères hexadécimaux

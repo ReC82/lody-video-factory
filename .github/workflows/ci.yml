@@ -110,3 +110,5 @@ jobs:
           test/services/test_upload_post.py
           test/services/test_controller_video.py
           test/services/test_webui_task.py
+          test/services/test_audio_assets.py
+          test/services/test_controller_audio_assets.py
