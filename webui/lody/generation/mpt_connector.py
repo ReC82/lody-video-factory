@@ -14,6 +14,7 @@ import os
 import re
 import socket
 import time
+from datetime import datetime, timezone
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -551,6 +552,21 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le moteur a répondu sans identifiant de tâche exploitable.")
         return ExternalTask(PROVIDER_ID, task_id)
 
+    def _warnings(self, raw: object) -> tuple[str, ...]:
+        """Avertissements réellement exploitables (#93) : le moteur envoie soit une chaîne/un entier
+        (ancien format, encore utilisé par certains chemins), soit un dict ``{"code": ..., ...}`` (format
+        RÉEL actuel, voir ``app/services/task.py`` — ex. ``elevenlabs_bgm_failed``,
+        ``batch_materials_reused``). L'ancien filtre (``isinstance(item, (str, int))`` seul) perdait
+        silencieusement TOUS les avertissements dict — jamais un dict brut affiché tel quel ici : seul le
+        ``code`` (une chaîne courte, jamais une donnée arbitraire) en est extrait."""
+        texts = []
+        for item in (raw or []):
+            if isinstance(item, (str, int)):
+                texts.append(sanitize(item, 120))
+            elif isinstance(item, dict) and isinstance(item.get("code"), str):
+                texts.append(sanitize(item["code"], 120))
+        return tuple(texts)[:10]
+
     def poll(self, task: ExternalTask) -> TaskSnapshot:
         if not is_safe_task_id(task.task_id):
             raise ProviderError(ErrorKind.INVALID_RESPONSE, "Identifiant de tâche invalide.")
@@ -562,7 +578,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         if not isinstance(data, dict) or "state" not in data:
             raise ProviderError(ErrorKind.INVALID_RESPONSE, "Réponse inattendue du moteur de génération.")
         state = data.get("state")
-        warnings = tuple(sanitize(item, 120) for item in (data.get("warnings") or []) if isinstance(item, (str, int)))[:10]
+        warnings = self._warnings(data.get("warnings"))
         progress = data.get("progress") if isinstance(data.get("progress"), int) and not isinstance(data.get("progress"), bool) else None
         if state == -1:
             kind, message = classify_engine_error(_text(data.get("failed_stage")), data.get("error"))
@@ -609,7 +625,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             duration_seconds=float(duration) if isinstance(duration, (int, float)) and not isinstance(duration, bool) else None,
             script=_text(data.get("script")),
             assets=tuple(assets[:40]),
-            warnings=tuple(sanitize(item, 120) for item in (data.get("warnings") or []) if isinstance(item, (str, int)))[:10],
+            warnings=self._warnings(data.get("warnings")),
         )
 
     def list_scene_images(self, task: ExternalTask) -> list[dict[str, str]]:
@@ -628,7 +644,10 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
                 self.resolve_asset(task, ref, suffixes=(".png",))
             except ValueError:
                 continue
-            images.append({"ref": ref, "name": entry.name})
+            # #93 : horodatage réel d'écriture sur disque — seule base honnête pour « reçue il y a Xs »
+            # dans le suivi de progression (jamais une estimation, toujours relu depuis le fichier lui-même).
+            captured_at = datetime.fromtimestamp(entry.stat().st_mtime, tz=timezone.utc).isoformat()
+            images.append({"ref": ref, "name": entry.name, "captured_at": captured_at})
         return images[:40]
 
     def read_subtitles(self, task: ExternalTask) -> str | None:

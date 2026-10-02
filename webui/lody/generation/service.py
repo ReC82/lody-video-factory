@@ -432,9 +432,19 @@ class ProductionService:
             with self._lock:
                 self._inflight.discard(production_id)
 
+    def _step_trace(self, base: dict[str, Any]) -> dict[str, Any]:
+        """Fusionne l'horodatage de début de l'étape COURANTE (#93) dans une trace déjà existante —
+        jamais un écrasement : chaque appelant fournit la trace la plus à jour qu'il connaît (celle déjà
+        en base, ou celle qu'il vient lui-même de calculer), pour ne jamais perdre un horodatage posé par
+        une étape précédente de CETTE même exécution. Un nouvel appel à chaque changement RÉEL de
+        ``current_step`` seulement — jamais à chaque sondage (voir ``_apply``, qui ne l'appelle QUE
+        lorsque l'étape rapportée par le moteur diffère de la précédente)."""
+        return {**base, "current_step_started_at": self._clock()}
+
     def _run(self, production_id: str) -> None:
         if not self.repo.transition(production_id, [ProductionStatus.CONFIRMEE], status=ProductionStatus.EN_COURS,
-                                    started_at=self._clock(), current_step="Écriture du script", progress=None):
+                                    started_at=self._clock(), current_step="Écriture du script", progress=None,
+                                    trace=self._step_trace({})):
             return
         production = self.repo.get(production_id)
         provider = self.provider(production.provider)
@@ -476,7 +486,8 @@ class ProductionService:
             else:
                 # #76 : script fourni manuellement — même frontière, jamais de traitement de faveur.
                 validate_spoken_script(request.script, production)
-            self.repo.update(production_id, current_step="Préparation des scènes")
+            self.repo.update(production_id, current_step="Préparation des scènes",
+                             trace=self._step_trace(self.repo.get(production_id).trace))
             scenes = build_storyboard(request.script, self._scene_count(provider, request),
                                       visual_style=request.visual_style, aspect=request.aspect,
                                       narration_pace=request.narration_pace, visual_rules=request.visual_rules,
@@ -504,10 +515,12 @@ class ProductionService:
                 # clés de diagnostic n'ont jamais été perdues, même si l'écriture SQL ci-dessus les a déjà
                 # réécrites une première fois).
                 params={**production.params, "request": request.to_dict(), "engine": provider.describe_params(request)},
-                trace=self._trace(production, provider, request, script_request))  # avant l'envoi : conservée même en cas d'échec
+                # avant l'envoi : conservée même en cas d'échec
+                trace=self._step_trace(self._trace(production, provider, request, script_request)))
             task = provider.submit(request, production.idempotency_key)
             self.repo.update(production_id, external_task_id=task.task_id, status=ProductionStatus.EN_FILE,
-                             current_step="Dans la file du moteur", progress=0, last_polled_at=self._clock())
+                             current_step="Dans la file du moteur", progress=0, last_polled_at=self._clock(),
+                             trace=self._step_trace(self.repo.get(production_id).trace))
             self._initial_thumbnail_background(production_id, provider, request)
         except ProviderError as error:
             self._fail(production_id, error.kind, error.message)
@@ -583,10 +596,15 @@ class ProductionService:
                 "script_mode": script_mode(production.snapshot.get("narrative_context"))}
 
     def _fail(self, production_id: str, kind: ErrorKind, message: str) -> None:
+        # #93 : conserve QUELLE étape était active au moment de l'échec, AVANT que current_step ne
+        # devienne « Échec » — sans ce champ, le suivi par étapes ne saurait jamais laquelle marquer en
+        # erreur (voir lody.generation.progress._active_label).
+        production = self.repo.get(production_id)
         self.repo.transition(
             production_id, [ProductionStatus.CONFIRMEE, ProductionStatus.EN_COURS, ProductionStatus.EN_FILE],
             status=ProductionStatus.ECHEC, error_code=kind.value, error_message=sanitize(message),
-            finished_at=self._clock(), current_step="Échec")
+            finished_at=self._clock(), current_step="Échec",
+            trace={**production.trace, "failed_at_step": production.current_step})
 
     # -- suivi ---------------------------------------------------------------------
     def refresh(self, production_id: str) -> Production:
@@ -635,8 +653,14 @@ class ProductionService:
             return self._complete(production, provider, task, snapshot.result, snapshot.warnings)
         else:
             status = ProductionStatus.EN_FILE if snapshot.state is RemoteState.QUEUED else ProductionStatus.EN_COURS
+            new_step = snapshot.step or production.current_step
+            # #93 : l'horodatage ne se réinitialise QUE si l'étape a réellement changé depuis le dernier
+            # sondage — jamais à chaque appel (toutes les 4 s pendant un suivi actif), sinon le temps
+            # écoulé dans l'étape resterait toujours proche de zéro, aussi faussement « figé » que l'était
+            # l'ancien pourcentage.
+            trace = self._step_trace(production.trace) if new_step != production.current_step else production.trace
             self.repo.transition(production.id, ACTIVE_STATUSES, status=status, progress=snapshot.progress,
-                                 current_step=snapshot.step or production.current_step,
+                                 current_step=new_step, trace=trace,
                                  warnings=list(dict.fromkeys([*production.warnings, *snapshot.warnings])), **common)
         return self.repo.get(production.id)
 

@@ -9,8 +9,9 @@ import streamlit as st
 from lody import catalog, nav, view_kit
 from lody.components import format_datetime
 from lody.generation import costing
+from lody.generation import progress as prog
 from lody.generation.kit_service import KitService
-from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ProductionStatus as S
+from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ExternalTask, ProductionStatus as S
 from lody.generation.narrative_context import (
     scene_mentioned_characters,
     script_injection_applied,
@@ -63,21 +64,46 @@ def elapsed_text(production: Production, now: datetime | None = None) -> str:
     return f"{minutes} min {secs:02d} s" if minutes else f"{secs} s"
 
 
-def _progress_html(production: Production) -> str:
-    """Barre uniquement si le moteur fournit une vraie valeur ; sinon, l'étape seule."""
-    value = production.progress
-    if production.status not in ACTIVE_STATUSES or value is None or value < 5:
+_STEP_STATE_LABEL = {
+    prog.PENDING: "En attente", prog.IN_PROGRESS: "En cours", prog.DONE: "Terminée", prog.ERROR: "En erreur",
+}
+
+
+def _steps_html(production: Production, images: list[dict]) -> str:
+    """Étapes réelles du pipeline (#93) : remplace l'ancien pourcentage global, qui restait figé entre
+    deux jalons grossiers du moteur (en particulier pendant la génération des images, qui ne progresse
+    jamais côté moteur quel que soit le nombre de scènes — voir ``lody.generation.progress``).
+
+    ``images`` : liste réellement reçue pour CETTE production (``provider.list_scene_images``, jamais
+    recalculée ici) — sert à la fois le compteur d'images et le « dernière activité connue » honnête.
+    """
+    if production.status not in ACTIVE_STATUSES and production.status is not S.ECHEC:
         return ""
-    return (
-        f'<div class="run-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{value}" '
-        f'aria-label="Avancement du moteur"><span style="width:{value}%"></span></div>'
-        f'<p class="muted-note">Avancement du moteur : {value} %. Ce sont les jalons du moteur, pas une estimation du temps restant.</p>'
-    )
+    now = datetime.now(timezone.utc)
+    steps = prog.compute_steps(production, images_done=len(images))
+    items = []
+    for step in steps:
+        notes = []
+        if step.state == prog.IN_PROGRESS:
+            elapsed = prog.step_elapsed_seconds(production, now)
+            if elapsed is not None:
+                notes.append(f"Depuis {prog.elapsed_label(elapsed)}")
+            if step.label == prog.IMAGES:
+                notes.append(prog.waiting_text(prog.last_image_activity_seconds(images, now)))
+            if step.hint:
+                notes.append(step.hint)
+        detail_html = f'<p class="run-step-detail">{esc(step.detail)}</p>' if step.detail else ""
+        live_html = f'<p class="run-step-live">{esc(" · ".join(filter(None, notes)))}</p>' if notes else ""
+        items.append(
+            f'<li class="run-step-item step-{step.state}"><span class="run-step-dot" aria-hidden="true"></span>'
+            f'<div><p class="run-step-label">{esc(step.label)} '
+            f'<span class="run-step-tag">{esc(_STEP_STATE_LABEL[step.state])}</span></p>'
+            f"{detail_html}{live_html}</div></li>"
+        )
+    return f'<ul class="run-steps" role="list" aria-label="Étapes de la génération">{"".join(items)}</ul>'
 
 
-def status_card_html(production: Production) -> str:
-    step = production.current_step or STATUS_LABELS[production.status]
-    step_html = "" if step == STATUS_LABELS[production.status] else f'<p class="run-step">{esc(step)}</p>'
+def status_card_html(production: Production, images: list[dict] | None = None) -> str:
     demo = '<span class="badge badge-accent">Démonstration</span>' if production.provider == DEMO_PROVIDER else ""
     warning = ""
     if production.status in ACTIVE_STATUSES and production.error_message:
@@ -86,9 +112,8 @@ def status_card_html(production: Production) -> str:
     return (
         f'<div class="run-head">{status_pill(production)}{demo}'
         f'<span class="run-elapsed">Temps écoulé : {esc(elapsed_text(production))}</span></div>'
-        f"{step_html}"
         f'<p class="run-message">{esc(_STATUS_MESSAGE.get(production.status, ""))}</p>'
-        f"{_progress_html(production)}{warning}"
+        f"{_steps_html(production, images or [])}{warning}"
     )
 
 
@@ -505,8 +530,19 @@ def render(service: ProductionService, project: Project, production_id: str, kit
     @st.fragment(run_every=REFRESH_SECONDS if production.is_active else None)
     def live() -> None:
         current = service.refresh(production_id)
+        images: list[dict] = []
+        if current.external_task_id and current.status in (*ACTIVE_STATUSES, S.ECHEC):
+            # #93 : relecture RÉELLE (jamais inventée) des images déjà reçues pour CETTE tâche — même
+            # fonction déjà utilisée par les kits de publication (``kit_service.py``), ici pendant le
+            # suivi actif. Coûte un scan de disque borné (40 fichiers maximum) à chaque actualisation ;
+            # jamais un appel fournisseur.
+            try:
+                images = service.provider(current.provider).list_scene_images(
+                    ExternalTask(current.provider, current.external_task_id))
+            except Exception:
+                images = []
         with st.container(key="run_card"):
-            st.markdown(status_card_html(current), unsafe_allow_html=True)
+            st.markdown(status_card_html(current, images), unsafe_allow_html=True)
             if current.status is S.ECHEC:
                 st.markdown(f'<div class="banner banner-error" role="alert">{esc(current.error_message)}</div>',
                             unsafe_allow_html=True)
