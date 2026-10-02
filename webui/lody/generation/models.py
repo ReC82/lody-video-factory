@@ -102,6 +102,13 @@ class GenerationRequest:
     # Renseignés au fil de la production (script fourni par l'utilisateur ou écrit par le moteur).
     script: str = ""
     visual_prompts: tuple[str, ...] = ()
+    # #86 (prérequis multi-locuteurs #39) : référence opaque d'un audio déjà synthétisé, obtenue via
+    # VideoGenerationProvider.upload_audio_asset (jamais inventée ici). Vides par défaut : TOUTE
+    # production qui ne les renseigne pas (le cas de toutes les productions actuelles et futures tant
+    # que #87 n'existe pas) suit exactement le chemin TTS mono-voix historique — voir
+    # mpt_connector.build_payload, qui n'ajoute ces clés au payload que si audio_asset_id est non vide.
+    audio_asset_id: str = ""
+    audio_asset_scope: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

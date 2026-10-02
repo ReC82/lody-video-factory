@@ -17,6 +17,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -114,6 +115,28 @@ def apply_image_template(template: str, term: str) -> str:
     return template.replace("{term}", term)
 
 
+def _encode_multipart(fields: dict[str, str], file_field: str, filename: str, file_bytes: bytes,
+                      content_type: str = "application/octet-stream") -> tuple[bytes, str]:
+    """Corps ``multipart/form-data`` minimal (stdlib uniquement, comme le reste de ce connecteur — voir
+    ``Transport``) : des champs texte puis un fichier. Le nom de fichier n'est jamais utilisé comme
+    chemin ici ni côté moteur (voir ``docs/lody-engine-contract.md`` et #86) ; il est seulement
+    échappé des guillemets pour rester un en-tête HTTP valide."""
+    boundary = uuid.uuid4().hex
+    parts: list[bytes] = []
+    for name, value in fields.items():
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode("utf-8")
+        )
+    safe_filename = (filename or "upload").replace('"', "")
+    parts.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="{safe_filename}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n".encode("utf-8")
+    )
+    parts.append(file_bytes)
+    parts.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
 _NARRATION_INSTRUCTION = "Écris uniquement le texte parlé de la narration : pas de titre, pas d’indication de scène, pas de liste."
 
 
@@ -196,6 +219,12 @@ def build_payload(request: GenerationRequest, facts: EngineFacts) -> dict[str, A
     font, _ = typography.pick_subtitle_font(str(payload.get("font_name", "")), request.language, settings.fonts_dir())
     if font:
         payload["font_name"] = font
+    # #86 (prérequis multi-locuteurs #39) : clés ajoutées UNIQUEMENT si une référence d'asset audio est
+    # effectivement présente — absentes par défaut, donc le payload mono-voix historique est strictement
+    # inchangé au caractère près tant que #87 ne fixe jamais ``request.audio_asset_id``.
+    if request.audio_asset_id:
+        payload["custom_audio_asset_id"] = request.audio_asset_id
+        payload["audio_asset_scope"] = request.audio_asset_scope
     return payload
 
 
@@ -203,6 +232,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
     id = PROVIDER_ID
     display_name = "Moteur de génération"
     supports_cancel = False  # aucun endpoint d'annulation dans le contrat
+    supports_audio_assets = True  # POST /api/v1/audio_assets (#86, prérequis multi-locuteurs #39)
 
     def __init__(self, base_url: str = DEFAULT_URL, storage_root: str | Path = DEFAULT_STORAGE,
                  config_path: Path | None = None, report_path: Path | None = None, api_key: str = "", transport: Transport = urllib_transport,
@@ -220,12 +250,11 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         self._ping_ok_until = 0.0
 
     # -- HTTP ---------------------------------------------------------------
-    def _call(self, method: str, path: str, payload: dict[str, Any] | None = None, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
-        headers = {"Accept": "application/json"}
-        body = None
-        if payload is not None:
-            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json"
+    def _send(self, method: str, path: str, body: bytes | None, headers: dict[str, str],
+              timeout: float) -> tuple[int, dict[str, Any]]:
+        """Transport + traduction d'erreur partagés par ``_call`` (JSON) et ``_call_multipart`` (upload
+        d'asset audio, #86) — un seul endroit qui sait parler au transport HTTP, jamais deux logiques
+        d'erreur qui pourraient diverger."""
         if self._api_key:
             headers["x-api-key"] = self._api_key
         try:
@@ -247,6 +276,22 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
                 raise ProviderError(ErrorKind.PROVIDER, "Le moteur de génération a rencontré une erreur interne.")
             raise ProviderError(ErrorKind.INVALID_RESPONSE, "Réponse inattendue du moteur de génération.")
         return status, envelope
+
+    def _call(self, method: str, path: str, payload: dict[str, Any] | None = None, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
+        headers = {"Accept": "application/json"}
+        body = None
+        if payload is not None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        return self._send(method, path, body, headers, timeout)
+
+    def _call_multipart(self, method: str, path: str, fields: dict[str, str], file_field: str, filename: str,
+                        file_bytes: bytes, timeout: float = 30.0) -> tuple[int, dict[str, Any]]:
+        """Requête ``multipart/form-data`` (upload d'un fichier + champs texte) — pour #86 uniquement
+        (``upload_audio_asset``) : aucune autre méthode de ce connecteur n'envoie de fichier."""
+        body, content_type = _encode_multipart(fields, file_field, filename, file_bytes)
+        headers = {"Accept": "application/json", "Content-Type": content_type}
+        return self._send(method, path, body, headers, timeout)
 
     def _raise_for_status(self, status: int, envelope: dict[str, Any], stage: str) -> None:
         if status == 200 and envelope.get("status", 200) == 200:
@@ -477,6 +522,22 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             kind, message = classify_engine_error("script", script or "empty")
             raise ProviderError(kind, message, stage="script")
         return script
+
+    def upload_audio_asset(self, audio_bytes: bytes, filename: str, scope: str) -> str:
+        """``POST /api/v1/audio_assets`` (#86, prérequis multi-locuteurs #39) : AUCUN appel TTS, AUCUNE
+        génération — seulement le transfert d'un audio déjà synthétisé. ``scope`` doit être fourni de
+        nouveau, à l'identique, dans la requête ``submit()`` qui consommera la référence renvoyée (voir
+        ``GenerationRequest.audio_asset_scope`` et ``lody.generation.safety.new_audio_asset_scope``)."""
+        status, envelope = self._call_multipart(
+            "POST", "/api/v1/audio_assets", {"production_scope": scope}, "file", filename, audio_bytes,
+            timeout=60.0,
+        )
+        self._raise_for_status(status, envelope, "audio_asset")
+        data = envelope.get("data")
+        asset_id = _text(data.get("asset_id")) if isinstance(data, dict) else ""
+        if not asset_id:
+            raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le moteur n’a renvoyé aucune référence audio.", stage="audio_asset")
+        return asset_id
 
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:
         # Le moteur n'a pas de clé d'idempotence : l'unicité est garantie en amont par Lody

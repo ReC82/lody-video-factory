@@ -71,6 +71,10 @@ class VideoGenerationProvider(ABC):
     #: seul (voir ``narrative_context.reference_images_status``), jamais une transmission silencieusement
     #: ignorée mais présentée comme utilisée.
     supports_reference_images: bool = False
+    #: vrai si le moteur sait recevoir un audio DÉJÀ synthétisé pour le montage final, sans refaire le
+    #: TTS (#86, prérequis multi-locuteurs #39). Faux par défaut : ``upload_audio_asset`` est alors
+    #: refusé — jamais une simulation silencieuse d'un support absent.
+    supports_audio_assets: bool = False
 
     def plan_units(self, request: GenerationRequest) -> SceneUnits:
         units = estimate_units(request)
@@ -87,6 +91,15 @@ class VideoGenerationProvider(ABC):
     def generate_thumbnail_background(self, request: GenerationRequest, prompt: str) -> bytes:
         """Génère UNE image de fond sans texte (payant). Lève ``ProviderError`` si le moteur ne le permet pas."""
         raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer une image de fond de miniature.")
+
+    def upload_audio_asset(self, audio_bytes: bytes, filename: str, scope: str) -> str:
+        """Transfère un audio DÉJÀ synthétisé (#86, prérequis #39) : AUCUN appel TTS, AUCUNE génération —
+        seulement le transfert. Renvoie un identifiant opaque, consommable UNE SEULE FOIS par un appel
+        ultérieur à ``submit()`` dont la requête porte EXACTEMENT le même ``scope`` (voir
+        ``GenerationRequest.audio_asset_scope``, jamais le ``production_id`` lui-même — voir
+        ``lody.generation.safety.new_audio_asset_scope``). Lève ``ProviderError`` si le moteur ne le permet pas.
+        """
+        raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas recevoir un audio déjà synthétisé.")
 
     def describe_script_request(self, request: GenerationRequest, narrative_block: str = "",
                                 dialogue_character: str = "") -> dict:
