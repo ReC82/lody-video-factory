@@ -15,6 +15,7 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
+from app.services import audio_assets
 from app.services import bgm as bgm_service
 from app.services import (
     elevenlabs_music,
@@ -497,22 +498,40 @@ def generate_audio(
         - sub_maker: subtitle maker object if TTS is used, None otherwise
     """
     logger.info("\n\n## generating audio")
-    # /audio 和 /subtitle 请求模型不包含 custom_audio_file，
-    # 这里统一做兼容读取，避免直调接口时抛属性错误。
-    requested_custom_audio_file = getattr(params, "custom_audio_file", None)
-    try:
-        custom_audio_file = resolve_custom_audio_file(
-            task_id,
-            requested_custom_audio_file,
-            allow_server_file_input=allow_server_file_input,
-        )
-    except ValueError as exc:
-        _mark_task_failed(
-            task_id,
-            "audio",
-            f"invalid custom audio file: {exc}",
-        )
-        return None, None, None
+    # #86 (prérequis multi-locuteurs #39) : une référence d'asset pré-synthétisé a priorité absolue sur
+    # custom_audio_file — mécanisme séparé, jamais combiné ni confondu avec lui (voir
+    # app/services/audio_assets.py). Une référence invalide/expirée/déjà consommée échoue ICI, sans
+    # jamais retomber silencieusement sur custom_audio_file ni sur le TTS historique.
+    requested_audio_asset_id = getattr(params, "custom_audio_asset_id", None)
+    if requested_audio_asset_id:
+        try:
+            custom_audio_file = audio_assets.resolve_audio_asset(
+                requested_audio_asset_id, getattr(params, "audio_asset_scope", None) or ""
+            )
+        except audio_assets.AudioAssetError as exc:
+            _mark_task_failed(
+                task_id,
+                "audio",
+                f"invalid audio asset reference: {exc}",
+            )
+            return None, None, None
+    else:
+        # /audio 和 /subtitle 请求模型不包含 custom_audio_file，
+        # 这里统一做兼容读取，避免直调接口时抛属性错误。
+        requested_custom_audio_file = getattr(params, "custom_audio_file", None)
+        try:
+            custom_audio_file = resolve_custom_audio_file(
+                task_id,
+                requested_custom_audio_file,
+                allow_server_file_input=allow_server_file_input,
+            )
+        except ValueError as exc:
+            _mark_task_failed(
+                task_id,
+                "audio",
+                f"invalid custom audio file: {exc}",
+            )
+            return None, None, None
 
     if not custom_audio_file:
         reusable_preview = _resolve_reusable_voice_preview(
