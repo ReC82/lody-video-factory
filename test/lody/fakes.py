@@ -103,11 +103,12 @@ class ScriptedConnector(VideoGenerationProvider):
         return PreflightReport(tuple(items.values()))
 
     def describe_script_request(self, request, narrative_block="", dialogue_character=""):
+        # #77 : dialogue_character accepté pour respecter l'interface, jamais ajouté comme clé ici (voir
+        # write_script ci-dessous, qui est la seule source — dialogue_characters_received — utilisée par
+        # les tests ; un faux dict figé ne doit jamais gagner un champ que le VRAI connecteur n'expose pas
+        # tel quel, voir mpt_connector.describe_script_request qui le replie dans video_script_prompt).
         return {"video_subject": request.subject, "video_language": request.language,
-                "video_script_prompt": narrative_block or "(aucun bloc narratif)",
-                # #77 : jamais réellement utilisé pour écrire un texte (voir write_script ci-dessous),
-                # seulement exposé ici pour que les tests puissent vérifier ce qui a été transmis.
-                "dialogue_character": dialogue_character}
+                "video_script_prompt": narrative_block or "(aucun bloc narratif)"}
 
     def write_script(self, request, narrative_block="", dialogue_character=""):
         self.calls.append("write_script")
