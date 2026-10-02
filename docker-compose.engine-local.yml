@@ -1,0 +1,59 @@
+# Déploiement du moteur à partir du code DE CE DÉPÔT, en image construite et épinglée par tag — pour
+# qu'un correctif comme #86 (nouvel endpoint POST /api/v1/audio_assets, prérequis #39) soit réellement
+# joignable.
+#
+# Pourquoi ce fichier plutôt que les deux déjà présents :
+#   - docker-compose.release.yml utilise l'image publique non épinglée `ghcr.io/harry0703/
+#     moneyprinterturbo:latest` : jamais le code de ce dépôt, quel que soit son état (voir
+#     docs/audits/moneyprinterturbo_initial_audit.md, §13-14).
+#   - docker-compose.yml (variante "build") monte TOUT le dépôt en direct (`./:/MoneyPrinterTurbo`) :
+#     aucune image reproductible/épinglée, le code tourné dépend de l'état courant du clone sur l'hôte,
+#     pas d'un commit précis.
+# Ici : image construite une fois depuis ce dépôt (Dockerfile standard, inchangé), étiquetée par
+# MPT_IMAGE_TAG (convention identique à LODY_IMAGE_TAG de docker-compose.lody.yml). Mêmes noms de
+# conteneur, mêmes ports, mêmes volumes (uniquement config.toml + storage, comme release.yml) : rien ne
+# change côté Lody (qui joint "moneyprinterturbo-api" par nom sur le réseau "moneyprinterturbo_default")
+# ni côté l'ancienne WebUI — seule la SOURCE du code change.
+#
+# Usage :
+#   docker compose -f docker-compose.release.yml down        # libère les noms de conteneur
+#   MPT_IMAGE_TAG=<hash> docker compose -f docker-compose.engine-local.yml up -d --build
+#
+# Retour arrière (image précédente conservée dans le cache local Docker, jamais supprimée par ceci) :
+#   docker compose -f docker-compose.engine-local.yml down
+#   docker compose -f docker-compose.release.yml up -d
+#
+# Une seule des deux images construit réellement (service "api") : les deux services partagent le MÊME
+# Dockerfile/contexte et produisent donc une image identique — laisser chacun définir son propre `build:`
+# fait travailler Compose deux fois pour rien et crée une course sur l'étiquetage final de la même
+# étiquette (observé : "image ... already exists" quand les deux exports finissent presque en même
+# temps). `webui` réutilise simplement l'image déjà construite et étiquetée par `api`.
+
+x-common-volumes: &common-volumes
+  - ./config.toml:/MoneyPrinterTurbo/config.toml
+  - ./storage:/MoneyPrinterTurbo/storage
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: moneyprinterturbo:${MPT_IMAGE_TAG:-local}
+    pull_policy: never
+    container_name: "moneyprinterturbo-api"
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: [ "python3", "main.py" ]
+    volumes: *common-volumes
+    restart: always
+  webui:
+    image: moneyprinterturbo:${MPT_IMAGE_TAG:-local}
+    pull_policy: never
+    container_name: "moneyprinterturbo-webui"
+    ports:
+      - "127.0.0.1:8501:8501"
+    command: [ "streamlit", "run", "./webui/Main.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.serverAddress=127.0.0.1", "--server.enableCORS=True", "--browser.gatherUsageStats=False", "--client.toolbarMode=minimal", "--logger.hideWelcomeMessage=True", "--server.showEmailPrompt=False" ]
+    volumes: *common-volumes
+    restart: always
+    depends_on:
+      - api
