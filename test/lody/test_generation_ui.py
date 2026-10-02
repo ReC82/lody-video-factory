@@ -152,7 +152,10 @@ def test_single_confirmation_launches_and_opens_the_tracking_page(engine):
     project, app = _launch(engine)
     assert app.query_params["vue"] == ["suivi"] or app.query_params["vue"] == "suivi"
     text = _text(app)
-    assert "Suivi de la production" in text and "Dans la file du moteur" in text and "En file d’attente" in text
+    # #93 : le libellé brut du moteur ("Dans la file du moteur") n'est plus affiché tel quel — remplacé
+    # par l'étape canonique ("Préparation des scènes") avec son état honnête.
+    assert "Suivi de la production" in text and "En file d’attente" in text
+    assert "Préparation des scènes" in text and "run-step-tag\">En cours" in text
     assert engine.calls.count("submit") == 1 and engine.calls.count("write_script") == 1
     productions = _repo().list_for_project(project.id)
     assert len(productions) == 1 and productions[0].external_task_id == "task-0001"
@@ -160,12 +163,16 @@ def test_single_confirmation_launches_and_opens_the_tracking_page(engine):
 
 def test_tracking_shows_real_steps_without_inventing_a_percentage(engine):
     project, app = _launch(engine)
-    assert "Avancement du moteur" not in _text(app)  # file d'attente : pas de pourcentage
+    assert "Avancement du moteur" not in _text(app)  # jamais de pourcentage, même en file d'attente
     engine.queue(TaskSnapshot(RemoteState.RUNNING, 25, "Génération de la voix"))
     app = _button(app, "Actualiser").click().run()
     text = _text(app)
-    assert "Génération de la voix" in text and "En cours" in text and "Avancement du moteur : 25 %" in text
+    assert "Avancement du moteur" not in text and "25 %" not in text  # jamais le pourcentage brut du moteur
+    # L'étape canonique "Génération de la voix" est "en cours" ; les étapes précédentes sont "terminée".
+    assert 'step-en_cours"><span class="run-step-dot" aria-hidden="true"></span><div><p class="run-step-label">Génération de la voix' in text
+    assert "run-step-tag\">Terminée" in text and "run-step-tag\">En attente" in text
     assert "Temps écoulé" in text and "Tu peux quitter cette page" in text
+    assert "La synthèse vocale dépend de la longueur du script." in text  # message discret et contextualisé
 
 
 def test_tracking_survives_leaving_and_coming_back(engine):
