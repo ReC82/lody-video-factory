@@ -4,6 +4,7 @@ Authentification, type/extension trompeurs, traversée de chemin, taille, décod
 tests service (``test_audio_assets.py``) et de câblage pipeline (``test_task.py``) par le protocole HTTP
 réel (``TestClient`` sur l'application ASGI, aucun serveur ni appel réseau réel)."""
 
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -26,8 +27,16 @@ class TestAudioAssetUploadHTTP(unittest.TestCase):
         self._cleanup_snapshot = aa._last_cleanup_monotonic
         aa._assets.clear()
         aa._last_cleanup_monotonic = None
+        # Jamais écrire dans le vrai storage/audio_assets/ de l'hôte : dossier temporaire dédié, patché
+        # pour toute la durée du test (l'endpoint appelle lui-même cleanup() en interne).
+        self._temp_dir_cm = tempfile.TemporaryDirectory()
+        self.temp_dir = self._temp_dir_cm.__enter__()
+        self._dir_patch = patch.object(aa, "uploaded_audio_asset_dir", return_value=self.temp_dir)
+        self._dir_patch.start()
 
     def tearDown(self):
+        self._dir_patch.stop()
+        self._temp_dir_cm.__exit__(None, None, None)
         config.app.clear()
         config.app.update(self.original_app_config)
         aa._assets.clear()
@@ -51,6 +60,10 @@ class TestAudioAssetUploadHTTP(unittest.TestCase):
         # Jamais le nom de fichier ni un chemin serveur dans la réponse.
         self.assertNotIn("segment.mp3", response.text)
         self.assertNotIn("storage", response.text)
+        # Stocké dans le dossier de test isolé, jamais dans le vrai storage/audio_assets/ de l'hôte.
+        import os
+
+        self.assertIn(f"{asset_id}.mp3", os.listdir(self.temp_dir))
 
     def test_unauthenticated_request_is_rejected_when_a_key_is_configured(self):
         config.app["api_key"] = "engine-secret"

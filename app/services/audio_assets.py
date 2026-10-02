@@ -16,7 +16,7 @@ de #87 (dépend de celui-ci), pas de #86.
 
 Cycle de vie d'un asset :
 
-    créé (upload validé, fichier stocké sous un nom opaque)
+    créé (upload validé, fichier + métadonnées stockés sous un nom opaque)
       -> réservé (en attente de consommation, TTL ``UNRESOLVED_TTL_SECONDS``)
       -> consommé (une seule fois, par un ``/videos`` dont le ``production_scope`` correspond)
       -> nettoyé (TTL ``CONSUMED_GRACE_SECONDS`` après consommation, ou ``UNRESOLVED_TTL_SECONDS``
@@ -29,14 +29,23 @@ lui (ou avec une valeur différente), la référence est refusée avec un messag
 soit inconnu, expiré, déjà consommé, ou lié à un autre ``production_scope`` — jamais de distinction qui
 laisserait deviner lequel de ces cas s'est produit.
 
-Registre en mémoire du PROCESSUS (même limitation, déjà documentée et acceptée, que ``MemoryState`` pour
-les tâches : un redémarrage perd le registre). Le nettoyage par motif de nom de fichier (``_ASSET_FILE_
-PATTERN``) reste donc une seconde ligne de défense indépendante du registre, pour les fichiers orphelins
-qu'un redémarrage aurait rendus invisibles à celui-ci.
+**Persistance (déploiement observé : un seul processus, ``main.py`` appelle ``uvicorn.run()`` sans
+``workers=``, ``enable_redis = false`` dans ``config.toml`` — voir le diagnostic posté sur la PR #88).**
+Le dict en mémoire (``_assets``) n'est qu'un CACHE du processus en cours ; la source de vérité est le
+fichier ``<asset_id>.meta.json`` écrit de façon atomique à côté de l'audio (même dossier,
+``tempfile`` + ``os.replace``, comme le fichier audio lui-même). Un redémarrage du processus perd le
+cache mais JAMAIS les métadonnées : ``resolve_audio_asset``/``cleanup`` relisent le fichier sur demande
+et reconstruisent un enregistrement identique (même ``production_scope``, même ``consumed_at``) — un
+asset valide reste donc résolvable avec son autorisation intacte, et un asset déjà consommé ou expiré
+reste refusé, même après un redémarrage. Comme le déploiement actuel est mono-processus, ce mécanisme
+sert la PERSISTANCE (survivre à un redémarrage), pas le PARTAGE entre processus concurrents ; si ce
+service tournait un jour derrière plusieurs workers, ce fichier serait alors aussi le point de partage
+(il n'y a qu'une seule source de vérité, jamais un cache qui pourrait diverger entre processus).
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
@@ -86,8 +95,16 @@ _WINDOWS_RESERVED_FILENAMES = frozenset(
     | {f"LPT{index}" for index in range(1, 10)}
 )
 
-# Nom de fichier final : toujours <uuid4 hex><extension>, jamais dérivé du nom fourni par le client —
-# sert aussi de motif pour le nettoyage des orphelins après un redémarrage (registre en mémoire perdu).
+# Identifiant opaque : TOUJOURS cette forme (uuid4().hex) — validé avant toute construction de chemin,
+# car un ``asset_id`` fourni par un appelant ne doit jamais, même indirectement, influencer un chemin de
+# fichier au-delà de ce motif strict (défense contre une traversée de chemin via ce champ).
+_ASSET_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+_METADATA_SUFFIX = ".meta.json"
+_METADATA_FILE_PATTERN = re.compile(r"^([0-9a-f]{32})\.meta\.json$")
+
+# Nom de fichier audio final : toujours <uuid4 hex><extension>, jamais dérivé du nom fourni par le
+# client — sert aussi de motif pour le nettoyage des orphelins sans métadonnées (crash entre les deux
+# écritures, voir ``cleanup``).
 _ASSET_FILE_PATTERN = re.compile(
     r"^[0-9a-f]{32}(" + "|".join(re.escape(extension) for extension in SUPPORTED_AUDIO_ASSET_EXTENSIONS) + r")$"
 )
@@ -109,6 +126,9 @@ class _AssetRecord:
     consumed_at: float | None = None
 
 
+# Cache PROCESSUS de ce que les fichiers ``.meta.json`` contiennent déjà de façon durable — jamais la
+# seule source de vérité (voir ``resolve_audio_asset``/``cleanup``, qui relisent toujours le disque sur
+# un cache manquant).
 _assets: dict[str, _AssetRecord] = {}
 _registry_lock = threading.Lock()
 _last_cleanup_monotonic: float | None = None
@@ -214,13 +234,68 @@ def _stage_upload(filename: str, source: BinaryIO) -> tuple[str, str, int]:
         raise
 
 
+def _metadata_path(target_dir: str, asset_id: str) -> str:
+    return os.path.join(target_dir, f"{asset_id}{_METADATA_SUFFIX}")
+
+
+def _write_metadata(target_dir: str, asset_id: str, record: _AssetRecord, extension: str) -> None:
+    """Persiste l'enregistrement de façon atomique (tempfile du MÊME dossier + ``os.replace``) : seule
+    source de vérité qui doit survivre à un redémarrage du processus — jamais seulement le cache mémoire."""
+    payload = {
+        "production_scope": record.production_scope,
+        "created_at": record.created_at,
+        "consumed_at": record.consumed_at,
+        "extension": extension,
+    }
+    descriptor, temp_path = tempfile.mkstemp(prefix=_INTERNAL_UPLOAD_PREFIX, suffix=".json", dir=target_dir)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            json.dump(payload, output)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temp_path, _metadata_path(target_dir, asset_id))
+    except OSError:
+        _remove_file_quietly(temp_path)
+        raise
+
+
+def _read_metadata(target_dir: str, asset_id: str) -> _AssetRecord | None:
+    """Relit un enregistrement depuis le disque (reconstruction après un redémarrage du processus, le
+    cache mémoire étant alors vide) — ``None`` pour tout fichier absent, corrompu, incomplet, ou dont
+    l'audio associé n'existe plus : traité comme une référence inconnue, jamais une exception qui
+    remonterait jusqu'au client."""
+    try:
+        with open(_metadata_path(target_dir, asset_id), "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    try:
+        extension = str(payload["extension"])
+        if extension not in SUPPORTED_AUDIO_ASSET_EXTENSIONS:
+            return None
+        audio_path = os.path.join(target_dir, f"{asset_id}{extension}")
+        if not os.path.isfile(audio_path):
+            return None
+        consumed_at = payload.get("consumed_at")
+        return _AssetRecord(
+            file_path=audio_path,
+            production_scope=str(payload["production_scope"]),
+            created_at=float(payload["created_at"]),
+            consumed_at=float(consumed_at) if consumed_at is not None else None,
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def cleanup(now: float | None = None, force: bool = False) -> int:
     """Nettoyage à basse fréquence (au plus une fois par ``_CLEANUP_INTERVAL_SECONDS``, sauf
-    ``force=True`` réservé aux tests) : enlève du registre et du disque les assets expirés
-    (jamais consommés après ``UNRESOLVED_TTL_SECONDS``, ou consommés depuis plus de
-    ``CONSUMED_GRACE_SECONDS``), PUIS balaie le disque à la recherche de fichiers orphelins (nom
-    conforme à ``_ASSET_FILE_PATTERN``, absents du registre — ex. après un redémarrage) plus vieux que
-    ``UNRESOLVED_TTL_SECONDS``. Ne touche jamais un fichier dont le nom ne correspond pas à ce motif."""
+    ``force=True`` réservé aux tests), TOUJOURS depuis le disque (seule source de vérité, voir le
+    docstring du module) : pour chaque ``<asset_id>.meta.json`` trouvé, supprime l'asset (audio +
+    métadonnées + entrée de cache) s'il est expiré (jamais consommé après ``UNRESOLVED_TTL_SECONDS``,
+    ou consommé depuis plus de ``CONSUMED_GRACE_SECONDS``) ou si ses métadonnées sont illisibles/
+    incomplètes. Balaie ensuite les fichiers audio SANS métadonnées (crash entre les deux écritures) sur
+    la seule base de leur âge de modification. Ne touche jamais un fichier dont le nom ne correspond à
+    aucun des deux motifs."""
     global _last_cleanup_monotonic
     monotonic_now = time.monotonic()
     with _registry_lock:
@@ -230,45 +305,61 @@ def cleanup(now: float | None = None, force: bool = False) -> int:
         _last_cleanup_monotonic = monotonic_now
 
         current_time = time.time() if now is None else now
-        expired_ids = []
-        for asset_id, record in _assets.items():
-            if record.consumed_at is not None:
-                if current_time - record.consumed_at >= CONSUMED_GRACE_SECONDS:
-                    expired_ids.append(asset_id)
-            elif current_time - record.created_at >= UNRESOLVED_TTL_SECONDS:
-                expired_ids.append(asset_id)
+        target_dir = uploaded_audio_asset_dir(create=False)
+        if not os.path.isdir(target_dir):
+            return 0
+        try:
+            with os.scandir(target_dir) as entries:
+                names = [entry.name for entry in entries]
+        except OSError as exc:
+            logger.warning(f"failed to scan audio asset storage: error={str(exc)}")
+            return 0
+
         removed = 0
-        for asset_id in expired_ids:
-            record = _assets.pop(asset_id, None)
-            if record:
+        seen_asset_ids: set[str] = set()
+        for name in names:
+            match = _METADATA_FILE_PATTERN.fullmatch(name)
+            if not match:
+                continue
+            asset_id = match.group(1)
+            seen_asset_ids.add(asset_id)
+            record = _read_metadata(target_dir, asset_id)
+            meta_path = os.path.join(target_dir, name)
+            if record is None:
+                # Métadonnées illisibles/incomplètes, ou audio déjà absent : jamais résolvable.
+                _remove_file_quietly(meta_path)
+                _assets.pop(asset_id, None)
+                removed += 1
+                continue
+            expired = (
+                (record.consumed_at is not None and current_time - record.consumed_at >= CONSUMED_GRACE_SECONDS)
+                or (record.consumed_at is None and current_time - record.created_at >= UNRESOLVED_TTL_SECONDS)
+            )
+            if expired:
                 _remove_file_quietly(record.file_path)
+                _remove_file_quietly(meta_path)
+                _assets.pop(asset_id, None)
                 removed += 1
 
-        target_dir = uploaded_audio_asset_dir(create=False)
-        if os.path.isdir(target_dir):
+        for name in names:
+            if not _ASSET_FILE_PATTERN.fullmatch(name) or name[:32] in seen_asset_ids:
+                continue
+            path = os.path.join(target_dir, name)
             try:
-                with os.scandir(target_dir) as entries:
-                    stale_orphans = [entry for entry in entries
-                                    if entry.name not in _assets and _ASSET_FILE_PATTERN.fullmatch(entry.name)]
-            except OSError as exc:
-                logger.warning(f"failed to scan audio asset storage: error={str(exc)}")
-                stale_orphans = []
-            for entry in stale_orphans:
-                try:
-                    if not entry.is_file(follow_symlinks=False):
-                        continue
-                    age = current_time - entry.stat(follow_symlinks=False).st_mtime
-                except OSError:
-                    continue
-                if age >= UNRESOLVED_TTL_SECONDS:
-                    _remove_file_quietly(entry.path)
-                    removed += 1
+                age = current_time - os.stat(path).st_mtime
+            except OSError:
+                continue
+            if age >= UNRESOLVED_TTL_SECONDS:
+                _remove_file_quietly(path)
+                _assets.pop(name[:32], None)
+                removed += 1
         return removed
 
 
 def save_audio_asset_upload(filename: str, source: BinaryIO, production_scope: str) -> str:
     """Valide, décode réellement (FFmpeg, jamais seulement l'extension/le type MIME déclaré) et stocke
-    un fichier audio déjà synthétisé sous un nom opaque — AUCUN appel TTS, AUCUNE génération.
+    un fichier audio déjà synthétisé sous un nom opaque, avec ses métadonnées persistées à côté (voir le
+    docstring du module) — AUCUN appel TTS, AUCUNE génération.
 
     Lève ``AudioAssetError`` (entrée cliente invalide) ou ``AudioAssetServiceError`` (panne serveur).
     Renvoie un ``asset_id`` imprévisible (``uuid4().hex``, 128 bits), jamais dérivé du nom de fichier ni
@@ -276,15 +367,17 @@ def save_audio_asset_upload(filename: str, source: BinaryIO, production_scope: s
     """
     scope = _validate_production_scope(production_scope)
     safe_name, temp_path, total_bytes = _stage_upload(filename, source)
+    target_dir = os.path.dirname(temp_path)
+    asset_id = uuid4().hex
+    extension = Path(safe_name).suffix.lower()
+    target_path = os.path.join(target_dir, f"{asset_id}{extension}")
+    record = _AssetRecord(file_path=target_path, production_scope=scope, created_at=time.time())
     try:
         # Décodage RÉEL du flux audio (pas une simple lecture d'en-tête) : un fichier renommé avec une
         # fausse extension, ou un contenu corrompu, échoue ici même s'il a passé sanitize_* ci-dessus.
         bgm_service.validate_audio_file(temp_path, timeout_seconds=30)
-
-        asset_id = uuid4().hex
-        stored_name = f"{asset_id}{Path(safe_name).suffix.lower()}"
-        target_path = os.path.join(os.path.dirname(temp_path), stored_name)
         os.replace(temp_path, target_path)
+        _write_metadata(target_dir, asset_id, record, extension)
     except bgm_service.BgmUploadError as exc:
         _remove_file_quietly(temp_path)
         raise AudioAssetError(str(exc)) from exc
@@ -292,31 +385,44 @@ def save_audio_asset_upload(filename: str, source: BinaryIO, production_scope: s
         _remove_file_quietly(temp_path)
         raise AudioAssetServiceError(str(exc)) from exc
     except OSError as exc:
+        # Jamais laisser un fichier audio persistant sans ses métadonnées : sans elles, il ne serait
+        # jamais résolvable par un redémarrage ultérieur (voir _read_metadata) — repli complet.
         _remove_file_quietly(temp_path)
+        _remove_file_quietly(target_path)
+        _remove_file_quietly(_metadata_path(target_dir, asset_id))
         raise AudioAssetServiceError("failed to persist audio asset upload") from exc
 
     with _registry_lock:
-        _assets[asset_id] = _AssetRecord(file_path=target_path, production_scope=scope, created_at=time.time())
+        _assets[asset_id] = record
     logger.debug(f"audio asset stored: asset_id={asset_id}, size={total_bytes} bytes")
     cleanup()
     return asset_id
 
 
 def resolve_audio_asset(asset_id: str, production_scope: str) -> str:
-    """Résout (et marque consommée) une référence d'asset pour un ``/videos`` en cours de création.
+    """Résout (et marque consommée, de façon PERSISTANTE) une référence d'asset pour un ``/videos`` en
+    cours de création.
 
     Lève ``AudioAssetError`` avec un message TOUJOURS identique, que l'asset soit inconnu, expiré,
     déjà consommé, ou lié à un ``production_scope`` différent — jamais de distinction qui laisserait
     deviner lequel de ces cas s'est produit. Comparaison du jeton à temps constant
-    (``secrets.compare_digest``) : ce champ joue le rôle d'un secret d'autorisation.
+    (``secrets.compare_digest``) : ce champ joue le rôle d'un secret d'autorisation. Fonctionne
+    identiquement après un redémarrage du processus (reconstruction depuis le disque, voir
+    ``_read_metadata``) : un asset valide reste résolvable avec son autorisation intacte, un asset
+    expiré/consommé/mal autorisé reste refusé.
     """
     cleanup()
     generic_error = AudioAssetError("unknown or expired audio asset reference")
-    if not isinstance(asset_id, str) or not asset_id:
+    if not isinstance(asset_id, str) or not _ASSET_ID_PATTERN.fullmatch(asset_id):
         raise generic_error
     scope = str(production_scope or "")
+    target_dir = uploaded_audio_asset_dir(create=False)
     with _registry_lock:
         record = _assets.get(asset_id)
+        if record is None:
+            record = _read_metadata(target_dir, asset_id)  # reconstruction après redémarrage
+            if record is not None:
+                _assets[asset_id] = record
         if record is None:
             raise generic_error
         if record.consumed_at is not None:
@@ -324,4 +430,13 @@ def resolve_audio_asset(asset_id: str, production_scope: str) -> str:
         if not secrets.compare_digest(record.production_scope.encode("utf-8"), scope.encode("utf-8")):
             raise generic_error
         record.consumed_at = time.time()
+        try:
+            _write_metadata(target_dir, asset_id, record, Path(record.file_path).suffix.lower())
+        except OSError as exc:
+            # La consommation DOIT être persistée pour empêcher tout double usage après un redémarrage ;
+            # si l'écriture échoue, on refuse plutôt que de renvoyer un chemin dont la consommation ne
+            # serait pas garantie durable — jamais un succès qui ne survivrait pas à un redémarrage.
+            record.consumed_at = None
+            logger.warning(f"failed to persist audio asset consumption: asset_id={asset_id}, error={str(exc)}")
+            raise AudioAssetServiceError("failed to persist audio asset consumption") from exc
         return record.file_path
