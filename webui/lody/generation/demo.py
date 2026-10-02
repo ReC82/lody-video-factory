@@ -13,6 +13,7 @@ import json
 import subprocess
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 
 from lody import settings
@@ -132,19 +133,30 @@ class DemoConnector(VideoGenerationProvider):
         return TaskSnapshot(RemoteState.QUEUED if progress == 0 else RemoteState.RUNNING, progress, label)
 
     def list_scene_images(self, task: ExternalTask) -> list[dict[str, str]]:
-        """Trois fonds de démonstration synthétiques (jamais de texte), créés localement."""
-        if self._started(task) is None:
+        """Trois fonds de démonstration synthétiques (jamais de texte), révélés PROGRESSIVEMENT pendant
+        l'étape « Génération des images » (#93, même jalon que le moteur réel, ``_TIMELINE``) — jamais en
+        avance sur la progression simulée, pour que le suivi par étapes ait quelque chose de réel à
+        observer même en démonstration, sans jamais appeler de fournisseur."""
+        started = self._started(task)
+        if started is None:
             return []
+        elapsed = self._clock() - started
+        steps = int(elapsed // self._step)
+        if steps < 4:  # étape "Génération des images" pas encore atteinte
+            return []
+        revealed = 3 if steps >= 5 else min(3, int((elapsed - 4 * self._step) // (self._step / 3)) + 1)
+
         from lody.generation.thumbnail import placeholder_background
 
         images = []
-        for number in (1, 2, 3):
+        for number in range(1, revealed + 1):
             target = self._dir(task.task_id) / f"scene-{number}.png"
             if not target.exists():
                 buffer = io.BytesIO()
                 placeholder_background(f"{task.task_id}-{number}", (512, 768)).save(buffer, format="PNG")
                 target.write_bytes(buffer.getvalue())
-            images.append({"ref": f"demo/{task.task_id}/{target.name}", "name": target.name})
+            captured_at = datetime.fromtimestamp(target.stat().st_mtime, tz=timezone.utc).isoformat()
+            images.append({"ref": f"demo/{task.task_id}/{target.name}", "name": target.name, "captured_at": captured_at})
         return images
 
     def read_subtitles(self, task: ExternalTask) -> str | None:
