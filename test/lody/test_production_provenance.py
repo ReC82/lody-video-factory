@@ -6,6 +6,10 @@ final validé (#76) et transmis dans video_script » de « voix snapshotée (pr�
 et son injection. Toujours lu depuis production.script/snapshot/trace/params — jamais depuis les fiches
 projet/personnages/lieux actuelles. Faux connecteurs uniquement, aucun appel réel, aucun changement de
 pipeline ou de payload.
+
+Les noms de personnage et de voix utilisés ici sont volontairement génériques (« Personnage test »,
+« Voix spécifique du personnage », « Ancienne voix projet — SENTINELLE ») : le comportement vérifié ne
+dépend d'aucun nom particulier — il doit valoir pour n'importe quel personnage et n'importe quelle voix.
 """
 
 from __future__ import annotations
@@ -33,10 +37,14 @@ PRICES = PriceBook("EUR", {("text", "openai"): Decimal("0.02"), ("visual", "open
                            ("voice", "elevenlabs"): Decimal("0.3"), ("music", "elevenlabs"): Decimal("0.1")})
 SUBJECT = "Explique en une phrase ce qu'est un bloc dans une blockchain, pour un débutant curieux."
 
-ELI_VOICE_ID = "goccsFDjQ0kcbRoOsQ2r"
-ELI_VOICE_NAME = "Eli — PNJ Conscient"
-GASTON_SENTINEL_ID = "GASTON-OLD-SENTINEL9"
-GASTON_SENTINEL_NAME = "Gaston — ancienne voix (SENTINELLE, ne doit jamais apparaître)"
+# Voix spécifique d'un personnage sélectionné — n'importe quel personnage, n'importe quelle voix : aucun
+# traitement particulier lié à un nom.
+CHARACTER_VOICE_ID = "CHARACTER-VOICE-TEST1"
+CHARACTER_VOICE_NAME = "Voix spécifique du personnage"
+# Voix de repli du PROJET, volontairement distincte et nommée SENTINELLE : si elle apparaît alors qu'un
+# personnage avec une voix spécifique valide est sélectionné, c'est la preuve d'une régression.
+OLD_PROJECT_VOICE_SENTINEL_ID = "OLD-PROJECT-VOICE-SENTINEL9"
+OLD_PROJECT_VOICE_SENTINEL_NAME = "Ancienne voix projet — SENTINELLE (ne doit jamais être envoyée à sa place)"
 
 
 def _text(app):
@@ -46,18 +54,20 @@ def _text(app):
 
 
 class Env:
-    """Projet PNJ-like avec une voix projet SENTINELLE (Gaston) distincte d'Eli, service câblé sur un faux
-    connecteur (aucun appel réel)."""
+    """Projet avec une voix projet SENTINELLE distincte de la voix spécifique du personnage test, service
+    câblé sur un faux connecteur (aucun appel réel)."""
 
     def __init__(self, tmp_path):
         self.path = tmp_path / "lody.sqlite3"
         self.projects = ProjectRepository(self.path)
         self.characters = CharacterRepository(self.path)
         self.locations = LocationRepository(self.path)
-        fields = {**copy.deepcopy(DEFAULTS), "name": "PNJ", "language": "fr-FR", "text_provider": "openai",
-                  "visual_provider": "openai_image", "voice_provider": "elevenlabs",
-                  "voice_name": GASTON_SENTINEL_NAME, "music_provider": "none",
-                  "settings": {"brief": {"voice_id": GASTON_SENTINEL_ID, "voice_model": "eleven_multilingual_v2"}}}
+        fields = {**copy.deepcopy(DEFAULTS), "name": "Projet test", "language": "fr-FR",
+                  "text_provider": "openai", "visual_provider": "openai_image",
+                  "voice_provider": "elevenlabs", "voice_name": OLD_PROJECT_VOICE_SENTINEL_NAME,
+                  "music_provider": "none",
+                  "settings": {"brief": {"voice_id": OLD_PROJECT_VOICE_SENTINEL_ID,
+                                         "voice_model": "eleven_multilingual_v2"}}}
         self.project = self.projects.create(**fields)
         self.connector = ScriptedConnector(tmp_path / "storage")
         self.service = ProductionService(
@@ -65,9 +75,9 @@ class Env:
             price_book=lambda: PRICES, character_repo=self.characters, location_repo=self.locations,
         )
 
-    def add_eli(self, **overrides):
-        fields = {"name": "Eli", "is_primary": True, "voice_provider": "elevenlabs",
-                  "external_voice_id": ELI_VOICE_ID, "voice_name": ELI_VOICE_NAME, **overrides}
+    def add_test_character(self, **overrides):
+        fields = {"name": "Personnage test", "is_primary": True, "voice_provider": "elevenlabs",
+                  "external_voice_id": CHARACTER_VOICE_ID, "voice_name": CHARACTER_VOICE_NAME, **overrides}
         return self.characters.create(self.project.id, **fields)
 
 
@@ -93,10 +103,10 @@ def _fake_production(**overrides) -> Production:
 # -- scene_mentioned_characters() : fonction pure ------------------------------------------------------------------
 # ======================================================================================================================
 def test_scene_mentioned_characters_finds_only_characters_actually_named():
-    characters = [{"name": "Eli"}, {"name": "Zoé"}]
-    assert scene_mentioned_characters("Eli arrive au village.", characters) == ["Eli"]
+    characters = [{"name": "Personnage test"}, {"name": "Zoé"}]
+    assert scene_mentioned_characters("Personnage test arrive au village.", characters) == ["Personnage test"]
     assert scene_mentioned_characters("Rien de spécial ici.", characters) == []
-    assert scene_mentioned_characters("Eli et Zoé discutent.", characters) == ["Eli", "Zoé"]
+    assert scene_mentioned_characters("Personnage test et Zoé discutent.", characters) == ["Personnage test", "Zoé"]
 
 
 # ======================================================================================================================
@@ -114,29 +124,30 @@ def test_voice_not_yet_transmitted_is_distinguished_from_no_snapshot_at_all():
     """Une production préparée (voix déjà snapshotée) mais pas encore envoyée (trace encore vide) doit
     distinguer « pas encore transmise » de « jamais eu de voix du tout » (production historique)."""
     production = _fake_production(
-        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": ELI_VOICE_ID,
-                                        "name": ELI_VOICE_NAME, "model": "x"}}},
+        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": CHARACTER_VOICE_ID,
+                                        "name": CHARACTER_VOICE_NAME, "model": "x"}}},
         trace={},
     )
     html = _provenance_html(production)
-    assert ELI_VOICE_ID in html
+    assert CHARACTER_VOICE_ID in html
     assert "pas encore transmise" in html
 
 
-def test_eli_sent_and_gaston_never_sent_is_provable_from_the_html():
-    """LE critère d'acceptation central du ticket : une production permet de prouver si Eli OU Gaston a
-    été envoyé comme voix."""
+def test_character_voice_sent_and_project_sentinel_never_sent_is_provable_from_the_html():
+    """LE critère d'acceptation central du ticket : une production permet de prouver si la voix spécifique
+    du personnage OU la voix de repli (sentinelle) du projet a été envoyée — quel que soit le nom du
+    personnage ou de la voix."""
     production = _fake_production(
         script="Bienvenue dans le monde des blocs.",
-        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": ELI_VOICE_ID,
-                                        "name": ELI_VOICE_NAME, "model": "x"}}},
-        trace={"voice": {"provider": "elevenlabs", "voice_id": ELI_VOICE_ID, "name": ELI_VOICE_NAME,
-                        "source": "character", "fallback": False, "reason": "voix de Eli"}},
+        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": CHARACTER_VOICE_ID,
+                                        "name": CHARACTER_VOICE_NAME, "model": "x"}}},
+        trace={"voice": {"provider": "elevenlabs", "voice_id": CHARACTER_VOICE_ID, "name": CHARACTER_VOICE_NAME,
+                        "source": "character", "fallback": False, "reason": "voix du personnage"}},
         params={"voice_resolution": {"source": "character"}},
     )
     html = _provenance_html(production)
-    assert ELI_VOICE_ID in html and ELI_VOICE_NAME in html
-    assert "Gaston" not in html
+    assert CHARACTER_VOICE_ID in html and CHARACTER_VOICE_NAME in html
+    assert OLD_PROJECT_VOICE_SENTINEL_ID not in html and OLD_PROJECT_VOICE_SENTINEL_NAME not in html
     assert "Identique" in html  # prévue == transmise, prouvé par deux sources indépendantes
     assert "personnage sélectionné" in html
 
@@ -145,8 +156,8 @@ def test_a_simulated_divergence_between_snapshot_and_trace_is_visibly_flagged():
     """Défense en profondeur : si jamais la voix snapshotée et la voix transmise divergeaient (un bug
     hypothétique que #75 empêche déjà en pratique), ce diagnostic doit le rendre visible, jamais le taire."""
     production = _fake_production(
-        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": ELI_VOICE_ID,
-                                        "name": ELI_VOICE_NAME, "model": "x"}}},
+        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": CHARACTER_VOICE_ID,
+                                        "name": CHARACTER_VOICE_NAME, "model": "x"}}},
         trace={"voice": {"provider": "elevenlabs", "voice_id": "AUTRE-ID-DIFFERENT", "name": "Autre voix"}},
     )
     html = _provenance_html(production)
@@ -163,9 +174,9 @@ def test_manual_script_is_also_labelled_validated_and_transmitted():
 def test_no_secret_ever_appears_in_the_provenance_html():
     production = _fake_production(
         script="Un script tout à fait normal.",
-        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": ELI_VOICE_ID,
-                                        "name": ELI_VOICE_NAME, "model": "x"}}},
-        trace={"voice": {"provider": "elevenlabs", "voice_id": ELI_VOICE_ID, "name": ELI_VOICE_NAME}},
+        snapshot={"request": {"voice": {"provider": "elevenlabs", "voice_id": CHARACTER_VOICE_ID,
+                                        "name": CHARACTER_VOICE_NAME, "model": "x"}}},
+        trace={"voice": {"provider": "elevenlabs", "voice_id": CHARACTER_VOICE_ID, "name": CHARACTER_VOICE_NAME}},
     )
     assert find_secret_path(_provenance_html(production)) is None
 
@@ -174,12 +185,12 @@ def test_no_secret_ever_appears_in_the_provenance_html():
 # -- _scene_provenance_line() : fonction pure -----------------------------------------------------------------------
 # ======================================================================================================================
 def test_scene_line_lists_mentioned_character_and_location_and_injection_state():
-    narrative = {"characters": [{"name": "Eli"}], "location": {"name": "Place du village"}}
+    narrative = {"characters": [{"name": "Personnage test"}], "location": {"name": "Place du village"}}
     prompt_sent = ("un prompt de scène\n\n### Continuité visuelle (instantané de production, #34/#35/#37) ###\n"
-                  "Eli, Place du village")
+                  "Personnage test, Place du village")
     line = _scene_provenance_line({"prompt_sent": prompt_sent, "engine_template_applied": True},
-                                  "Eli explore la place.", narrative)
-    assert "Personnages mentionnés : Eli" in line
+                                  "Personnage test explore la place.", narrative)
+    assert "Personnages mentionnés : Personnage test" in line
     assert "Lieu (toutes les scènes) : Place du village" in line
     assert "Injection visuelle : appliquée" in line
     assert "Gabarit moteur : appliqué" in line
@@ -197,18 +208,19 @@ def test_scene_line_without_any_mention_or_selection_says_so_explicitly():
 # ======================================================================================================================
 # -- intégration bout-en-bout (ProductionService, faux connecteur) + écran (AppTest) -------------------------------
 # ======================================================================================================================
-def test_eli_and_place_du_village_end_to_end_proves_eli_not_gaston_was_sent(env):
-    eli = env.add_eli()
+def test_character_and_place_du_village_end_to_end_proves_character_voice_not_sentinel_was_sent(env):
+    character = env.add_test_character()
     village = env.locations.create(env.project.id, name="Place du village", location_type="Extérieur")
-    script = ("Eli se promène tranquillement. Il observe les alentours avec attention. "
+    script = ("Personnage test se promène tranquillement. Il observe les alentours avec attention. "
              "Le soleil brille fort aujourd'hui.")
     draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=script,
-                                character_ids=[eli.id], location_id=village.id)
+                                character_ids=[character.id], location_id=village.id)
     launched = env.service.confirm(draft.id, accept_partial=True)
     assert launched.status.value == "EN_FILE"
 
     html = _provenance_html(launched)
-    assert ELI_VOICE_ID in html and "Gaston" not in html
+    assert CHARACTER_VOICE_ID in html
+    assert OLD_PROJECT_VOICE_SENTINEL_ID not in html and OLD_PROJECT_VOICE_SENTINEL_NAME not in html
 
     narrative = launched.snapshot.get("narrative_context") or {}
     narrations = {s["index"]: s["narration"] for s in launched.storyboard}
@@ -222,7 +234,7 @@ def test_fallback_voice_is_named_explicitly_not_silently_shown_as_normal(env):
     draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", character_ids=[incomplete.id])
     launched = env.service.confirm(draft.id, accept_partial=True)
     html = _provenance_html(launched)
-    assert GASTON_SENTINEL_NAME in html  # repli sur la voix du projet, bien visible
+    assert OLD_PROJECT_VOICE_SENTINEL_NAME in html  # repli sur la voix du projet, bien visible
     assert "voix du projet" in html
 
 
@@ -235,12 +247,13 @@ def test_tracking_page_shows_the_provenance_section_with_no_secret(engine):  # n
     project = _project()
     characters = _CR(settings.db_path())
     locations = _LR(settings.db_path())
-    eli = characters.create(project.id, name="Eli", is_primary=True, voice_provider="elevenlabs",
-                            external_voice_id=ELI_VOICE_ID, voice_name=ELI_VOICE_NAME)
+    character = characters.create(project.id, name="Personnage test", is_primary=True,
+                                  voice_provider="elevenlabs", external_voice_id=CHARACTER_VOICE_ID,
+                                  voice_name=CHARACTER_VOICE_NAME)
     locations.create(project.id, name="Place du village")
 
     app = _run({"projet": project.id, "vue": "production"})
-    app.multiselect(key=f"chars_sel_{project.id}").set_value([eli.id]).run()
+    app.multiselect(key=f"chars_sel_{project.id}").set_value([character.id]).run()
     app.selectbox(key=f"loc_sel_{project.id}").set_value(
         next(loc.id for loc in locations.list_for_project(project.id))).run()
     app = _prepare(app, project)
@@ -254,7 +267,7 @@ def test_tracking_page_shows_the_provenance_section_with_no_secret(engine):  # n
     assert "Provenance — script et voix" in text
     assert "validé (#76)" in text and "video_script" in text
     assert "Voix snapshotée" in text and "Voix transmise" in text
-    assert ELI_VOICE_ID in text
+    assert CHARACTER_VOICE_ID in text
     assert "Personnages mentionnés" in text
     for secret in ("FAKE-CONFIG-VALUE-NOT-A-KEY", "sk-", "api_key"):
         assert secret not in text
@@ -269,11 +282,11 @@ def test_isolation_between_projects_provenance_never_leaks(env):
     draft_other = env.service.prepare(other, SUBJECT, provider_id="scripted", character_ids=[other_char.id])
     launched_other = env.service.confirm(draft_other.id, accept_partial=True)
 
-    eli = env.add_eli()
-    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", character_ids=[eli.id])
+    character = env.add_test_character()
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", character_ids=[character.id])
     launched = env.service.confirm(draft.id, accept_partial=True)
 
     html = _provenance_html(launched)
     assert "AUTREPROJETID00001" not in html
     other_html = _provenance_html(launched_other)
-    assert ELI_VOICE_ID not in other_html
+    assert CHARACTER_VOICE_ID not in other_html
