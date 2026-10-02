@@ -11,7 +11,11 @@ from lody.components import format_datetime
 from lody.generation import costing
 from lody.generation.kit_service import KitService
 from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ProductionStatus as S
-from lody.generation.narrative_context import script_injection_applied, visual_injection_applied
+from lody.generation.narrative_context import (
+    scene_mentioned_characters,
+    script_injection_applied,
+    visual_injection_applied,
+)
 from lody.generation.runtime import DEMO_PROVIDER
 from lody.generation.service import ProductionService, request_of
 from lody.generation.safety import redact
@@ -340,16 +344,88 @@ def _voice_diagnostic_html(production: Production) -> str:
     ])
 
 
+_SOURCE_LABELS = {"character": "personnage sélectionné", "project": "voix du projet"}
+
+
+def _voice_summary(voice: dict) -> str:
+    if not voice or not voice.get("provider"):
+        return "—"
+    label = catalog.label(catalog.VOICE_PROVIDERS, voice.get("provider", ""))
+    return " · ".join(filter(None, [label, voice.get("name", ""), voice.get("voice_id", "")])) or "—"
+
+
+def _provenance_html(production: Production) -> str:
+    """Provenance explicite du script final et de la voix (ticket #81) : distingue SNAPSHOTÉE (voix prévue,
+    figée à la préparation) de TRANSMISE (voix réellement envoyée, enregistrée juste avant l'envoi par
+    ``ProductionService._trace``, #75) — et VALIDÉ (script accepté par le garde-fou #76) de TRANSMIS (texte
+    exact du ``video_script`` envoyé au moteur).
+
+    Toujours lu depuis ``production.script``/``snapshot``/``trace``/``params`` — jamais depuis la fiche
+    projet ou les personnages/lieux actuellement éditables. Compatible avec toute production antérieure à
+    #70/#75/#76 : les clés absentes affichent simplement « — », rien ne plante.
+    """
+    snapshot_voice = (production.snapshot or {}).get("request", {}).get("voice") or {}
+    trace_voice = (production.trace or {}).get("voice") or {}
+    voice_origin = production.params.get("voice_resolution") or {}
+
+    snapshot_text = _voice_summary(snapshot_voice)
+    trace_text = _voice_summary(trace_voice)
+    if not snapshot_voice and not trace_voice:
+        concordance = "— (production antérieure à #70/#75 : rien à comparer)"
+    elif not trace_voice:
+        concordance = "— (pas encore transmise : voir le statut de la production)"
+    elif snapshot_text == trace_text:
+        concordance = "Identique — aucune divergence entre la voix prévue et la voix transmise."
+    else:
+        concordance = "⚠️ DIVERGENCE détectée entre la voix prévue et la voix transmise."
+
+    return (
+        '<p class="card-eyebrow">Provenance — script et voix (#81)</p>'
+        '<p class="muted-note">« Snapshotée » = figée à la préparation · « transmise » = enregistrée '
+        "juste avant l'envoi au moteur, jamais recalculée.</p>"
+        + _table([
+            ("Script final — validé (#76) et transmis dans « video_script »", production.script or "—"),
+            ("Voix snapshotée (prévue, instantané de préparation)", snapshot_text),
+            ("Voix transmise (trace, juste avant l'envoi)", trace_text),
+            ("Source de la voix", _SOURCE_LABELS.get(voice_origin.get("source", ""), "—")),
+            ("Concordance voix prévue / transmise", concordance),
+        ])
+    )
+
+
+def _scene_provenance_line(scene: dict, narration: str, narrative: dict) -> str:
+    """Personnages mentionnés, lieu, injection visuelle et gabarit moteur pour CETTE scène (#81) — jamais
+    recalculé depuis les fiches actuelles, uniquement depuis le snapshot/trace déjà figés de CETTE
+    production."""
+    characters = narrative.get("characters") or []
+    location = narrative.get("location")
+    mentioned = scene_mentioned_characters(narration, characters)
+    parts = [f"Personnages mentionnés : {', '.join(mentioned) if mentioned else 'aucun'}"]
+    if location:
+        parts.append(f"Lieu (toutes les scènes) : {location.get('name', '—')}")
+    applied = visual_injection_applied(narrative, scene.get("prompt_sent", ""))
+    parts.append(f"Injection visuelle : {'appliquée' if applied else 'non appliquée'}")
+    parts.append(f"Gabarit moteur : {'appliqué' if scene.get('engine_template_applied') else 'non appliqué'}")
+    return " · ".join(parts)
+
+
 def _render_diagnostic(production: Production) -> None:
     """Traçabilité complète d'une production : d'où vient chaque prompt. Aucune clé n'est jamais affichée."""
     snapshot, trace = production.snapshot, production.trace
     with st.expander("Diagnostic administrateur — traçabilité de la production"):
+        st.caption(
+            "Lecture seule, depuis cette production uniquement — jamais depuis les fiches projet/"
+            "personnages/lieux actuelles. « Sélectionné » = choisi par l'utilisateur · « snapshoté » = figé "
+            "dans l'instantané de préparation · « injecté » = présent dans le prompt envoyé · « validé » = "
+            "accepté par le garde-fou du script (#76) · « transmis » = effectivement envoyé au moteur/TTS."
+        )
         if not snapshot:
             st.markdown('<div class="banner banner-info" role="note">Production antérieure à la traçabilité : aucun instantané ni '
                         "prompt final n’a été enregistré. Le storyboard ci-dessous est ce que Lody a envoyé ; le moteur a pu y ajouter "
                         "son propre gabarit d’images (non enregistré à l’époque).</div>", unsafe_allow_html=True)
         st.markdown(_narrative_diagnostic_html(production), unsafe_allow_html=True)
         st.markdown(_voice_diagnostic_html(production), unsafe_allow_html=True)
+        st.markdown(_provenance_html(production), unsafe_allow_html=True)
         project = snapshot.get("project", {})
         st.markdown('<p class="card-eyebrow">Projet source et instantané</p>' + _table([
             ("Projet", f"{project.get('name', '—')} ({project.get('id', production.project_id)})"),
@@ -386,8 +462,13 @@ def _render_diagnostic(production: Production) -> None:
                                           "engine_template_applied": False} for scene in production.storyboard]
         st.markdown('<p class="card-eyebrow">Storyboard : prompt exact de chaque scène</p>', unsafe_allow_html=True)
         narrations = {scene["index"]: scene["narration"] for scene in production.storyboard}
+        narrative = (snapshot or {}).get("narrative_context") or {}
         for scene in scenes:
-            st.markdown(f"**Scène {int(scene['index'])}** — {esc(redact(narrations.get(scene['index'], '')))}")
+            narration = narrations.get(scene["index"], "")
+            st.markdown(f"**Scène {int(scene['index'])}** — {esc(redact(narration))}")
+            # #81 : passage source déjà affiché ci-dessus ; personnages/lieu/injection/gabarit de CETTE
+            # scène, toujours depuis le snapshot/trace déjà figés (jamais recalculé depuis les fiches).
+            st.caption(redact(_scene_provenance_line(scene, narration, narrative)))
             st.code(redact(scene["prompt_sent"]), language=None)
             if scene.get("engine_template_applied"):
                 st.markdown("_Prompt final réellement envoyé au modèle d’images (après ajout du gabarit du moteur) :_")

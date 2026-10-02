@@ -446,3 +446,11 @@ def resolve_voice(project_voice: VoiceSpec, narrative_context: dict[str, Any] | 
                                 name=str(reference.get("voice_name") or ""), model=project_voice.model)
     return character_voice, {"source": "character", "fallback": False, "character_name": name,
                              "reason": f"voix de {name} ({why})"}
+
+
+def scene_mentioned_characters(narration: str, characters: Sequence[dict[str, Any]]) -> list[str]:
+    """Noms des personnages (snapshotés) dont le nom apparaît dans cette narration — pour le diagnostic de
+    provenance (#81). Réutilise EXACTEMENT la correspondance déjà utilisée par ``enrich_visual_prompts``
+    (#37, voir ``_mentions``) pour décider d'ajouter la continuité visuelle d'une scène : jamais une
+    nouvelle règle qui pourrait diverger de ce qui est réellement injecté."""
+    return [character.get("name", "") for character in characters if _mentions(narration, character.get("name", ""))]
