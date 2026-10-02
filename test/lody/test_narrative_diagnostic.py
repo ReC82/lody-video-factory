@@ -102,7 +102,13 @@ def test_production_with_no_snapshot_at_all_shows_the_compatibility_message(env)
     assert "Aucun personnage ou lieu sélectionné" in html
 
 
-def test_eli_alone_is_selected_snapshotted_and_injected_only_where_mentioned(env):  # noqa: F811
+def test_eli_alone_is_selected_snapshotted_and_injected_in_every_scene(env):  # noqa: F811
+    """Un seul personnage sélectionné => mode dialogue (#77, voir ``_reference_character``) => personnage
+    de référence présent dans CHAQUE scène, que son nom soit mentionné ou non (#92) : il parle à la première
+    personne et ne prononce donc, par construction, jamais son propre nom. ``ScriptedConnector.write_script``
+    écrit toujours SCRIPT (voir ``fakes.py``), où « Eli » n'apparaît jamais par son nom — avant le correctif
+    #92, la continuité visuelle n'était alors ajoutée à AUCUNE scène, ce qui a cassé l'identité visuelle de
+    tout personnage seul en mode dialogue (voir le diagnostic de #92)."""
     eli = env.add_character(name="Eli", role="Guide", personality="Curieux")
     draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", character_ids=[eli.id])
     launched = env.service.confirm(draft.id, accept_partial=True)
@@ -115,10 +121,9 @@ def test_eli_alone_is_selected_snapshotted_and_injected_only_where_mentioned(env
     assert "Eli" in html
     assert "Lieu sélectionné (snapshoté)</dt><dd>Aucun" in html
     assert "Injection dans le script</dt><dd>Appliquée" in html  # le connecteur scripté reprend narrative_block
-    # ScriptedConnector.write_script écrit toujours SCRIPT (voir fakes.py) ; "Eli" n'y est jamais mentionné :
-    # la continuité visuelle n'est donc ajoutée à AUCUNE scène (comportement normal de #37, pas une anomalie).
-    assert "Injection dans les prompts visuels</dt><dd>Non appliquée" in html
-    assert "Transmis au fournisseur</dt><dd>Oui" in html  # le script, lui, a bien reçu le bloc
+    scene_count = len(launched.storyboard)
+    assert f"Appliquée sur {scene_count} scène(s) sur {scene_count}" in html  # #92 : TOUTES, pas seulement celles qui le nomment
+    assert "Transmis au fournisseur</dt><dd>Oui" in html
 
 
 def test_place_du_village_alone_applies_to_every_scene(env):  # noqa: F811
