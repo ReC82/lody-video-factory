@@ -74,12 +74,41 @@ def _cost_summary(production: Production) -> dict[str, Any]:
     }
 
 
-def build_config_export(production: Production) -> dict[str, Any]:
+def _scene_image_correspondence(production: Production, images: list[dict[str, str]] | None) -> Any:
+    """Correspondance scène → image RÉELLEMENT reçue → horodatage de réception (#92).
+
+    ``images`` vient de ``provider.list_scene_images()`` (même fonction que le suivi #93), déjà dans
+    l'ordre chronologique de réception — JAMAIS recalculée ici. Associée aux scènes PAR POSITION : le
+    moteur génère une image par terme de ``video_terms`` dans l'ordre (vérifié dans
+    ``app/services/material.py:_download_videos_openai_image_on_demand``), mais peut s'arrêter avant la
+    fin de la liste une fois la durée de l'audio couverte — une scène sans image correspondante le dit
+    EXPLICITEMENT, jamais une image inventée ou mal associée."""
+    storyboard = production.storyboard or []
+    if images is None:
+        return "indisponible : liste des images reçues non fournie à cet export"
+    if not storyboard:
+        return UNAVAILABLE
+    rows = []
+    for position, scene in enumerate(storyboard):
+        image = images[position] if position < len(images) else None
+        rows.append({
+            "scene": scene.get("index"),
+            "image_recue": image.get("name") if image else None,
+            "recue_le": image.get("captured_at") if image else None,
+            "statut": "reçue" if image else "aucune image dédiée reçue pour cette scène (couverture de "
+                                             "durée du moteur atteinte avant cette scène, ou génération encore en cours)",
+        })
+    return rows
+
+
+def build_config_export(production: Production, images: list[dict[str, str]] | None = None) -> dict[str, Any]:
     """Instantané JSON autonome et versionné de la configuration RÉELLEMENT utilisée par CETTE production
     (paramètres résolus, personnages/lieu snapshotés, prompts envoyés, script, storyboard, voix, coût...).
 
-    Toujours calculable, même en cours (``partiel`` le dit alors explicitement) ou pour une production
-    antérieure à ce ticket (les clés absentes affichent ``UNAVAILABLE``, jamais une valeur inventée)."""
+    ``images`` (optionnel) : images RÉELLEMENT reçues (``provider.list_scene_images()``, #93) — permet
+    d'ajouter la correspondance scène → image → horodatage (#92). Toujours calculable, même en cours
+    (``partiel`` le dit alors explicitement) ou pour une production antérieure à ce ticket (les clés
+    absentes affichent ``UNAVAILABLE``, jamais une valeur inventée)."""
     snapshot = production.snapshot or {}
     trace = production.trace or {}
     params = production.params or {}
@@ -123,11 +152,13 @@ def build_config_export(production: Production) -> dict[str, Any]:
                               if script_request else None,
         },
         "storyboard": [
-            {"index": scene.get("index"), "narration": scene.get("narration"),
+            {"index": scene.get("index"), "narration": scene.get("narration"), "action": scene.get("action", ""),
              "prompt_image_final": scene.get("prompt"), "duree_estimee_s": scene.get("seconds")}
             for scene in (production.storyboard or [])
         ] or UNAVAILABLE,
         "scenes_prompts_envoyes_au_moteur": trace.get("scenes") or UNAVAILABLE,
+        "correspondance_scene_image": _scene_image_correspondence(production, images),
+        "modele_images": trace.get("image_model") or UNAVAILABLE,
         "gabarit_images_moteur": trace.get("image_template") or UNAVAILABLE,
         "parametres_sous_titres_montage_musique": trace.get("engine_params") or UNAVAILABLE,
         "origine_de_chaque_valeur": trace.get("origins") or UNAVAILABLE,
@@ -147,9 +178,9 @@ def build_config_export(production: Production) -> dict[str, Any]:
     return _clean(config)
 
 
-def config_export_text(production: Production) -> str:
+def config_export_text(production: Production, images: list[dict[str, str]] | None = None) -> str:
     """Texte UTF-8 autonome (JSON indenté) : contenu de ``production_<id>_config.txt``."""
-    return json.dumps(build_config_export(production), indent=2, ensure_ascii=False, default=str)
+    return json.dumps(build_config_export(production, images), indent=2, ensure_ascii=False, default=str)
 
 
 def _event(at: str | None, label: str, **detail: Any) -> dict[str, Any]:

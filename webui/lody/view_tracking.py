@@ -532,11 +532,11 @@ def render(service: ProductionService, project: Project, production_id: str, kit
     def live() -> None:
         current = service.refresh(production_id)
         images: list[dict] = []
-        if current.external_task_id and current.status in (*ACTIVE_STATUSES, S.ECHEC):
-            # #93 : relecture RÉELLE (jamais inventée) des images déjà reçues pour CETTE tâche — même
-            # fonction déjà utilisée par les kits de publication (``kit_service.py``), ici pendant le
-            # suivi actif. Coûte un scan de disque borné (40 fichiers maximum) à chaque actualisation ;
-            # jamais un appel fournisseur.
+        # #93 : relecture RÉELLE (jamais inventée) des images déjà reçues pour CETTE tâche — même fonction
+        # déjà utilisée par les kits de publication (``kit_service.py``). Coûte un scan de disque borné (40
+        # fichiers maximum) à chaque actualisation ; jamais un appel fournisseur. Incluse aussi pour
+        # TERMINEE (#92) : alimente la correspondance scène → image de l'export de configuration (#91).
+        if current.external_task_id and current.status in (*ACTIVE_STATUSES, S.ECHEC, S.TERMINEE):
             try:
                 images = service.provider(current.provider).list_scene_images(
                     ExternalTask(current.provider, current.external_task_id))
@@ -571,7 +571,8 @@ def render(service: ProductionService, project: Project, production_id: str, kit
                 st.download_button("Télécharger les logs complets", data=export.logs_export_text(current),
                                    file_name=f"production_{current.id}_logs.txt", mime="text/plain",
                                    icon=":material/description:", key=f"export_logs_{current.id}")
-                st.download_button("Télécharger la configuration complète", data=export.config_export_text(current),
+                st.download_button("Télécharger la configuration complète",
+                                   data=export.config_export_text(current, images),
                                    file_name=f"production_{current.id}_config.txt", mime="text/plain",
                                    icon=":material/settings:", key=f"export_config_{current.id}")
         if production.is_active and not current.is_active:
