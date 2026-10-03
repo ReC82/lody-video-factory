@@ -338,6 +338,31 @@ def _generate_voice_preview(service: ProductionService, p: str, character: Chara
     ss.pop(f"{p}_voice_preview_{preset_key}_error", None)
 
 
+# #92 (suite) : la direction (ton, hésitation, pause, réflexion) évolue au fil des répliques — eleven_
+# multilingual_v2 n'offre aucun levier documenté pour faire varier cela DANS un seul appel (voice_settings
+# s'applique à tout l'appel, pas phrase par phrase ; aucune balise audio confirmée compatible avec ce
+# modèle). eleven_v3 (model_id officiel, voir https://elevenlabs.io/docs/best-practices/prompting/eleven-v3)
+# supporte des balises entre crochets interprétées comme des indications de jeu — JAMAIS prononcées —
+# combinées aux points de suspension/majuscules déjà recommandés pour les pauses et l'emphase (SSML non
+# supporté par ce modèle). Un SEUL appel continu par variante (jamais plusieurs segments recollés) :
+# le "request stitching" officiel n'est de toute façon pas disponible pour eleven_v3, et une génération
+# ininterrompue garde nativement le contexte de toute la séquence, sans raccord à soigner.
+# Mêmes MOTS strictement identiques entre les deux variantes (seules les balises et leur densité varient) ;
+# mêmes réglages de voix dans les deux cas, pour isoler l'effet du JEU de celui des réglages globaux.
+_VOICE_LAB_V3_SETTINGS = {
+    "model_id": "eleven_v3", "stability": 0.3, "similarity_boost": 0.75, "style": 0.35,
+    "use_speaker_boost": True, "speed": 1.0,
+}
+_VOICE_LAB_V3_PRESETS: list[tuple[str, str, str]] = [
+    ("v3_subtle", "eleven_v3 — interprétation subtile et naturelle",
+     "[matter-of-fact] Voyageur, j'ai une quête urgente pour toi ! [hesitates] Enfin... c'est ce que je dis "
+     "à chaque fois. [reflective] Attends... je l'ai déjà dit combien de fois, ça ?"),
+    ("v3_marked", "eleven_v3 — prise de conscience plus marquée, sans caricature",
+     "[matter-of-fact] Voyageur, j'ai une quête urgente pour toi ! [pause] [hesitates] Enfin... c'est ce que "
+     "je dis à chaque fois. [pause] [reflective] [hesitates] Attends... je l'ai déjà dit combien de fois, ça ?"),
+]
+
+
 def _render_voice_lab(service: ProductionService, project: Project, current: Character | None) -> None:
     """Essai vocal comparatif pour LA MÊME voix déjà configurée (#92, diagnostic du jeu vocal) — ne
     remplace jamais la voix utilisée en production : les réglages comparés ici ne s'appliquent nulle part
@@ -369,6 +394,26 @@ def _render_voice_lab(service: ProductionService, project: Project, current: Cha
             button_label = "Régénérer cet extrait" if (audio or error) else "Générer cet extrait"
             st.button(button_label, key=f"{p}_voice_preview_{preset_key}_generate",
                       on_click=_generate_voice_preview, args=(service, p, current, preset_key, text, settings))
+
+        st.markdown('<p class="card-eyebrow">Direction par réplique (eleven_v3)</p>', unsafe_allow_html=True)
+        st.caption("Le ton évolue phrase par phrase (assurance → hésitation → prise de conscience), un seul "
+                  "appel continu par variante pour garder le contexte de toute la séquence. Mêmes mots dans "
+                  "les deux variantes, mêmes réglages de voix — seules les balises de jeu entre crochets "
+                  "changent. Les crochets sont une direction interprétée par le modèle, jamais prononcés. "
+                  "Modèle ElevenLabs officiel eleven_v3 (jamais la voix ni le modèle de production).")
+        for preset_key, label, tagged_text in _VOICE_LAB_V3_PRESETS:
+            st.markdown(f"**{esc(label)}**")
+            st.code(tagged_text, language=None)
+            error = st.session_state.get(f"{p}_voice_preview_{preset_key}_error")
+            audio = st.session_state.get(f"{p}_voice_preview_{preset_key}_bytes")
+            if error:
+                st.markdown(f'<p class="field-error" role="alert">{esc(error)}</p>', unsafe_allow_html=True)
+            if audio:
+                st.audio(audio, format="audio/mp3")
+            button_label = "Régénérer cet extrait" if (audio or error) else "Générer cet extrait"
+            st.button(button_label, key=f"{p}_voice_preview_{preset_key}_generate",
+                      on_click=_generate_voice_preview,
+                      args=(service, p, current, preset_key, tagged_text, _VOICE_LAB_V3_SETTINGS))
 
 
 def _render_form(repo: CharacterRepository, project: Project, target: str | None, current: Character | None) -> None:
