@@ -44,6 +44,7 @@ class ScriptedConnector(VideoGenerationProvider):
     display_name = "Faux moteur"
     supports_thumbnail_background = False   # activable par les tests : le moteur historique ne sait pas générer une image seule
     supports_reference_images = False   # #92 : activable par les tests (voir upload_reference_image ci-dessous)
+    supports_voice_preview = False   # #92 : activable par les tests (voir generate_voice_preview ci-dessous)
 
     def __init__(self, root: Path, *, issues: list[ReadinessIssue] | None = None):
         self.root = Path(root)
@@ -69,6 +70,11 @@ class ScriptedConnector(VideoGenerationProvider):
         self.reference_asset_id = "fake-reference-asset-id-0001"
         self.reference_proposal_bytes: bytes | None = None
         self.reference_proposal_error: ProviderError | None = None
+        # #92 : chaque essai vocal demandé, dans l'ordre — (texte, voice_id, réglages) — jamais rejoué ni
+        # modifié ici : les tests vérifient ce qui a été RÉELLEMENT demandé.
+        self.voice_previews_received: list[tuple[str, str, dict]] = []
+        self.voice_preview_bytes: bytes | None = None
+        self.voice_preview_error: ProviderError | None = None
 
     # -- scénario -----------------------------------------------------------
     def queue(self, *items: TaskSnapshot | ProviderError) -> None:
@@ -110,6 +116,13 @@ class ScriptedConnector(VideoGenerationProvider):
         if self.reference_proposal_error:
             raise self.reference_proposal_error
         return self.reference_proposal_bytes if self.reference_proposal_bytes is not None else _png(prompt)
+
+    def generate_voice_preview(self, text, voice_id, settings):
+        self.calls.append("generate_voice_preview")   # appel payant : les tests comptent chaque appel
+        if self.voice_preview_error:
+            raise self.voice_preview_error
+        self.voice_previews_received.append((text, voice_id, dict(settings)))
+        return self.voice_preview_bytes if self.voice_preview_bytes is not None else b"fake-mp3-bytes"
 
     def describe_params(self, request):
         return {"video_aspect": request.aspect, "video_language": request.language, "subtitle_display_mode": "sentence"}

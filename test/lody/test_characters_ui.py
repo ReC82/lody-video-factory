@@ -428,7 +428,7 @@ def test_provider_error_during_generation_is_shown_and_nothing_crashes(engine): 
     assert len(app.get("image")) == 0  # aucune proposition à prévisualiser
 
 
-def test_reference_prompt_always_guards_against_a_multi_panel_collage_with_embedded_text():
+def test_reference_prompt_always_guards_against_a_multi_panel_collage_with_embedded_text(engine):  # noqa: F811
     """Essai réel #92 : une fiche seule, sans garde, a produit un montage à 8 vignettes avec un titre
     incrusté (inutilisable comme référence de continuité). La garde est GÉNÉRIQUE (jamais un nom/trait
     codé en dur) : présente même pour une fiche vide, jamais seulement pour une fiche remplie."""
@@ -440,3 +440,75 @@ def test_reference_prompt_always_guards_against_a_multi_panel_collage_with_embed
     for prompt in (_reference_prompt_from_sheet(filled), _reference_prompt_from_sheet(empty)):
         assert "une SEULE image" in prompt and "jamais un montage ni une grille" in prompt
         assert "Aucun texte" in prompt and "aucun logo" in prompt
+
+
+# -- essai vocal comparatif (#92, diagnostic du jeu vocal) ---------------------------------------------------------
+def test_voice_lab_is_absent_without_an_elevenlabs_voice_configured(engine):  # noqa: F811
+    project = _project()
+    _char_repo().create(project.id, name="Gaston")  # aucune voix configurée
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    assert "Essai vocal comparatif" not in _text(app)
+
+
+def test_voice_lab_is_absent_for_a_non_elevenlabs_voice(engine):  # noqa: F811
+    project = _project()
+    _char_repo().create(project.id, name="Gaston", voice_provider="edge", voice_name="fr-FR-SomeVoice")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    assert "Essai vocal comparatif" not in _text(app)
+
+
+def test_voice_lab_shows_three_presets_and_generates_on_demand(engine):  # noqa: F811
+    engine.supports_voice_preview = True
+    project = _project()
+    _char_repo().create(project.id, name="Gaston", voice_provider="elevenlabs", voice_name="Kev",
+                        external_voice_id="voice-abc123")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    assert not app.exception
+    assert "Essai vocal comparatif" in _text(app)
+    labels = _labels(app)
+    assert "Générer cet extrait" in labels  # au moins un des trois presets, pas encore généré
+
+    app = _button(app, "Générer cet extrait").click().run()
+
+    assert not app.exception
+    assert engine.calls.count("generate_voice_preview") == 1
+    text, voice_id, settings = engine.voice_previews_received[0]
+    assert voice_id == "voice-abc123"
+    assert text.strip()  # jamais vide
+    assert settings["use_speaker_boost"] is True
+    assert "Régénérer cet extrait" in _labels(app)  # redevenu disponible pour un nouvel essai
+
+
+def test_voice_lab_presets_use_officially_documented_settings_only(engine):  # noqa: F811
+    """Jamais une balise non confirmée compatible avec eleven_multilingual_v2 (#92) : uniquement
+    stability/similarity_boost/style/use_speaker_boost/speed."""
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston", voice_provider="elevenlabs", voice_name="Kev",
+                                    external_voice_id="voice-abc123")
+    from lody.view_characters import _voice_lab_presets
+
+    for _key, _label, _detail, preset_settings in _voice_lab_presets(project):
+        assert set(preset_settings) == {"stability", "similarity_boost", "style", "use_speaker_boost", "speed"}
+        assert 0.0 <= preset_settings["stability"] <= 1.0
+        assert 0.0 <= preset_settings["style"] <= 1.0
+        assert 0.25 <= preset_settings["speed"] <= 4.0
+    del character  # fiche non utilisée directement : seuls les réglages génériques sont vérifiés ici
+
+
+def test_voice_lab_shows_the_provider_error_without_crashing(engine):  # noqa: F811
+    from lody.generation.models import ErrorKind, ProviderError
+
+    engine.supports_voice_preview = True
+    project = _project()
+    _char_repo().create(project.id, name="Gaston", voice_provider="elevenlabs", voice_name="Kev",
+                        external_voice_id="voice-abc123")
+    engine.voice_preview_error = ProviderError(ErrorKind.KEY_MISSING, "ElevenLabs n’est pas configuré.")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    app = _button(app, "Générer cet extrait").click().run()
+
+    assert not app.exception
+    assert "ElevenLabs n’est pas configuré" in _text(app)
