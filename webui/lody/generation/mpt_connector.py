@@ -319,8 +319,15 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
 
     # -- API du VideoGenerationProvider --------------------------------------
     def describe_params(self, request: GenerationRequest) -> dict[str, Any]:
+        """Paramètres effectifs envoyés — « sans secret » au sens de la docstring de base : les jetons
+        d'autorisation d'asset opaques (#86/#92, ``secrets.token_hex(32)``) sont EXCLUS ici comme dans
+        ``ProductionService._persistable_request_dict`` — ce sont de vrais secrets d'autorisation que le
+        garde-fou générique de ``store.py`` (``GUARDED``) rejetterait sinon dans ``params``. Jamais utile
+        de les relire depuis l'archivage de toute façon : ils ne servent qu'une fois, juste avant cet appel."""
         payload = build_payload(request, resolve(self.config_path, self.report_path))
-        return {key: value for key, value in payload.items() if key not in ("video_script", "video_terms", "video_subject")}
+        excluded = ("video_script", "video_terms", "video_subject",
+                   "custom_audio_asset_id", "audio_asset_scope", "character_reference_asset_id", "image_asset_scope")
+        return {key: value for key, value in payload.items() if key not in excluded}
 
     def _ping(self) -> None:
         if self._clock() < self._ping_ok_until:

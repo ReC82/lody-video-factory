@@ -151,3 +151,21 @@ def test_image_model_is_explicitly_unavailable_when_unknown():
     production = _production_with_storyboard(trace={})
     config = export.build_config_export(production)
     assert config["modele_images"] == export.UNAVAILABLE
+
+
+def test_character_reference_image_usage_is_exported_when_recorded():
+    """#92 : la trace déjà posée par ``ProductionService._trace`` (``used``/``character_name``/
+    ``reference_file``) doit apparaître dans l'export — jamais seulement calculée, jamais perdue."""
+    production = _production_with_storyboard(trace={
+        "reference_image": {"used": True, "character_name": "Eli", "reference_file": "references/p/characters/c/abc.png"},
+    })
+    config = export.build_config_export(production)
+    assert config["reference_visuelle_personnage"] == {
+        "used": True, "character_name": "Eli", "reference_file": "references/p/characters/c/abc.png",
+    }
+
+
+def test_character_reference_image_usage_is_explicitly_unavailable_before_the_ticket():
+    production = _production_with_storyboard(trace={})
+    config = export.build_config_export(production)
+    assert config["reference_visuelle_personnage"] == export.UNAVAILABLE

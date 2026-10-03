@@ -160,6 +160,10 @@ def build_config_export(production: Production, images: list[dict[str, str]] | N
         "correspondance_scene_image": _scene_image_correspondence(production, images),
         "modele_images": trace.get("image_model") or UNAVAILABLE,
         "gabarit_images_moteur": trace.get("image_template") or UNAVAILABLE,
+        # #92 : référence visuelle de personnage RÉELLEMENT transmise (même référence canonique pour
+        # chaque scène, voir ProductionService._run) — "used" ne vaut jamais True sans upload réellement
+        # réussi avant l'envoi au moteur ; jamais recalculé depuis la fiche personnage actuelle.
+        "reference_visuelle_personnage": trace.get("reference_image") or UNAVAILABLE,
         "parametres_sous_titres_montage_musique": trace.get("engine_params") or UNAVAILABLE,
         "origine_de_chaque_valeur": trace.get("origins") or UNAVAILABLE,
         "cout": _cost_summary(production),

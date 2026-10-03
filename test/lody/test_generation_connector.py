@@ -141,6 +141,21 @@ def test_effective_params_record_the_font_actually_sent(tmp_path):
     assert connector.describe_params(_crypto_request())["font_name"] == "BeVietnamPro-Bold.ttf"
 
 
+def test_effective_params_never_include_the_opaque_asset_authorization_tokens(tmp_path):
+    """#86/#92 : ``describe_params`` est persisté dans ``params`` (colonne gardée, voir ``store.GUARDED``) —
+    un jeton opaque d'autorisation d'asset (``secrets.token_hex(32)`` ou l'identifiant renvoyé par le moteur)
+    y déclencherait à tort le garde-fou générique des secrets. Ces jetons ne servent qu'une fois, juste avant
+    l'envoi (voir ``ProductionService._persistable_request_dict``) : jamais utile de les relire ensuite."""
+    connector, _ = _connector(tmp_path, config=CONFIG)
+    request = _crypto_request(
+        audio_asset_id="deadbeefdeadbeefdeadbeefdeadbeef", audio_asset_scope="a1b2c3d4" * 8,
+        character_reference_asset_id="cafef00dcafef00dcafef00dcafef00", image_asset_scope="e5f6a7b8" * 8,
+    )
+    params = connector.describe_params(request)
+    for forbidden in ("custom_audio_asset_id", "audio_asset_scope", "character_reference_asset_id", "image_asset_scope"):
+        assert forbidden not in params
+
+
 def test_music_and_voice_variants():
     flags = EngineFacts()
     edge = _crypto_request(voice=VoiceSpec("edge", "", "fr-FR-DeniseNeural", ""), music_provider="none")
