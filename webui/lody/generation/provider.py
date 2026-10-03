@@ -101,6 +101,26 @@ class VideoGenerationProvider(ABC):
         """
         raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas recevoir un audio déjà synthétisé.")
 
+    def upload_reference_image(self, image_bytes: bytes, scope: str) -> str:
+        """Transfère une image de référence DÉJÀ VALIDÉE pour un personnage (#92, continuité visuelle) :
+        aucune génération, seulement le transfert. Renvoie un identifiant opaque, RÉSOLUBLE PLUSIEURS FOIS
+        (une fois par scène du personnage, contrairement à ``upload_audio_asset``) par les appels à
+        ``submit()`` ultérieurs dont la requête porte EXACTEMENT le même ``scope`` (voir
+        ``GenerationRequest.image_asset_scope``). Lève ``ProviderError`` si le moteur ne le permet pas —
+        voir ``supports_reference_images``, jamais un repli silencieux sur le texte seul à cet endroit
+        (c'est à l'appelant de décider, voir ``narrative_context.reference_images_status``).
+        """
+        raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas recevoir une image de référence.")
+
+    def generate_reference_proposal(self, prompt: str) -> bytes:
+        """Génère UNE image isolée (payant), pour proposer une référence visuelle de personnage à partir
+        de sa fiche — jamais liée à une tâche vidéo, jamais enregistrée tant qu'elle n'est pas validée
+        explicitement par l'utilisateur (l'enregistrement lui-même reste hors de ce module, voir la
+        frontière #35 : cette interface ne connaît aucun personnage, seulement un texte et des octets).
+        Lève ``ProviderError`` si le moteur ne le permet pas.
+        """
+        raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer une proposition de référence.")
+
     def describe_script_request(self, request: GenerationRequest, narrative_block: str = "",
                                 dialogue_character: str = "") -> dict:
         """Ce qui est envoyé au fournisseur pour ÉCRIRE le script (sujet, langue, prompt éditorial) — pour archivage.

@@ -114,7 +114,7 @@ def render() -> None:
     elif route.view == nav.VIEW_V2 and project and route.production_id:
         view_v2.render(service, project, route.production_id)
     elif route.view == nav.VIEW_CHARACTERS and project:
-        view_characters.render(get_character_repository(), project)
+        view_characters.render(get_character_repository(), project, service)
     elif route.view == nav.VIEW_LOCATIONS and project:
         view_locations.render(get_location_repository(), project)
     elif route.view == nav.VIEW_SYSTEM_SETTINGS:

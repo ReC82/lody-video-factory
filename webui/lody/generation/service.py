@@ -23,6 +23,7 @@ from typing import Any, Protocol
 
 from lody import brief as brief_lib
 from lody import catalog
+from lody import reference_images
 from lody.characters import CharacterRepository
 from lody.generation import kit_files, publication, thumbnail, typography
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
@@ -47,6 +48,7 @@ from lody.generation.narrative_context import (
     NarrativeContextError,
     always_present_character_id,
     enrich_visual_prompts,
+    reference_character,
     reference_images_status,
     render_prompt_block,
     resolve_narrative_context,
@@ -54,7 +56,7 @@ from lody.generation.narrative_context import (
     script_mode,
 )
 from lody.generation.provider import VideoGenerationProvider
-from lody.generation.safety import sanitize
+from lody.generation.safety import new_image_asset_scope, sanitize
 from lody.generation.script_guard import validate_spoken_script
 from lody.generation.storyboard import MAX_SCENES, build_storyboard
 from lody.generation.store import Production, ProductionRepository
@@ -528,6 +530,30 @@ class ProductionService:
             scenes = enrich_visual_prompts(scenes, narrative_context,
                                            always_present_id=always_present_character_id(narrative_context))
             request = request.with_updates(visual_prompts=[scene.prompt for scene in scenes])
+            # #92 (continuité visuelle) : transmet RÉELLEMENT l'image de référence du personnage de
+            # référence (MÊME résolution que always_present_character_id ci-dessus), si le fournisseur la
+            # supporte ET que ce personnage en a bien une. Jamais une transmission silencieusement
+            # ignorée mais présentée comme utilisée (voir narrative_context.reference_images_status) :
+            # un échec d'upload dégrade explicitement vers le texte seul (déjà complet, #99), jamais vers
+            # un échec de toute la production — l'image de référence est un renfort, pas une condition.
+            reference_asset_id, reference_scope = "", ""
+            ref_character = reference_character(narrative_context)
+            if provider.supports_reference_images and ref_character and ref_character.get("reference_image"):
+                try:
+                    image_bytes = reference_images.read_bytes(
+                        ref_character["reference_image"], production.project_id, "characters", ref_character["id"])
+                    reference_scope = new_image_asset_scope()
+                    reference_asset_id = provider.upload_reference_image(image_bytes, reference_scope)
+                except (ProviderError, OSError, ValueError) as error:
+                    logger.warning("production %s : image de référence non transmise (%s)",
+                                   production_id, type(error).__name__)
+                    self.repo.update(production_id, warnings=[
+                        *self.repo.get(production_id).warnings,
+                        "Image de référence du personnage non transmise : génération au texte seul."])
+                    reference_asset_id, reference_scope = "", ""
+            if reference_asset_id:
+                request = request.with_updates(character_reference_asset_id=reference_asset_id,
+                                               image_asset_scope=reference_scope)
             # #75 : dernière vérification, juste avant d'écrire la trace et d'envoyer — voir
             # _assert_voice_unchanged. Placée AVANT provider.submit() : une divergence bloque l'envoi,
             # aucun appel n'est jamais effectué avec la mauvaise voix.
@@ -543,7 +569,8 @@ class ProductionService:
                 # prepare() (``production`` est le même objet en mémoire depuis le début de _run() : ses
                 # clés de diagnostic n'ont jamais été perdues, même si l'écriture SQL ci-dessus les a déjà
                 # réécrites une première fois).
-                params={**production.params, "request": request.to_dict(), "engine": provider.describe_params(request)},
+                params={**production.params, "request": self._persistable_request_dict(request),
+                       "engine": provider.describe_params(request)},
                 # avant l'envoi : conservée même en cas d'échec
                 trace=self._step_trace(self._log_event(
                     self._trace(production, provider, request, script_request), "storyboard construit et continuité visuelle appliquée",
@@ -589,6 +616,19 @@ class ProductionService:
         self.repo.update(production_id, assets=[*production.assets, {"kind": "thumbnail_background", "ref": ref, "root": "data"}],
                          trace={**production.trace, "thumbnail_background": {"prompt": prompt, "ref": ref}})
 
+    def _persistable_request_dict(self, request: GenerationRequest) -> dict[str, Any]:
+        """``request.to_dict()`` sans les jetons d'autorisation d'asset (#86/#92) : ce sont des JETONS
+        OPAQUES de haute entropie (``secrets.token_hex(32)``, voir ``new_audio_asset_scope``/
+        ``new_image_asset_scope``) — le garde-fou secrets générique de ``store.py`` (``GUARDED``,
+        détection de jeton opaque ≥32 caractères) les refuserait sinon dans ``params``, à raison : ce sont
+        de VRAIS secrets d'autorisation. Jamais utile de les relire depuis le stockage de toute façon : ils
+        ne servent qu'une fois, juste avant ``provider.submit()`` (voir ``_run``, qui transmet le
+        ``request`` COMPLET à ``submit()`` AVANT cet appel, jamais la version tronquée ci-dessous)."""
+        data = request.to_dict()
+        for key in ("audio_asset_id", "audio_asset_scope", "character_reference_asset_id", "image_asset_scope"):
+            data.pop(key, None)
+        return data
+
     def _trace(self, production: Production, provider: VideoGenerationProvider, request: GenerationRequest,
                script_request: dict[str, Any] | None) -> dict[str, Any]:
         """Ce qui est RÉELLEMENT envoyé, et d'où vient chaque élément (sans clé : aucun champ secret n'existe ici)."""
@@ -615,6 +655,7 @@ class ProductionService:
             {"item": "Voix", "origin": voice_origin_text},
             {"item": "Langue, format, durée", "origin": "projet"},
         ]
+        ref_character_info = reference_character(production.snapshot.get("narrative_context")) or {}
         return {"recorded_at": self._clock(), "project": production.snapshot.get("project", {}),
                 "snapshot_version": production.snapshot.get("version", ""), "script_request": script_request,
                 "scenes": detail.get("scenes", []), "image_template": engine_template,
@@ -632,7 +673,17 @@ class ProductionService:
                 # #77 : mode d'écriture du script RÉELLEMENT utilisé (narration externe ou dialogue
                 # mono-personnage) — recalculé depuis le même narrative_context déjà figé (jamais un
                 # secret), pour que le diagnostic distingue toujours les deux, jamais silencieusement.
-                "script_mode": script_mode(production.snapshot.get("narrative_context"))}
+                "script_mode": script_mode(production.snapshot.get("narrative_context")),
+                # #92 : la référence visuelle a-t-elle été RÉELLEMENT transmise à ce fournisseur pour
+                # cette production ? ``request.character_reference_asset_id`` n'est non vide que si
+                # l'upload a réellement réussi (voir _run) — jamais une référence présentée comme utilisée
+                # si elle ne l'a pas été. ``reference_file`` identifie QUEL fichier (déjà sa propre
+                # "version", un nom de fichier opaque jamais réutilisé, voir reference_images.save).
+                "reference_image": {
+                    "used": bool(request.character_reference_asset_id),
+                    "character_name": ref_character_info.get("name", ""),
+                    "reference_file": ref_character_info.get("reference_image", ""),
+                }}
 
     def _fail(self, production_id: str, kind: ErrorKind, message: str) -> None:
         # #93 : conserve QUELLE étape était active au moment de l'échec, AVANT que current_step ne

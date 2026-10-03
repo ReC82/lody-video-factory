@@ -109,6 +109,15 @@ class GenerationRequest:
     # mpt_connector.build_payload, qui n'ajoute ces clés au payload que si audio_asset_id est non vide.
     audio_asset_id: str = ""
     audio_asset_scope: str = ""
+    # #92 (continuité visuelle) : référence opaque d'une image déjà uploadée pour le personnage de
+    # référence de cette production, obtenue via VideoGenerationProvider.upload_reference_image (jamais
+    # inventée ici). MVP mono-référence (même règle que la voix #70/le mode dialogue #77 : au maximum un
+    # personnage de référence par production). Vides par défaut : toute production qui ne les renseigne
+    # pas (aucune sélection, ou personnage sans image de référence) suit exactement le chemin texte seul
+    # historique — voir mpt_connector.build_payload, qui n'ajoute ces clés que si character_reference_
+    # asset_id est non vide.
+    character_reference_asset_id: str = ""
+    image_asset_scope: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

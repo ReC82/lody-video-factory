@@ -1,3 +1,4 @@
+import base64
 import glob
 import os
 import pathlib
@@ -21,6 +22,9 @@ from app.models.schema import (
     AudioRequest,
     BgmRetrieveResponse,
     BgmUploadResponse,
+    ImageAssetUploadResponse,
+    ImagePreviewRequest,
+    ImagePreviewResponse,
     SubtitleRequest,
     TaskDeletionResponse,
     TaskListResponse,
@@ -33,6 +37,8 @@ from app.models.schema import (
 )
 from app.services import audio_assets as audio_assets_service
 from app.services import bgm as bgm_service
+from app.services import image_assets as image_assets_service
+from app.services import material as material_service
 from app.services import material_upload as material_upload_service
 from app.services import state as sm
 from app.services import task as tm
@@ -436,6 +442,112 @@ def create_audio_asset(
         )
 
     response = {"asset_id": asset_id}
+    return utils.get_response(200, response)
+
+
+@router.post(
+    "/image_assets",
+    response_model=ImageAssetUploadResponse,
+    summary="Upload a character reference image for visual continuity across scenes",
+    description=(
+        "Validate a PNG, JPG, or WEBP file up to 25 MB and store it under an opaque, time-limited "
+        "reference (#92, visual continuity). The SAME production_scope value must be supplied again as "
+        "image_asset_scope when creating a video with character_reference_asset_id, or the reference is "
+        "rejected. Unlike audio assets, an image asset reference may be resolved MULTIPLE times within "
+        "the same task (once per generated scene) and is never marked consumed; it simply expires if "
+        "unused for too long."
+    ),
+    responses={
+        400: {"description": "The filename, format, size, image content, or production_scope is invalid"},
+        500: {"description": "Persistent storage is unavailable"},
+    },
+)
+def create_image_asset(
+    request: Request,
+    file: UploadFile = File(...),
+    production_scope: str = Form(...),
+):
+    request_id = base.get_task_id(request)
+    try:
+        asset_id = image_assets_service.save_image_asset_upload(
+            file.filename, file.file, production_scope
+        )
+    except image_assets_service.ImageAssetError as exc:
+        logger.warning(
+            f"image asset upload rejected: request_id={request_id}, error={str(exc)}"
+        )
+        raise HttpException(
+            task_id=request_id,
+            status_code=400,
+            message=f"{request_id}: {str(exc)}",
+        )
+    except image_assets_service.ImageAssetServiceError as exc:
+        logger.error(
+            f"image asset upload failed: request_id={request_id}, error={str(exc)}"
+        )
+        raise HttpException(
+            task_id=request_id,
+            status_code=500,
+            message=f"{request_id}: image asset validation is unavailable",
+        )
+
+    response = {"asset_id": asset_id}
+    return utils.get_response(200, response)
+
+
+@router.post(
+    "/image_preview",
+    response_model=ImagePreviewResponse,
+    summary="Generate a single standalone image (e.g. to preview a character reference proposal)",
+    description=(
+        "Generate ONE image from a text prompt using the configured OpenAI-compatible image provider, "
+        "outside of any video task (#92, visual continuity). Returned directly as base64, never persisted "
+        "under storage/tasks. Always text-only (/images/generations): there is no reference yet at this "
+        "stage — generating one IS the point of this endpoint."
+    ),
+    responses={
+        400: {"description": "The image provider is not configured"},
+        502: {"description": "The image provider request failed"},
+    },
+)
+def create_image_preview(request: Request, body: ImagePreviewRequest):
+    request_id = base.get_task_id(request)
+    if not material_service.is_openai_image_enabled():
+        raise HttpException(
+            task_id=request_id,
+            status_code=400,
+            message=f"{request_id}: the OpenAI-compatible image provider is not configured",
+        )
+    try:
+        items = material_service.generate_images_openai(
+            search_term=body.prompt,
+            minimum_duration=1,
+            video_aspect=body.video_aspect,
+        )
+    except ValueError as exc:
+        raise HttpException(
+            task_id=request_id,
+            status_code=400,
+            message=f"{request_id}: {str(exc)}",
+        )
+    if not items:
+        raise HttpException(
+            task_id=request_id,
+            status_code=502,
+            message=f"{request_id}: image generation failed; see server logs for the provider's response",
+        )
+    try:
+        with open(items[0].url, "rb") as handle:
+            encoded = base64.b64encode(handle.read()).decode("ascii")
+    finally:
+        # Image de prévisualisation seulement : jamais destinée à persister dans le cache partagé des
+        # images générées "à la volée" (cache_images), au contraire d'une image de scène réelle.
+        try:
+            os.remove(items[0].url)
+        except OSError:
+            pass
+
+    response = {"image_base64": encoded}
     return utils.get_response(200, response)
 
 

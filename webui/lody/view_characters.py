@@ -14,7 +14,10 @@ import streamlit as st
 from lody import catalog, nav, reference_images, resource_transfer, voice_picker
 from lody.characters import Character, CharacterNotFound, CharacterRepository, CharacterValidationError
 from lody.components import EMPTY_ICON_SVG
+from lody.generation.models import ProviderError
 from lody.generation.publication import slugify
+from lody.generation.runtime import DEFAULT_PROVIDER
+from lody.generation.service import ProductionService
 from lody.projects import Project
 from lody.theme import esc
 
@@ -192,6 +195,87 @@ def _row(repo: CharacterRepository, project: Project, character: Character) -> N
                 st.button("Oui, désactiver", type="primary", key=f"confirm_deactivate_yes_{character.id}",
                           on_click=_deactivate, args=(repo, project.id, character.id))
                 st.button("Annuler", key=f"cancel_deactivate_{character.id}", on_click=_cancel_deactivate)
+
+
+def _reference_prompt_from_sheet(character: Character) -> str:
+    """Prompt de proposition de référence, dérivé UNIQUEMENT de la fiche du personnage (#92) — jamais un
+    nom/trait codé en dur ailleurs dans la plateforme : tout vient de ces quatre champs, dans cet ordre."""
+    parts = [part for part in (
+        character.visual_description, character.reference_prompt, character.permanent_elements,
+    ) if part.strip()]
+    if not parts:
+        return f"Portrait de {character.name}, personnage de fiction, style neutre, fond simple."
+    return " ".join(parts)
+
+
+def _generate_reference_proposal(service: ProductionService, p: str, character: Character) -> None:
+    ss = st.session_state
+    provider = service.provider(DEFAULT_PROVIDER)
+    try:
+        image_bytes = provider.generate_reference_proposal(_reference_prompt_from_sheet(character))
+        reference_images.validate(image_bytes)
+    except (ProviderError, reference_images.ReferenceImageError) as error:
+        ss[f"{p}_proposal_error"] = str(getattr(error, "message", error))
+        ss.pop(f"{p}_proposal_bytes", None)
+        return
+    ss[f"{p}_proposal_bytes"] = image_bytes
+    ss.pop(f"{p}_proposal_error", None)
+
+
+def _validate_reference_proposal(repo: CharacterRepository, project_id: str, character_id: str, p: str) -> None:
+    image_bytes = st.session_state.get(f"{p}_proposal_bytes")
+    if not image_bytes:
+        return
+    try:
+        repo.set_reference_image(project_id, character_id, image_bytes)
+    except CharacterValidationError as error:
+        nav.flash("error", f"La proposition n’a pas pu être enregistrée : "
+                           f"{error.errors.get('reference_image', 'erreur inconnue')}")
+        return
+    st.session_state.pop(f"{p}_proposal_bytes", None)
+    nav.flash("success", "Référence visuelle enregistrée.")
+
+
+def _discard_reference_proposal(p: str) -> None:
+    st.session_state.pop(f"{p}_proposal_bytes", None)
+    st.session_state.pop(f"{p}_proposal_error", None)
+
+
+def _render_reference_proposal(repo: CharacterRepository, project: Project, service: ProductionService,
+                               current: Character | None) -> None:
+    """Génère UNE proposition de référence (payant) depuis la fiche DÉJÀ ENREGISTRÉE du personnage,
+    la prévisualise, et ne l'enregistre qu'après validation explicite (#92) — jamais une régénération
+    automatique, jamais un remplacement silencieux d'une référence existante. HORS du formulaire (un
+    st.button simple n'est pas permis dans un st.form) : disponible seulement en modification d'un
+    personnage déjà créé, dont la fiche visuelle existe donc déjà."""
+    if current is None or current.reference_image:
+        return
+    p = _prefix(project.id, current.id)
+    provider = service.provider(DEFAULT_PROVIDER)
+    with st.container(key="reference_proposal"):
+        st.markdown('<p class="card-eyebrow">Proposition de référence visuelle</p>', unsafe_allow_html=True)
+        if not provider.supports_reference_images:
+            st.caption("Le fournisseur d’images configuré ne sait pas encore utiliser une image de référence "
+                      "pour la génération des scènes : une proposition peut être créée et enregistrée, mais "
+                      "elle ne sera pas transmise tant que ce fournisseur ne le permet pas.")
+        proposal = st.session_state.get(f"{p}_proposal_bytes")
+        error = st.session_state.get(f"{p}_proposal_error")
+        if proposal:
+            st.image(proposal, width=200, caption="Proposition — pas encore enregistrée")
+            with st.container(horizontal=True, key="reference_proposal_actions"):
+                st.button("Valider cette référence", type="primary", icon=":material/check:",
+                          key=f"{p}_validate_proposal", on_click=_validate_reference_proposal,
+                          args=(repo, project.id, current.id, p))
+                st.button("Rejeter", key=f"{p}_discard_proposal", type="tertiary",
+                          on_click=_discard_reference_proposal, args=(p,))
+        else:
+            if error:
+                st.markdown(f'<p class="field-error" role="alert">{esc(error)}</p>', unsafe_allow_html=True)
+            st.caption("Générée à partir de la description visuelle, du prompt de référence et des éléments "
+                      "permanents déjà enregistrés pour ce personnage. Appel payant.")
+            st.button("Générer une proposition de référence", icon=":material/auto_awesome:",
+                      key=f"{p}_generate_proposal", on_click=_generate_reference_proposal,
+                      args=(service, p, current))
 
 
 def _render_form(repo: CharacterRepository, project: Project, target: str | None, current: Character | None) -> None:
@@ -374,7 +458,7 @@ def _render_import_export(repo: CharacterRepository, project: Project) -> None:
                       args=(repo, project.id, preview))
 
 
-def render(repo: CharacterRepository, project: Project) -> None:
+def render(repo: CharacterRepository, project: Project, service: ProductionService) -> None:
     st.markdown(
         '<section class="hero"><p class="eyebrow">Personnages</p>'
         f'<h1 class="hero-title">{esc(project.name)}</h1>'
@@ -436,6 +520,7 @@ def render(repo: CharacterRepository, project: Project) -> None:
         st.button("Ajouter un personnage", type="primary", icon=":material/add:", key="add_character",
                   on_click=_start_create, args=(project.id,))
     else:
+        _render_reference_proposal(repo, project, service, current)
         _render_form(repo, project, target, current)
 
     _render_import_export(repo, project)

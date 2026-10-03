@@ -8,6 +8,7 @@ et à reprendre des préférences d'affichage des sous-titres ; aucune valeur se
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -226,6 +227,12 @@ def build_payload(request: GenerationRequest, facts: EngineFacts) -> dict[str, A
     if request.audio_asset_id:
         payload["custom_audio_asset_id"] = request.audio_asset_id
         payload["audio_asset_scope"] = request.audio_asset_scope
+    # #92 (continuité visuelle) : même principe — clés ajoutées UNIQUEMENT si une référence d'image est
+    # effectivement présente (voir ProductionService._run, qui l'upload juste avant submit()) ; absentes
+    # par défaut, le payload texte-seul historique reste strictement inchangé.
+    if request.character_reference_asset_id:
+        payload["character_reference_asset_id"] = request.character_reference_asset_id
+        payload["image_asset_scope"] = request.image_asset_scope
     return payload
 
 
@@ -234,6 +241,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
     display_name = "Moteur de génération"
     supports_cancel = False  # aucun endpoint d'annulation dans le contrat
     supports_audio_assets = True  # POST /api/v1/audio_assets (#86, prérequis multi-locuteurs #39)
+    supports_reference_images = True  # POST /api/v1/image_assets + /images/edits (#92, continuité visuelle)
 
     def __init__(self, base_url: str = DEFAULT_URL, storage_root: str | Path = DEFAULT_STORAGE,
                  config_path: Path | None = None, report_path: Path | None = None, api_key: str = "", transport: Transport = urllib_transport,
@@ -542,6 +550,36 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         if not asset_id:
             raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le moteur n’a renvoyé aucune référence audio.", stage="audio_asset")
         return asset_id
+
+    def upload_reference_image(self, image_bytes: bytes, scope: str) -> str:
+        """``POST /api/v1/image_assets`` (#92, continuité visuelle) : AUCUNE génération — seulement le
+        transfert d'une image de référence déjà validée. ``scope`` doit être fourni de nouveau, à
+        l'identique, dans la requête ``submit()`` qui consommera la référence (voir
+        ``GenerationRequest.image_asset_scope``)."""
+        status, envelope = self._call_multipart(
+            "POST", "/api/v1/image_assets", {"production_scope": scope}, "file", "reference.png", image_bytes,
+            timeout=30.0,
+        )
+        self._raise_for_status(status, envelope, "image_asset")
+        data = envelope.get("data")
+        asset_id = _text(data.get("asset_id")) if isinstance(data, dict) else ""
+        if not asset_id:
+            raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le moteur n’a renvoyé aucune référence d’image.", stage="image_asset")
+        return asset_id
+
+    def generate_reference_proposal(self, prompt: str) -> bytes:
+        """``POST /api/v1/image_preview`` (#92) : UNE image isolée, payante, jamais liée à une tâche
+        vidéo — pour proposer une référence visuelle avant validation par l'utilisateur."""
+        status, envelope = self._call("POST", "/api/v1/image_preview", {"prompt": prompt}, timeout=120.0)
+        self._raise_for_status(status, envelope, "image_preview")
+        data = envelope.get("data")
+        encoded = _text(data.get("image_base64")) if isinstance(data, dict) else ""
+        if not encoded:
+            raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le moteur n’a renvoyé aucune image.", stage="image_preview")
+        try:
+            return base64.b64decode(encoded)
+        except (ValueError, TypeError) as error:
+            raise ProviderError(ErrorKind.INVALID_RESPONSE, "Image de prévisualisation illisible.", stage="image_preview") from error
 
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:
         # Le moteur n'a pas de clé d'idempotence : l'unicité est garantie en amont par Lody

@@ -16,6 +16,7 @@ from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
 from app.services import audio_assets
+from app.services import image_assets
 from app.services import bgm as bgm_service
 from app.services import (
     elevenlabs_music,
@@ -737,6 +738,24 @@ def get_video_materials(
             return None
     else:
         logger.info(f"\n\n## downloading videos from {params.video_source}")
+        # 角色参考图（#92，连续性）：和 custom_audio_asset_id（#86）同一取舍——引用无效/过期/
+        # production_scope 不匹配时在这里就让任务失败，绝不静默退化为无参考生成。调用方（Lody）才能
+        # 诚实地知道参考图究竟有没有被使用，而不是猜测。只对 openai_image 素材源有意义，其余素材源
+        # 忽略该字段（从未支持参考图，不是新的限制）。
+        reference_image_path: str | None = None
+        requested_image_asset_id = getattr(params, "character_reference_asset_id", None)
+        if requested_image_asset_id and params.video_source == "openai_image":
+            try:
+                reference_image_path = image_assets.resolve_image_asset(
+                    requested_image_asset_id, getattr(params, "image_asset_scope", None) or ""
+                )
+            except image_assets.ImageAssetError as exc:
+                _mark_task_failed(
+                    task_id,
+                    "materials",
+                    f"invalid character reference image reference: {exc}",
+                )
+                return None
         # 顺序匹配模式只在用户显式开启时生效。这里强制素材下载按关键词顺序
         # 轮询，避免某个早期关键词下载太多素材，把后续脚本主题挤出最终时间线。
         try:
@@ -753,6 +772,7 @@ def get_video_materials(
                 audio_duration=audio_duration * params.video_count,
                 max_clip_duration=params.video_clip_duration,
                 match_script_order=params.match_materials_to_script,
+                reference_image_path=reference_image_path,
             )
         except volcengine_seedance.VolcEngineSeedanceError as exc:
             # 未确认状态和已生成但下载失败都对应一个可在方舟控制台恢复的远端

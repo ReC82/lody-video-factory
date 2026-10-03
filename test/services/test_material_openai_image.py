@@ -129,6 +129,55 @@ class TestOpenAIImageProvider(unittest.TestCase):
         )
         self.assertEqual(item.source_info["search_term"], "sunrise over mountains")
 
+    def test_generate_images_openai_with_reference_image_uses_images_edit_endpoint(self):
+        """#92, continuité visuelle : avec reference_image_path, l'appel doit aller vers /images/edits en
+        multipart/form-data (prompt en champ de formulaire, image en fichier joint) — jamais
+        /images/generations, et le fichier de référence doit être transmis tel quel."""
+        reference_bytes = _png_bytes(width=512, height=512, color=(1, 2, 3))
+        reference_path = os.path.join(self.save_dir, "character-reference.png")
+        with open(reference_path, "wb") as handle:
+            handle.write(reference_bytes)
+
+        response = _image_response(
+            {"data": [{"b64_json": base64.b64encode(_png_bytes()).decode("ascii")}]}
+        )
+        with patch("app.services.material.requests.post", return_value=response) as post:
+            results = material.generate_images_openai(
+                "Eli, bras croisés",
+                minimum_duration=5,
+                video_aspect=material.VideoAspect.portrait,
+                save_dir=self.save_dir,
+                reference_image_path=reference_path,
+            )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(post.call_args.args[0], "https://img.example.com/v1/images/edits")
+        self.assertNotIn("json", post.call_args.kwargs)  # jamais un corps JSON pour /images/edits
+        self.assertEqual(
+            post.call_args.kwargs["data"],
+            {"model": "test-image-model", "prompt": "Eli, bras croisés", "n": 1, "size": "1024x1536"},
+        )
+        sent_image = post.call_args.kwargs["files"]["image"]
+        self.assertEqual(sent_image[1], reference_bytes)  # exactement les octets du fichier de référence
+
+    def test_generate_images_openai_falls_back_to_text_only_when_reference_file_is_unreadable(self):
+        """Un chemin de référence invalide/disparu ne doit jamais faire échouer la génération : repli sur
+        /images/generations (texte seul), jamais une référence silencieusement prétendue envoyée."""
+        response = _image_response(
+            {"data": [{"b64_json": base64.b64encode(_png_bytes()).decode("ascii")}]}
+        )
+        with patch("app.services.material.requests.post", return_value=response) as post:
+            results = material.generate_images_openai(
+                "Eli, bras croisés",
+                minimum_duration=5,
+                save_dir=self.save_dir,
+                reference_image_path="/nonexistent/reference.png",
+            )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(post.call_args.args[0], "https://img.example.com/v1/images/generations")
+        self.assertIn("json", post.call_args.kwargs)
+
     def test_generate_images_openai_with_url_response(self):
         """url 响应必须立即下载临时地址并落盘。"""
         response = _image_response(
@@ -607,7 +656,7 @@ class TestOpenAIImageProvider(unittest.TestCase):
             "term-3": [self._generated_item("term-3", "/tmp/img-3.png")],
         }
 
-        def fake_generate(search_term, minimum_duration, video_aspect, save_dir=""):
+        def fake_generate(search_term, minimum_duration, video_aspect, save_dir="", reference_image_path=None):
             return generated[search_term]
 
         def fake_render(image_path, clip_duration):
@@ -640,6 +689,84 @@ class TestOpenAIImageProvider(unittest.TestCase):
         # 每张图片都渲染成 mp4 片段后才计入时长
         self.assertEqual(render.call_count, 2)
         self.assertEqual(result, ["/tmp/img-1.png.mp4", "/tmp/img-2.png.mp4"])
+
+    def test_download_videos_openai_image_with_match_script_order_never_stops_early(self):
+        """
+        Lody (match_materials_to_script=True, repris ici en match_script_order) attend une image par
+        scène du storyboard, quel que soit le nombre de scènes déjà couvertes en durée cumulée — sinon
+        les dernières scènes du script ne reçoivent jamais leur propre image (#92, régression observée
+        sur une production réelle : 6 scènes envoyées, seulement 4 images reçues).
+        """
+        generated = {
+            "term-1": [self._generated_item("term-1", "/tmp/img-1.png")],
+            "term-2": [self._generated_item("term-2", "/tmp/img-2.png")],
+            "term-3": [self._generated_item("term-3", "/tmp/img-3.png")],
+        }
+
+        def fake_generate(search_term, minimum_duration, video_aspect, save_dir="", reference_image_path=None):
+            return generated[search_term]
+
+        def fake_render(image_path, clip_duration):
+            return f"{image_path}.mp4"
+
+        with (
+            patch(
+                "app.services.material.generate_images_openai",
+                side_effect=fake_generate,
+            ) as generate,
+            patch(
+                "app.services.material._render_openai_image_video",
+                side_effect=fake_render,
+            ),
+        ):
+            result = material.download_videos(
+                task_id="test-openai-image-match-script-order",
+                search_terms=["term-1", "term-2", "term-3"],
+                source="openai_image",
+                audio_duration=8,  # 5s + 5s >= 8s : s'arrêterait après term-2 sans match_script_order
+                max_clip_duration=5,
+                match_script_order=True,
+            )
+
+        # Les TROIS termes génèrent bien leur propre image, malgré la durée déjà couverte après le 2e.
+        self.assertEqual(generate.call_count, 3)
+        self.assertEqual(
+            [call.kwargs["search_term"] for call in generate.call_args_list],
+            ["term-1", "term-2", "term-3"],
+        )
+        self.assertEqual(result, ["/tmp/img-1.png.mp4", "/tmp/img-2.png.mp4", "/tmp/img-3.png.mp4"])
+
+    def test_download_videos_openai_image_without_match_script_order_keeps_stopping_early(self):
+        """Non-régression : sans match_script_order (valeur par défaut, autres appelants), le comportement
+        historique — s'arrêter dès que la durée cumulée suffit — reste strictement inchangé."""
+        generated = {
+            "term-1": [self._generated_item("term-1", "/tmp/img-1.png")],
+            "term-2": [self._generated_item("term-2", "/tmp/img-2.png")],
+            "term-3": [self._generated_item("term-3", "/tmp/img-3.png")],
+        }
+
+        def fake_generate(search_term, minimum_duration, video_aspect, save_dir="", reference_image_path=None):
+            return generated[search_term]
+
+        with (
+            patch(
+                "app.services.material.generate_images_openai",
+                side_effect=fake_generate,
+            ) as generate,
+            patch(
+                "app.services.material._render_openai_image_video",
+                side_effect=lambda image_path, clip_duration: f"{image_path}.mp4",
+            ),
+        ):
+            material.download_videos(
+                task_id="test-openai-image-default-still-stops",
+                search_terms=["term-1", "term-2", "term-3"],
+                source="openai_image",
+                audio_duration=8,
+                max_clip_duration=5,
+            )
+
+        self.assertEqual(generate.call_count, 2)  # inchangé : term-3 jamais généré
 
     def test_download_videos_openai_image_continues_after_invalid_image(self):
         """
@@ -697,7 +824,7 @@ class TestOpenAIImageProvider(unittest.TestCase):
             "term-3": [self._generated_item("term-3", "/tmp/img-3.png")],
         }
 
-        def fake_generate(search_term, minimum_duration, video_aspect, save_dir=""):
+        def fake_generate(search_term, minimum_duration, video_aspect, save_dir="", reference_image_path=None):
             return generated[search_term]
 
         with (
@@ -761,7 +888,7 @@ class TestOpenAIImageProvider(unittest.TestCase):
             "term-3": [self._generated_item("term-3", "/tmp/img-3.png")],
         }
 
-        def fake_generate(search_term, minimum_duration, video_aspect, save_dir=""):
+        def fake_generate(search_term, minimum_duration, video_aspect, save_dir="", reference_image_path=None):
             return generated[search_term]
 
         def fake_render(image_path, clip_duration):

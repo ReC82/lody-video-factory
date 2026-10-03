@@ -113,3 +113,10 @@ def new_audio_asset_scope() -> str:
     (jamais affiché) ; #87 décidera quand générer et transmettre cette valeur.
     """
     return secrets.token_hex(32)  # 256 bits d'entropie, 64 caractères hexadécimaux
+
+
+def new_image_asset_scope() -> str:
+    """Même principe que ``new_audio_asset_scope``, pour une référence visuelle de personnage (#92) —
+    jeton INDÉPENDANT (jamais le même que celui de l'audio) : deux registres d'assets distincts côté
+    moteur, chacun avec sa propre autorisation."""
+    return secrets.token_hex(32)

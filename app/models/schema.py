@@ -132,6 +132,15 @@ class VideoParams(BaseModel):
     # back to TTS.
     custom_audio_asset_id: Optional[str] = Field(default=None, max_length=64)
     audio_asset_scope: Optional[str] = Field(default=None, max_length=256)
+    # Référence visuelle persistante d'un personnage, depuis POST /api/v1/image_assets (#92, continuité
+    # visuelle). Même mécanisme d'asset opaque + scope que custom_audio_asset_id (#86), mais résoluble
+    # PLUSIEURS FOIS au sein de la tâche (voir app/services/image_assets.py) : une fois par scène
+    # générée via le fournisseur d'images "openai_image" où le personnage apparaît. MVP mono-référence
+    # (un seul personnage de référence par tâche, cohérent avec le mono-locuteur #70/#77 déjà établi côté
+    # Lody) — ignoré si absent, jamais une substitution silencieuse si invalide/expiré : l'image de cette
+    # scène échoue alors explicitement plutôt que de retomber sur une génération sans référence.
+    character_reference_asset_id: Optional[str] = Field(default=None, max_length=64)
+    image_asset_scope: Optional[str] = Field(default=None, max_length=256)
     video_language: Optional[str] = ""  # auto detect
 
     voice_name: Optional[str] = ""
@@ -195,6 +204,16 @@ class SubtitleRequest(BaseModel):
     stroke_width: float = 1.5
     video_source: Optional[str] = "local"
     subtitle_enabled: Optional[str] = "true"
+
+
+class ImagePreviewRequest(BaseModel):
+    """Génération d'UNE image isolée, sans tâche vidéo (#92) — pour prévisualiser une proposition de
+    référence visuelle de personnage avant validation. Jamais persistée dans storage/tasks ; utilise le
+    même chemin que la génération de scènes (texte seul), jamais /images/edits (il n'y a pas encore de
+    référence à ce stade, c'est justement ce qu'on cherche à produire)."""
+
+    prompt: str = Field(min_length=1, max_length=4000)
+    video_aspect: Optional[VideoAspect] = VideoAspect.portrait.value
 
 
 class AudioRequest(BaseModel):
@@ -353,6 +372,14 @@ class BgmUploadData(BaseModel):
 
 class AudioAssetUploadData(BaseModel):
     asset_id: str
+
+
+class ImageAssetUploadData(BaseModel):
+    asset_id: str
+
+
+class ImagePreviewData(BaseModel):
+    image_base64: str
 
 
 class VideoMaterialRetrieveData(BaseModel):
@@ -556,6 +583,30 @@ class AudioAssetUploadResponse(BaseResponse):
                 "message": "success",
                 "data": {"asset_id": "cb9bde8aad994c8ab60270d34a2006cc"},
             },
+        }
+    )
+
+
+class ImageAssetUploadResponse(BaseResponse):
+    data: ImageAssetUploadData
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": 200,
+                "message": "success",
+                "data": {"asset_id": "ab9fae41c8f3774961cfdc3d2e5b7a10"},
+            },
+        }
+    )
+
+
+class ImagePreviewResponse(BaseResponse):
+    data: ImagePreviewData
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"status": 200, "message": "success", "data": {"image_base64": "iVBORw0KBMCC..."}},
         }
     )
 

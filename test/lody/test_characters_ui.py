@@ -209,7 +209,7 @@ def test_archived_project_view_called_directly_also_refuses_to_edit():  # pas d'
         )
         import tempfile
         repo = CharacterRepository(tempfile.mktemp(suffix=".sqlite3"))
-        view_characters.render(repo, archived)
+        view_characters.render(repo, archived, None)  # service jamais utilisé sur ce chemin (retour anticipé)
 
     app = AppTest.from_function(script)
     app.run()
@@ -349,3 +349,80 @@ def test_a_character_without_a_reference_image_behaves_exactly_as_before_38(engi
     assert not app.exception
     character = _char_repo().list_for_project(project.id)[0]
     assert character.reference_image == ""
+
+
+# -- proposition de référence générée depuis la fiche (#92) ------------------------------------------------------
+def test_generate_proposal_button_is_absent_when_creating_a_new_character(engine):  # noqa: F811
+    """Fiche pas encore enregistrée (current=None) : rien à prévisualiser depuis, bouton absent."""
+    project = _project()
+    app = _open(project)
+    app = _button(app, "Ajouter un personnage").click().run()
+    assert "Générer une proposition de référence" not in _labels(app)
+
+
+def test_generate_proposal_button_is_absent_when_a_reference_already_exists(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston")
+    _char_repo().set_reference_image(project.id, character.id, _png_bytes())
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    assert "Générer une proposition de référence" not in _labels(app)
+
+
+def test_generate_proposal_shows_a_preview_built_from_the_saved_sheet(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(
+        project.id, name="Gaston", visual_description="Cheveux roux, veste jaune vif",
+        reference_prompt="portrait studio, fond neutre", permanent_elements="Toujours un chapeau de paille",
+    )
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    app = _button(app, "Générer une proposition de référence").click().run()
+
+    assert not app.exception
+    assert "generate_reference_proposal" in engine.calls
+    assert len(app.get("image")) == 1  # la proposition, affichée avant tout enregistrement
+    assert _char_repo().get(project.id, character.id).reference_image == ""  # pas encore enregistrée
+    assert "Valider cette référence" in _labels(app) and "Rejeter" in _labels(app)
+
+
+def test_validating_the_proposal_saves_it_as_the_reference_image(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston", visual_description="Cheveux roux")
+    engine.reference_proposal_bytes = _png_bytes(color=(10, 20, 30))
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    app = _button(app, "Générer une proposition de référence").click().run()
+    app = _button(app, "Valider cette référence").click().run()
+
+    assert not app.exception
+    assert "enregistrée" in _text(app).lower()
+    updated = _char_repo().get(project.id, character.id)
+    assert updated.reference_image != ""
+
+
+def test_rejecting_the_proposal_never_saves_it(engine):  # noqa: F811
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston", visual_description="Cheveux roux")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    app = _button(app, "Générer une proposition de référence").click().run()
+    app = _button(app, "Rejeter").click().run()
+
+    assert _char_repo().get(project.id, character.id).reference_image == ""
+    assert "Générer une proposition de référence" in _labels(app)  # redevenu disponible
+
+
+def test_provider_error_during_generation_is_shown_and_nothing_crashes(engine):  # noqa: F811
+    from lody.generation.models import ErrorKind, ProviderError
+
+    project = _project()
+    _char_repo().create(project.id, name="Gaston", visual_description="Cheveux roux")
+    engine.reference_proposal_error = ProviderError(ErrorKind.QUOTA, "Le fournisseur signale un quota insuffisant.")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    app = _button(app, "Générer une proposition de référence").click().run()
+
+    assert not app.exception
+    assert "quota insuffisant" in _text(app)
+    assert len(app.get("image")) == 0  # aucune proposition à prévisualiser
