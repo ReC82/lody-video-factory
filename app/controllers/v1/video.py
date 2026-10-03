@@ -3,6 +3,7 @@ import glob
 import os
 import pathlib
 import shutil
+import tempfile
 from typing import Union
 
 from fastapi import BackgroundTasks, Depends, Form, Path, Query, Request, UploadFile
@@ -33,7 +34,9 @@ from app.models.schema import (
     TaskResponse,
     TaskVideoRequest,
     VideoMaterialUploadResponse,
-    VideoMaterialRetrieveResponse
+    VideoMaterialRetrieveResponse,
+    VoicePreviewRequest,
+    VoicePreviewResponse,
 )
 from app.services import audio_assets as audio_assets_service
 from app.services import bgm as bgm_service
@@ -42,6 +45,7 @@ from app.services import material as material_service
 from app.services import material_upload as material_upload_service
 from app.services import state as sm
 from app.services import task as tm
+from app.services import voice as voice_service
 from app.utils import file_security, utils
 
 # 统一在 V1 视频路由入口执行鉴权。verify_token 会在 api_key 为空时
@@ -548,6 +552,58 @@ def create_image_preview(request: Request, body: ImagePreviewRequest):
             pass
 
     response = {"image_base64": encoded}
+    return utils.get_response(200, response)
+
+
+@router.post(
+    "/voice_preview",
+    response_model=VoicePreviewResponse,
+    summary="Generate a single standalone ElevenLabs TTS clip to compare voice_settings (#92)",
+    description=(
+        "Generate ONE short audio clip from text using an ElevenLabs voice, with explicit voice_settings "
+        "(stability/similarity_boost/style/use_speaker_boost/speed) — outside of any video task, never "
+        "persisted under storage/tasks. Diagnostic only: never used to change the voice actually configured "
+        "for a production. Omitted settings fall back to ElevenLabs' own documented defaults."
+    ),
+    responses={
+        400: {"description": "ElevenLabs is not configured"},
+        502: {"description": "The ElevenLabs request failed"},
+    },
+)
+def create_voice_preview(request: Request, body: VoicePreviewRequest):
+    request_id = base.get_task_id(request)
+    if not voice_service.get_elevenlabs_api_key():
+        raise HttpException(
+            task_id=request_id,
+            status_code=400,
+            message=f"{request_id}: ElevenLabs is not configured",
+        )
+    voice_settings = {
+        "stability": body.stability if body.stability is not None else 0.5,
+        "similarity_boost": body.similarity_boost if body.similarity_boost is not None else 0.75,
+        "style": body.style if body.style is not None else 0.0,
+        "use_speaker_boost": body.use_speaker_boost if body.use_speaker_boost is not None else True,
+        "speed": body.speed if body.speed is not None else 1.0,
+    }
+    with tempfile.TemporaryDirectory() as temp_dir:
+        voice_file = os.path.join(temp_dir, "preview.mp3")
+        result = voice_service.elevenlabs_tts(
+            text=body.text,
+            voice_id=body.voice_id,
+            voice_file=voice_file,
+            model_id=body.model_id or "",
+            voice_settings_override=voice_settings,
+        )
+        if result is None or not os.path.isfile(voice_file):
+            raise HttpException(
+                task_id=request_id,
+                status_code=502,
+                message=f"{request_id}: ElevenLabs voice generation failed; see server logs for the provider's response",
+            )
+        with open(voice_file, "rb") as handle:
+            encoded = base64.b64encode(handle.read()).decode("ascii")
+
+    response = {"audio_base64": encoded}
     return utils.get_response(200, response)
 
 
