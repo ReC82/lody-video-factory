@@ -75,6 +75,10 @@ class VideoGenerationProvider(ABC):
     #: TTS (#86, prérequis multi-locuteurs #39). Faux par défaut : ``upload_audio_asset`` est alors
     #: refusé — jamais une simulation silencieuse d'un support absent.
     supports_audio_assets: bool = False
+    #: vrai si le moteur sait générer UN clip vocal isolé avec des réglages explicites, pour comparer le
+    #: jeu vocal d'une voix déjà configurée (#92, diagnostic). Faux par défaut : ``generate_voice_preview``
+    #: est alors refusé — jamais une simulation silencieuse.
+    supports_voice_preview: bool = False
 
     def plan_units(self, request: GenerationRequest) -> SceneUnits:
         units = estimate_units(request)
@@ -120,6 +124,16 @@ class VideoGenerationProvider(ABC):
         Lève ``ProviderError`` si le moteur ne le permet pas.
         """
         raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer une proposition de référence.")
+
+    def generate_voice_preview(self, text: str, voice_id: str, settings: dict) -> bytes:
+        """Génère UN clip vocal isolé (payant) avec des réglages EXPLICITES (#92, diagnostic du jeu
+        vocal) — jamais lié à une tâche vidéo, jamais utilisé pour changer la voix réellement configurée
+        d'une production (c'est à l'appelant de proposer le choix, jamais silencieusement). ``settings``
+        ne porte que des champs déjà documentés comme officiellement compatibles avec le modèle employé
+        (voir ``mpt_connector.generate_voice_preview``) — jamais une balise non confirmée compatible.
+        Lève ``ProviderError`` si le moteur ne le permet pas.
+        """
+        raise ProviderError(ErrorKind.REJECTED, "Ce moteur ne sait pas générer un essai vocal isolé.")
 
     def describe_script_request(self, request: GenerationRequest, narrative_block: str = "",
                                 dialogue_character: str = "") -> dict:

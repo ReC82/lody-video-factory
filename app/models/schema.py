@@ -216,6 +216,23 @@ class ImagePreviewRequest(BaseModel):
     video_aspect: Optional[VideoAspect] = VideoAspect.portrait.value
 
 
+class VoicePreviewRequest(BaseModel):
+    """Essai vocal comparatif pour UNE voix ElevenLabs déjà configurée (#92, diagnostic du jeu vocal) —
+    jamais lié à une tâche vidéo, jamais persisté au-delà de la réponse. Les réglages omis reprennent les
+    valeurs par défaut officielles d'ElevenLabs (voir voice.elevenlabs_tts) ; ``speed`` et ``style`` sont
+    documentés comme compatibles avec tout modèle hors Eleven v4 — jamais une balise audio ([sighs]...),
+    non confirmée compatible avec eleven_multilingual_v2 par la documentation officielle."""
+
+    text: str = Field(min_length=1, max_length=2000)
+    voice_id: str = Field(min_length=1, max_length=128)
+    model_id: Optional[str] = None
+    stability: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    similarity_boost: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    style: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    use_speaker_boost: Optional[bool] = None
+    speed: Optional[float] = Field(default=None, ge=0.25, le=4.0)
+
+
 class AudioRequest(BaseModel):
     video_script: str
     video_language: Optional[str] = ""
@@ -380,6 +397,10 @@ class ImageAssetUploadData(BaseModel):
 
 class ImagePreviewData(BaseModel):
     image_base64: str
+
+
+class VoicePreviewData(BaseModel):
+    audio_base64: str
 
 
 class VideoMaterialRetrieveData(BaseModel):
@@ -607,6 +628,16 @@ class ImagePreviewResponse(BaseResponse):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {"status": 200, "message": "success", "data": {"image_base64": "iVBORw0KBMCC..."}},
+        }
+    )
+
+
+class VoicePreviewResponse(BaseResponse):
+    data: VoicePreviewData
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"status": 200, "message": "success", "data": {"audio_base64": "SUQzBAAAAAAA..."}},
         }
     )
 

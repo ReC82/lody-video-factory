@@ -2027,7 +2027,14 @@ def elevenlabs_tts(
     voice_rate: float = 1.0,
     voice_volume: float = 1.0,
     model_id: str = "",
+    voice_settings_override: dict | None = None,
 ) -> Union[SubMaker, None]:
+    """
+    ``voice_settings_override`` (#92, diagnostic du jeu vocal) : remplace ENTIÈREMENT les réglages par
+    défaut ci-dessous — réservé à l'essai vocal comparatif (voir ``create_voice_preview``), jamais utilisé
+    par le pipeline de production normal (qui laisse ce paramètre à ``None``). Permet de comparer stability/
+    style/speed sans toucher à la voix réellement configurée tant qu'aucun choix n'a été fait.
+    """
     text = (text or "").strip()
     if not text:
         logger.error("ElevenLabs TTS text is empty")
@@ -2046,15 +2053,29 @@ def elevenlabs_tts(
         "xi-api-key": api_key,
         "Content-Type": "application/json",
     }
-    payload = {
-        "text": text,
-        "model_id": model_id,
-        "voice_settings": {
+    if voice_settings_override is not None:
+        voice_settings = voice_settings_override
+    else:
+        # #92 : "speed" est un champ officiel de voice_settings (toute voix, tout modèle hors v4 — voir
+        # https://elevenlabs.io/docs/api-reference/text-to-speech/convert), plage [0.25, 4.0], 1.0 par
+        # défaut. ``voice_rate`` (ex. 1.1 pour narration_pace="rapide", voir mpt_connector._VOICE_RATE)
+        # était accepté par cette fonction mais JAMAIS transmis à ElevenLabs jusqu'ici — la cadence
+        # configurée côté Lody n'avait donc aucun effet réel sur une voix ElevenLabs. stability/
+        # similarity_boost/style/use_speaker_boost restent inchangés : choisir des valeurs plus expressives
+        # pour la PRODUCTION reste une décision utilisateur, pas un défaut silencieux (voir l'essai
+        # comparatif, qui lui fait varier ces réglages explicitement).
+        speed = max(0.25, min(4.0, float(voice_rate or 1.0)))
+        voice_settings = {
             "stability": 0.5,
             "similarity_boost": 0.75,
             "style": 0.0,
             "use_speaker_boost": True,
-        },
+            "speed": speed,
+        }
+    payload = {
+        "text": text,
+        "model_id": model_id,
+        "voice_settings": voice_settings,
     }
 
     # Errors where retrying will never help (auth/access/validation failures).

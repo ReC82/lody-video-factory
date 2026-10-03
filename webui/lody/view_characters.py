@@ -11,9 +11,11 @@ import json
 
 import streamlit as st
 
+from lody import brief as brief_lib
 from lody import catalog, nav, reference_images, resource_transfer, voice_picker
 from lody.characters import Character, CharacterNotFound, CharacterRepository, CharacterValidationError
 from lody.components import EMPTY_ICON_SVG
+from lody.generation import mpt_connector
 from lody.generation.models import ProviderError
 from lody.generation.publication import slugify
 from lody.generation.runtime import DEFAULT_PROVIDER
@@ -291,6 +293,84 @@ def _render_reference_proposal(repo: CharacterRepository, project: Project, serv
                       args=(service, p, current))
 
 
+# -- essai vocal comparatif (#92, diagnostic du jeu vocal) --------------------------------------------------------
+
+_VOICE_LAB_SAMPLE_TEXT = (
+    "Voyageur, j'ai une quête urgente pour toi ! Enfin, c'est ce que je dis tous les jours, en fait. "
+    "Attends, je l'ai déjà dit combien de fois, ça ?"
+)
+
+
+def _voice_lab_presets(project: Project) -> list[tuple[str, str, str, dict]]:
+    """Trois réglages comparables pour LA MÊME voix déjà configurée (#92) — uniquement des champs
+    officiellement documentés par ElevenLabs pour tout modèle hors Eleven v4 (stability/similarity_boost/
+    style/use_speaker_boost/speed, voir https://elevenlabs.io/docs/api-reference/text-to-speech/convert),
+    jamais une balise non confirmée compatible avec le modèle employé (eleven_multilingual_v2)."""
+    pace = brief_lib.brief_settings(project.settings)["narration_pace"]
+    configured_speed = mpt_connector.voice_rate_for_pace(pace)
+    return [
+        ("current", "Réglages actuellement envoyés en production",
+         f"stability=0.5, similarity_boost=0.75, style=0.0, speed=1.0 — la cadence réellement configurée "
+         f"pour ce projet ({configured_speed}×) n'était jusqu'ici jamais transmise à ElevenLabs (voir le bilan).",
+         {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0, "use_speaker_boost": True, "speed": 1.0}),
+        ("expressive", "Plus expressif (stabilité et style), même cadence",
+         "stability=0.3, similarity_boost=0.75, style=0.35, speed=1.0 — isole l'effet de l'expressivité, "
+         "sans changer le rythme : accélérer seul ne suffit pas à rendre la voix plus vivante.",
+         {"stability": 0.3, "similarity_boost": 0.75, "style": 0.35, "use_speaker_boost": True, "speed": 1.0}),
+        ("expressive_paced", "Plus expressif + cadence réellement configurée",
+         f"stability=0.3, similarity_boost=0.75, style=0.35, speed={configured_speed} — ajoute la cadence "
+         "du projet par-dessus les mêmes réglages d'expressivité.",
+         {"stability": 0.3, "similarity_boost": 0.75, "style": 0.35, "use_speaker_boost": True, "speed": configured_speed}),
+    ]
+
+
+def _generate_voice_preview(service: ProductionService, p: str, character: Character, preset_key: str,
+                            text: str, settings: dict) -> None:
+    ss = st.session_state
+    provider = service.provider(DEFAULT_PROVIDER)
+    try:
+        audio_bytes = provider.generate_voice_preview(text, character.external_voice_id, settings)
+    except ProviderError as error:
+        ss[f"{p}_voice_preview_{preset_key}_error"] = str(getattr(error, "message", error))
+        ss.pop(f"{p}_voice_preview_{preset_key}_bytes", None)
+        return
+    ss[f"{p}_voice_preview_{preset_key}_bytes"] = audio_bytes
+    ss.pop(f"{p}_voice_preview_{preset_key}_error", None)
+
+
+def _render_voice_lab(service: ProductionService, project: Project, current: Character | None) -> None:
+    """Essai vocal comparatif pour LA MÊME voix déjà configurée (#92, diagnostic du jeu vocal) — ne
+    remplace jamais la voix utilisée en production : les réglages comparés ici ne s'appliquent nulle part
+    ailleurs tant qu'aucun choix explicite n'est fait. HORS du formulaire, comme la proposition de
+    référence (un ``st.button`` simple n'est pas permis dans un ``st.form``). Seulement pour une voix
+    ElevenLabs déjà configurée (seul fournisseur dont le moteur sait générer un essai isolé aujourd'hui)."""
+    if current is None or current.voice_provider != "elevenlabs" or not current.external_voice_id:
+        return
+    p = _prefix(project.id, current.id)
+    provider = service.provider(DEFAULT_PROVIDER)
+    with st.container(key="voice_lab"):
+        st.markdown('<p class="card-eyebrow">Essai vocal comparatif</p>', unsafe_allow_html=True)
+        if not provider.supports_voice_preview:
+            st.caption("Le moteur configuré ne sait pas encore générer un essai vocal isolé.")
+            return
+        st.caption("Même voix déjà configurée pour ce personnage, mêmes répliques, réglages différents — "
+                  "jamais un remplacement de la voix utilisée en production. Appels payants.")
+        text = st.text_area("Répliques de l'essai (texte seul, aucune indication scénique)",
+                            value=_VOICE_LAB_SAMPLE_TEXT, key=f"{p}_voice_lab_text", height=100)
+        for preset_key, label, detail, settings in _voice_lab_presets(project):
+            st.markdown(f"**{esc(label)}**")
+            st.caption(detail)
+            error = st.session_state.get(f"{p}_voice_preview_{preset_key}_error")
+            audio = st.session_state.get(f"{p}_voice_preview_{preset_key}_bytes")
+            if error:
+                st.markdown(f'<p class="field-error" role="alert">{esc(error)}</p>', unsafe_allow_html=True)
+            if audio:
+                st.audio(audio, format="audio/mp3")
+            button_label = "Régénérer cet extrait" if (audio or error) else "Générer cet extrait"
+            st.button(button_label, key=f"{p}_voice_preview_{preset_key}_generate",
+                      on_click=_generate_voice_preview, args=(service, p, current, preset_key, text, settings))
+
+
 def _render_form(repo: CharacterRepository, project: Project, target: str | None, current: Character | None) -> None:
     p = _prefix(project.id, target)
     title = f"Modifier « {current.name} »" if current else "Nouveau personnage"
@@ -534,6 +614,7 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
                   on_click=_start_create, args=(project.id,))
     else:
         _render_reference_proposal(repo, project, service, current)
+        _render_voice_lab(service, project, current)
         _render_form(repo, project, target, current)
 
     _render_import_export(repo, project)
