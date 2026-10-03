@@ -753,6 +753,7 @@ def combine_videos(
     source_usage: dict[str, int] | None = None,
     source_groups: dict[str, str] | None = None,
     used_video_paths: List[str] | None = None,
+    match_materials_to_script: bool = False,
 ) -> str:
     audio_clip = AudioFileClip(audio_file)
     try:
@@ -769,6 +770,30 @@ def combine_videos(
         f"(audio duration + {_VIDEO_DURATION_SAFETY_MARGIN:.2f}s safety margin)"
     )
 
+    # #92 : ``match_materials_to_script`` (ici) ne vaut jamais que pour une image générée PAR SCÈNE
+    # (openai_image, voir task.py:generate_final_videos qui ne le transmet que pour cette source) : chaque
+    # fichier de ``video_paths`` correspond alors À UNE SEULE scène du script, DANS L'ORDRE — jamais une
+    # réserve de candidats à piocher ou tourner (ce dernier cas, stock pexels/pixabay/coverr/local, garde
+    # le plafond fixe et l'arrêt anticipé historiques, voir allocate_batch_materials côté appelant).
+    # ``max_clip_duration`` est estimé par l'appelant depuis la durée CIBLE du projet divisée par le nombre
+    # de scènes (voir mpt_connector.build_payload côté Lody) : un script réellement plus court que cette
+    # cible lui donne une valeur largement supérieure à la part RÉELLE de chaque scène. Plafonner chaque
+    # clip à cette valeur fixe, puis arrêter dès que la durée cumulée couvre l'audio, faisait alors
+    # disparaître silencieusement les dernières scènes alors que leurs images avaient bien été reçues
+    # (observé en validation réelle #92 : 4 images reçues, seulement 2 visibles dans le montage final).
+    # En mode "une image par scène", chaque matériau reçoit donc une part ÉGALE de la durée requise à la
+    # place du plafond fixe, et AUCUNE scène prévue n'est abandonnée pour autant (voir plus bas : la
+    # condition d'arrêt anticipée ne s'applique jamais dans ce mode, le dernier ajustement à la durée
+    # exacte de l'audio reste de toute façon fait par ``concat_video_clips_with_ffmpeg`` ci-dessous).
+    if match_materials_to_script and video_paths:
+        effective_max_clip_duration = max(1.0, required_video_duration / len(video_paths))
+        logger.info(
+            f"match_materials_to_script: using an equal per-scene share of "
+            f"{effective_max_clip_duration:.2f}s instead of the fixed max_clip_duration={max_clip_duration}s"
+        )
+    else:
+        effective_max_clip_duration = max_clip_duration
+
     # 兼容 API 直接调用时未传转场模式的情况，避免后续访问 .value 时崩溃。
     transition_value = getattr(video_transition_mode, "value", video_transition_mode)
     normalized_clip_speed = utils.normalize_clip_speed(clip_speed)
@@ -781,7 +806,7 @@ def combine_videos(
     # 6 秒源画面同样会得到 3 秒片段。因此切片前必须按速度反推源时长；如果
     # 仍固定读取 3 秒再慢放、裁剪，下一段却从源视频第 3 秒开始，会跳过中间
     # 1.5 秒画面。该计算同时保证不同速度下的源时间线连续且无重叠。
-    source_clip_duration = max_clip_duration * normalized_clip_speed
+    source_clip_duration = effective_max_clip_duration * normalized_clip_speed
     output_dir = os.path.dirname(combined_video_path)
 
     aspect = VideoAspect(video_aspect)
@@ -830,9 +855,12 @@ def combine_videos(
         
     logger.debug(f"total subclipped items: {len(subclipped_items)}")
     
-    # Add downloaded clips over and over until the duration of the audio (max_duration) has been reached
+    # Add downloaded clips over and over until the duration of the audio (max_duration) has been reached.
+    # #92 : en mode "une image par scène", chaque matériau DOIT apparaître — jamais d'arrêt anticipé, même
+    # si une somme de parts égales dépasse légèrement la durée requise par arrondi (voir plus haut) : le
+    # dernier ajustement exact à la durée de l'audio reste fait par concat_video_clips_with_ffmpeg ci-dessous.
     for i, subclipped_item in enumerate(subclipped_items):
-        if video_duration >= required_video_duration:
+        if not match_materials_to_script and video_duration >= required_video_duration:
             break
         
         logger.debug(
@@ -898,8 +926,8 @@ def combine_videos(
                 shuffle_transition = random.choice(transition_funcs)
                 clip = shuffle_transition(clip)
 
-            if clip.duration > max_clip_duration:
-                clip = clip.subclipped(0, max_clip_duration)
+            if clip.duration > effective_max_clip_duration:
+                clip = clip.subclipped(0, effective_max_clip_duration)
                 
             # wirte clip to temp file
             clip_file = f"{output_dir}/temp-clip-{i+1}.mp4"

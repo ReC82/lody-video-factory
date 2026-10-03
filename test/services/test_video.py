@@ -961,6 +961,60 @@ class TestVideoService(unittest.TestCase):
         self.assertEqual(write_mock.call_count, 4)
         self.assertEqual(concat_mock.call_args.kwargs["max_duration"], 10.0)
 
+    def _combine_with_four_oversized_clips(self, *, match_materials_to_script):
+        """4 scènes, chacune avec une image déjà reçue (clip source de 13s, comme une image OpenAI
+        convertie à la durée estimée depuis la cible du projet) mais un script réel beaucoup plus court
+        (16.6s au total) — le scénario exact observé en validation réelle #92 (4 images reçues, montage
+        final n'en montrant que 2)."""
+
+        class _FakeAudioClip:
+            duration = 16.6
+
+            def close(self):
+                pass
+
+        class _FakeVideoClip:
+            def __init__(self, duration):
+                self.duration = duration
+                self.size = (1080, 1920)
+                self.w = 1080
+                self.h = 1920
+
+            def subclipped(self, start_time, end_time):
+                return _FakeVideoClip(end_time - start_time)
+
+        video_paths = [f"openai-image-{i}.png.mp4" for i in range(4)]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            combined_video_path = os.path.join(temp_dir, "combined.mp4")
+            with (
+                patch.object(vd, "AudioFileClip", return_value=_FakeAudioClip()),
+                patch.object(vd, "_open_video_clip_quietly", side_effect=lambda _p: _FakeVideoClip(13.0)),
+                patch.object(vd, "_write_videofile_with_codec_fallback") as write_mock,
+                patch.object(vd, "concat_video_clips_with_ffmpeg"),
+                patch.object(vd, "delete_files"),
+            ):
+                vd.combine_videos(
+                    combined_video_path=combined_video_path,
+                    video_paths=video_paths,
+                    audio_file=os.path.join(temp_dir, "audio.mp3"),
+                    video_aspect=vd.VideoAspect.portrait,
+                    video_concat_mode=vd.VideoConcatMode.sequential,
+                    video_transition_mode=None,
+                    max_clip_duration=13,
+                    match_materials_to_script=match_materials_to_script,
+                )
+        return write_mock.call_count
+
+    def test_combine_videos_without_match_materials_to_script_still_drops_scenes_early(self):
+        """Non-régression : comportement historique inchangé sans le drapeau #92."""
+        self.assertEqual(self._combine_with_four_oversized_clips(match_materials_to_script=False), 2)
+
+    def test_combine_videos_match_materials_to_script_keeps_every_scene(self):
+        """#92 : chaque scène déjà couverte par une image reçue doit apparaître dans le montage final —
+        plus aucune scène prévue abandonnée silencieusement parce que le plafond par clip était trop large."""
+        self.assertEqual(self._combine_with_four_oversized_clips(match_materials_to_script=True), 4)
+
     def test_concat_video_clips_limits_output_to_audio_duration(self):
         """最终拼接时应裁到音频时长，避免安全余量带来明显静音尾巴。"""
 

@@ -954,6 +954,14 @@ def generate_final_videos(
             max_clip_duration=params.video_clip_duration,
             threads=params.n_threads,
             clip_speed=params.video_clip_speed,
+            # #92 : la part égale par matériau n'a de sens QUE pour une image générée par scène
+            # (openai_image, un clip = une scène, voir material._download_videos_openai_image_on_demand) —
+            # jamais pour un stock de candidats (pexels/pixabay/coverr/local) où match_materials_to_script
+            # sélectionne/tourne parmi PLUSIEURS candidats par mot-clé : là, le plafond fixe et l'arrêt
+            # anticipé restent le comportement voulu (voir allocate_batch_materials ci-dessus).
+            match_materials_to_script=(
+                params.match_materials_to_script and params.video_source == "openai_image"
+            ),
             **batch_options,
         )
         if allocate_batch_materials:
