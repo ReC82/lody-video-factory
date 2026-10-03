@@ -512,3 +512,54 @@ def test_voice_lab_shows_the_provider_error_without_crashing(engine):  # noqa: F
 
     assert not app.exception
     assert "ElevenLabs n’est pas configuré" in _text(app)
+
+
+# -- direction par réplique, eleven_v3 (#92, suite) -----------------------------------------------------------
+def test_voice_lab_v3_presets_use_the_exact_same_words_only_tags_differ():
+    """Exigence explicite : mêmes mots strictement identiques entre les deux variantes, pour comparer le
+    jeu — seules les balises de direction (jamais prononcées) changent."""
+    import re
+
+    from lody.view_characters import _VOICE_LAB_V3_PRESETS
+
+    assert len(_VOICE_LAB_V3_PRESETS) == 2
+    words = [" ".join(re.sub(r"\[[^\]]*\]", " ", text).split()) for _key, _label, text in _VOICE_LAB_V3_PRESETS]
+    assert words[0] == words[1]
+    assert "Voyageur" in words[0] and "Attends" in words[0]
+
+
+def test_voice_lab_v3_settings_target_the_documented_model_and_are_shared_across_variants():
+    """model_id="eleven_v3" explicite (jamais la voix/le modèle de production changés silencieusement) ;
+    mêmes réglages de voix dans les deux variantes — seule la densité des balises varie."""
+    from lody.view_characters import _VOICE_LAB_V3_SETTINGS
+
+    assert _VOICE_LAB_V3_SETTINGS["model_id"] == "eleven_v3"
+    assert 0.0 <= _VOICE_LAB_V3_SETTINGS["stability"] <= 1.0
+    assert 0.25 <= _VOICE_LAB_V3_SETTINGS["speed"] <= 4.0
+
+
+def test_voice_lab_v3_presets_show_up_and_generate_a_single_continuous_clip_per_variant(engine):  # noqa: F811
+    from lody.view_characters import _prefix
+
+    engine.supports_voice_preview = True
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston", voice_provider="elevenlabs", voice_name="Kev",
+                                    external_voice_id="voice-abc123")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+
+    assert "Direction par réplique (eleven_v3)" in _text(app)
+    code_blocks = " ".join(block.value for block in app.code)
+    assert "[hesitates]" in code_blocks and "[reflective]" in code_blocks  # balises visibles, texte transparent
+
+    p = _prefix(project.id, character.id)
+    v3_button = next(b for b in app.button if b.key == f"{p}_voice_preview_v3_subtle_generate")
+    before = engine.calls.count("generate_voice_preview")
+    app = v3_button.click().run()
+
+    assert not app.exception
+    assert engine.calls.count("generate_voice_preview") == before + 1
+    text, voice_id, settings = engine.voice_previews_received[-1]
+    assert settings.get("model_id") == "eleven_v3"
+    assert voice_id == "voice-abc123"
+    assert "[matter-of-fact]" in text and "[hesitates]" in text  # la variante "subtile", balises incluses
