@@ -56,6 +56,13 @@ Transport = Callable[[str, str, bytes | None, dict[str, str], float], tuple[int,
 
 _VIDEO_SOURCES = {"openai_image": "openai_image"}
 _VOICE_RATE = {"calme": 0.95, "normal": 1.0, "rapide": 1.1}
+
+
+def voice_rate_for_pace(narration_pace: str) -> float:
+    """Même correspondance EXACTE que ``build_payload`` (#92) — exposée pour que l'essai vocal comparatif
+    (``view_characters._render_voice_lab``) teste la cadence RÉELLEMENT envoyée en production pour un
+    projet donné, jamais une valeur dupliquée qui pourrait diverger."""
+    return _VOICE_RATE.get(narration_pace, 1.0)
 _KEYLESS_LLM = frozenset({"ollama", "claude_code", "litellm", "pollinations"})
 # Préférences de sous-titres reprises de [ui] (non secrètes) : clé de config → champ de la requête.
 _UI_FIELDS = {
@@ -242,6 +249,7 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
     supports_cancel = False  # aucun endpoint d'annulation dans le contrat
     supports_audio_assets = True  # POST /api/v1/audio_assets (#86, prérequis multi-locuteurs #39)
     supports_reference_images = True  # POST /api/v1/image_assets + /images/edits (#92, continuité visuelle)
+    supports_voice_preview = True  # POST /api/v1/voice_preview (#92, diagnostic du jeu vocal — ElevenLabs uniquement)
 
     def __init__(self, base_url: str = DEFAULT_URL, storage_root: str | Path = DEFAULT_STORAGE,
                  config_path: Path | None = None, report_path: Path | None = None, api_key: str = "", transport: Transport = urllib_transport,
@@ -587,6 +595,24 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
             return base64.b64decode(encoded)
         except (ValueError, TypeError) as error:
             raise ProviderError(ErrorKind.INVALID_RESPONSE, "Image de prévisualisation illisible.", stage="image_preview") from error
+
+    def generate_voice_preview(self, text: str, voice_id: str, settings: dict) -> bytes:
+        """``POST /api/v1/voice_preview`` (#92, diagnostic du jeu vocal) : UN clip vocal isolé, payant,
+        avec des réglages EXPLICITES (``stability``/``similarity_boost``/``style``/``use_speaker_boost``/
+        ``speed`` — tous documentés comme compatibles avec tout modèle ElevenLabs hors Eleven v4, voir
+        https://elevenlabs.io/docs/api-reference/text-to-speech/convert) — jamais lié à une tâche vidéo,
+        jamais utilisé pour changer la voix réellement configurée tant que l'utilisateur n'a pas choisi."""
+        payload = {"text": text, "voice_id": voice_id, **settings}
+        status, envelope = self._call("POST", "/api/v1/voice_preview", payload, timeout=60.0)
+        self._raise_for_status(status, envelope, "voice_preview")
+        data = envelope.get("data")
+        encoded = _text(data.get("audio_base64")) if isinstance(data, dict) else ""
+        if not encoded:
+            raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le moteur n’a renvoyé aucun audio.", stage="voice_preview")
+        try:
+            return base64.b64decode(encoded)
+        except (ValueError, TypeError) as error:
+            raise ProviderError(ErrorKind.INVALID_RESPONSE, "Essai vocal illisible.", stage="voice_preview") from error
 
     def submit(self, request: GenerationRequest, idempotency_key: str) -> ExternalTask:
         # Le moteur n'a pas de clé d'idempotence : l'unicité est garantie en amont par Lody
