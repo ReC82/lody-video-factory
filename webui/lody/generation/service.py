@@ -508,6 +508,16 @@ class ProductionService:
                                       visual_avoid=request.visual_avoid)
             if not scenes:
                 raise ProviderError(ErrorKind.INVALID_RESPONSE, "Le script ne contient aucune phrase exploitable.", stage="script")
+            # #92 : texte RÉELLEMENT prononçable — toute indication scénique {...} a déjà été retirée de
+            # chaque Scene.narration par build_storyboard (jamais inventée, jamais perdue : elle devient
+            # Scene.action, utilisée ci-dessous par les prompts d'image uniquement). La concaténation des
+            # narrations déjà nettoyées EST le script propre : jamais recalculée séparément, jamais
+            # désynchronisée du storyboard. C'est CE texte qui part au TTS et devient les sous-titres —
+            # jamais une indication scénique n'est prononcée ou affichée.
+            clean_script = " ".join(scene.narration for scene in scenes)
+            if clean_script != request.script:
+                request = request.with_updates(script=clean_script)
+                self.repo.update(production_id, script=clean_script)
             # #37 : enrichit les prompts d'image des scènes déjà construites (mêmes scènes, même narration,
             # même nombre — donc même estimation de coût) avec la continuité visuelle du snapshot. "" sans
             # sélection ou snapshot antérieur à #35 : storyboard/prompts strictement inchangés (voir docstring).
@@ -608,12 +618,16 @@ class ProductionService:
         return {"recorded_at": self._clock(), "project": production.snapshot.get("project", {}),
                 "snapshot_version": production.snapshot.get("version", ""), "script_request": script_request,
                 "scenes": detail.get("scenes", []), "image_template": engine_template,
+                # #92 : modèle d'images réellement utilisé (ex. "gpt-image-2"), pour l'export #91 — jamais
+                # inventé si le rapport de capacités du moteur est indisponible (voir mpt_connector.trace_prompts).
+                "image_model": detail.get("image_model", ""),
                 "engine_params": provider.describe_params(request), "origins": origins,
                 # #75 : fournisseur/nom/identifiant/origine/repli de la voix RÉELLEMENT envoyée — jamais un
                 # secret (voir lody.reference_images/secrets_guard : un identifiant de voix ElevenLabs n'en
                 # est pas un), toujours contrôlable indépendamment de "params" (voir _assert_voice_unchanged).
                 "voice": {"provider": request.voice.provider, "name": request.voice.name,
-                         "voice_id": request.voice.voice_id, "source": voice_origin_info.get("source", ""),
+                         "voice_id": request.voice.voice_id, "model": request.voice.model,
+                         "source": voice_origin_info.get("source", ""),
                          "fallback": voice_origin_info.get("fallback", False), "reason": voice_origin_text},
                 # #77 : mode d'écriture du script RÉELLEMENT utilisé (narration externe ou dialogue
                 # mono-personnage) — recalculé depuis le même narrative_context déjà figé (jamais un

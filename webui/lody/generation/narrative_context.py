@@ -272,20 +272,10 @@ def _character_visual_full(character: dict[str, Any]) -> str:
     return f"- {name}" + (f" — {details}" if details else "")
 
 
-def _character_visual_repeat(character: dict[str, Any], first_index: int) -> str:
-    name = character.get("name", "")
-    return f"- {name} (déjà décrit·e à la scène {first_index} : même apparence, mêmes vêtements/accessoires)"
-
-
 def _location_visual_full(location: dict[str, Any]) -> str:
     details = _detail_line(location, _VISUAL_LOCATION_FIELDS, _VISUAL_FIELD_LABELS)
     name = location.get("name", "")
     return f"Lieu : {name}" + (f" — {details}" if details else "")
-
-
-def _location_visual_repeat(location: dict[str, Any], first_index: int) -> str:
-    name = location.get("name", "")
-    return f"Lieu : {name} (déjà décrit à la scène {first_index} : même disposition)"
 
 
 def _mentions(narration: str, name: str) -> bool:
@@ -299,35 +289,29 @@ def _mentions(narration: str, name: str) -> bool:
 
 
 def _scene_visual_lines(narration: str, characters: Sequence[dict[str, Any]], location: dict[str, Any] | None,
-                        first_seen: dict[str, int], scene_index: int,
                         always_present_id: str = "") -> list[str]:
     """Lignes de continuité pour UNE scène : personnages mentionnés dans sa narration (ou le personnage de
     référence en mode dialogue, voir ``always_present_character_id``/#92), puis le lieu (s'il existe, dans
     TOUTES les scènes — il représente le cadre de toute la vidéo, comme le style visuel du projet).
 
-    Description complète à la première apparition d'un élément (``scene_index`` le plus bas où il est utilisé),
-    rappel bref ensuite — pour ne jamais répéter inutilement un long bloc (voir le ticket #37).
+    Cause établie (#92, essai réel) : chaque appel au générateur d'images est un appel RÉSEAU INDÉPENDANT et
+    SANS ÉTAT — aucun connecteur actuel ne transmet de référence visuelle (``supports_reference_images`` vaut
+    toujours ``False`` aujourd'hui, voir ``reference_images_status``) ni de mémoire de conversation entre deux
+    scènes. Renvoyer autrefois un simple rappel du type « déjà décrit·e à la scène 1 » revenait donc à ne
+    RIEN transmettre à ce fournisseur : il n'a jamais eu accès à la scène 1. La description COMPLÈTE est
+    maintenant répétée à CHAQUE scène où l'élément est présent — seul moyen honnête de la transmettre tant
+    qu'aucun fournisseur ne supporte réellement une référence persistante.
     """
     lines: list[str] = []
     present = [character for character in characters
               if _mentions(narration, character.get("name", ""))
               or (always_present_id and character.get("id") == always_present_id)]
     for character in present:
-        key = character.get("id") or character.get("name", "")
-        if key in first_seen:
-            lines.append(_character_visual_repeat(character, first_seen[key]))
-        else:
-            lines.append(_character_visual_full(character))
-            first_seen[key] = scene_index
+        lines.append(_character_visual_full(character))
     if present:
         lines.append(_CHARACTER_CONTINUITY_RULE)
     if location:
-        loc_key = "\0location"  # jamais un id/nom réel : ne peut pas entrer en collision avec un personnage
-        if loc_key in first_seen:
-            lines.append(_location_visual_repeat(location, first_seen[loc_key]))
-        else:
-            lines.append(_location_visual_full(location))
-            first_seen[loc_key] = scene_index
+        lines.append(_location_visual_full(location))
         lines.append(_LOCATION_CONTINUITY_RULE)
     return lines
 
@@ -373,6 +357,12 @@ def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str
     les scènes — jamais injecté aveuglément au-delà de ce cas précis et justifié. Le lieu s'applique à toutes
     les scènes. Taille bornée par ``VISUAL_BLOCK_MAX`` (troncature nette entre éléments), ordre stable (celui
     déjà figé dans le snapshot).
+
+    Le bloc est placé en TÊTE du prompt (#92), avant le style du projet et avant la description de l'action
+    de la scène : l'identité des personnages et du lieu est l'information la plus critique à préserver d'une
+    scène à l'autre, elle ne doit jamais se retrouver diluée après les consignes génériques répétées à
+    chaque scène (style, liste négative...) ni risquer d'être coupée par la troncature finale de
+    ``storyboard.MAX_PROMPT`` (qui s'applique à la fin du texte, voir ``storyboard._prompt``).
     """
     if not narrative_context:
         return list(scenes)
@@ -381,16 +371,14 @@ def enrich_visual_prompts(scenes: Sequence["Scene"], narrative_context: dict[str
     if not characters and not location:
         return list(scenes)
 
-    first_seen: dict[str, int] = {}
     enriched: list[Scene] = []
     for scene in scenes:
-        lines = _scene_visual_lines(scene.narration, characters, location, first_seen, scene.index,
-                                    always_present_id)
+        lines = _scene_visual_lines(scene.narration, characters, location, always_present_id)
         if not lines:
             enriched.append(scene)
             continue
         block = _bounded_block(_VISUAL_HEADER, lines, _VISUAL_FOOTER, VISUAL_BLOCK_MAX, _VISUAL_TRUNCATION_NOTE)
-        enriched.append(replace(scene, prompt=(scene.prompt + "\n\n" + block)))
+        enriched.append(replace(scene, prompt=(block + "\n\n" + scene.prompt)))
     return enriched
 
 

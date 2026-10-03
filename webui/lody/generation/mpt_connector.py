@@ -509,7 +509,10 @@ class MoneyPrinterTurboConnector(VideoGenerationProvider):
         return {"scenes": scenes, "image_template": {
             "applied": applied, "text": template if applied else "",
             "origin": "moteur — config.toml, gabarit GLOBAL partagé par tous les projets" if applied
-            else ("inconnu (configuration du moteur non vérifiable)" if not facts.known else "aucun")}}
+            else ("inconnu (configuration du moteur non vérifiable)" if not facts.known else "aucun")},
+            # #92 : modèle d'images réellement utilisé par le moteur, pour que l'export de configuration
+            # (#91) le reflète — jamais inventé si le rapport de capacités est indisponible/périmé.
+            "image_model": facts.image_model if facts.known else ""}
 
     def write_script(self, request: GenerationRequest, narrative_block: str = "", dialogue_character: str = "") -> str:
         payload = {key: value for key, value in

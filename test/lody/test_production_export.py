@@ -85,3 +85,69 @@ def test_download_buttons_are_present_on_the_tracking_page(engine):  # noqa: F81
     labels = [getattr(button, "label", "") for button in app.get("download_button")]
     assert "Télécharger les logs complets" in labels
     assert "Télécharger la configuration complète" in labels
+
+
+# -- correspondance scène → image, modèle d'images, modèle de voix (#92) ----------------------------------
+def _production_with_storyboard(**overrides):
+    from lody.generation.store import Production
+    from lody.generation.models import ProductionStatus as S
+
+    base = dict(
+        id="prd_x", project_id="prj_x", root_production_id="prd_x", parent_production_id=None, version=1,
+        subject="sujet", brief={}, script="script", script_source="generated",
+        storyboard=[{"index": 1, "narration": "Une.", "prompt": "p1", "seconds": 3.0, "action": "assis"},
+                   {"index": 2, "narration": "Deux.", "prompt": "p2", "seconds": 3.0, "action": ""},
+                   {"index": 3, "narration": "Trois.", "prompt": "p3", "seconds": 3.0, "action": "bras levés"}],
+        visual_prompts=[], params={}, cost_currency="EUR", cost_low=None, cost_high=None, cost_partial=False,
+        cost_detail={}, confirmed_at="2020-01-01T00:00:00+00:00", provider="scripted", external_task_id="task-1",
+        idempotency_key="k", status=S.TERMINEE, progress=100, current_step="Terminée", error_code="",
+        error_message="", created_at="2020-01-01T00:00:00+00:00", started_at="2020-01-01T00:00:00+00:00",
+        finished_at="2020-01-01T00:10:00+00:00", updated_at="2020-01-01T00:10:00+00:00", last_polled_at=None,
+        video_ref="tasks/task-1/final-1.mp4", video_duration=9.0, trace={},
+    )
+    base.update(overrides)
+    return Production(**base)
+
+
+def test_scene_image_correspondence_maps_by_position_and_flags_missing_scenes():
+    """3 scènes, seulement 2 images reçues (le moteur peut s'arrêter avant la fin — cause établie #92) :
+    la 3e scène doit le dire explicitement, jamais une image inventée ou mal associée."""
+    production = _production_with_storyboard()
+    images = [{"name": "img-a.png", "captured_at": "2020-01-01T00:05:00+00:00"},
+             {"name": "img-b.png", "captured_at": "2020-01-01T00:06:00+00:00"}]
+    config = export.build_config_export(production, images)
+    rows = config["correspondance_scene_image"]
+    assert rows[0] == {"scene": 1, "image_recue": "img-a.png", "recue_le": "2020-01-01T00:05:00+00:00", "statut": "reçue"}
+    assert rows[1]["image_recue"] == "img-b.png"
+    assert rows[2]["image_recue"] is None
+    assert "aucune image dédiée reçue" in rows[2]["statut"]
+
+
+def test_scene_image_correspondence_is_explicit_when_images_were_not_fetched():
+    production = _production_with_storyboard()
+    config = export.build_config_export(production)  # images=None : jamais fetché, jamais prétendre le contraire
+    assert "indisponible" in config["correspondance_scene_image"]
+
+
+def test_storyboard_export_includes_the_action_field():
+    production = _production_with_storyboard()
+    config = export.build_config_export(production)
+    assert config["storyboard"][0]["action"] == "assis"
+    assert config["storyboard"][1]["action"] == ""
+
+
+def test_image_model_and_voice_model_are_exported_when_known():
+    production = _production_with_storyboard(trace={
+        "image_model": "gpt-image-2",
+        "voice": {"provider": "elevenlabs", "name": "V", "voice_id": "abc", "model": "eleven_multilingual_v2",
+                  "source": "project", "fallback": False, "reason": "projet"},
+    })
+    config = export.build_config_export(production)
+    assert config["modele_images"] == "gpt-image-2"
+    assert config["voix"]["transmise_trace"]["model"] == "eleven_multilingual_v2"
+
+
+def test_image_model_is_explicitly_unavailable_when_unknown():
+    production = _production_with_storyboard(trace={})
+    config = export.build_config_export(production)
+    assert config["modele_images"] == export.UNAVAILABLE
