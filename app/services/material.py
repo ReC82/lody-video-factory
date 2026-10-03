@@ -1069,6 +1069,11 @@ def save_video(video_url: str, save_dir: str = "") -> str:
 # 服务。生成的图片立即渲染成与 local 素材同款"缓慢放大"mp4 片段，对下游
 # 剪辑流程完全透明。
 OPENAI_IMAGE_ENDPOINT_PATH = "images/generations"
+# /images/edits (#92, continuité visuelle) : MÊME modèle, accepte une ou plusieurs images de référence en
+# plus du prompt (multipart/form-data) — documenté par OpenAI pour la cohérence de personnage d'une scène
+# à l'autre. Utilisé UNIQUEMENT quand une référence est fournie (reference_image_path) ; sans elle, le
+# comportement est strictement celui d'avant (/images/generations, texte seul).
+OPENAI_IMAGE_EDIT_ENDPOINT_PATH = "images/edits"
 # OpenAI 官方图片接口只接受模型规定的尺寸，不能直接传视频分辨率（如 1080x1920）。
 # 留空 openai_image_size 时按画幅取以下兼容默认值；本地网关可显式配置覆盖。
 OPENAI_IMAGE_DEFAULT_SIZES = {
@@ -1106,9 +1111,12 @@ def is_openai_image_enabled(app_config: dict | None = None) -> bool:
     )
 
 
-def _openai_image_endpoint() -> tuple[str, str]:
+def _openai_image_endpoint(edit: bool = False) -> tuple[str, str]:
     """
     读取文生图端点与模型名，缺失时抛出带配置指引的错误。
+
+    ``edit=True`` 返回 /images/edits（#92，带参考图时使用），其余完全相同——同一 base_url、同一模型，
+    参考图是否存在才是两者唯一的区别（见 generate_images_openai）。
     """
     base_url = (
         str(config.app.get("openai_image_base_url", "") or "").strip().rstrip("/")
@@ -1124,7 +1132,8 @@ def _openai_image_endpoint() -> tuple[str, str]:
             "\n\n##### openai_image_model is not set #####\n\n"
             f"Please set it in the config.toml file: {config.config_file}\n"
         )
-    return f"{base_url}/{OPENAI_IMAGE_ENDPOINT_PATH}", model
+    path = OPENAI_IMAGE_EDIT_ENDPOINT_PATH if edit else OPENAI_IMAGE_ENDPOINT_PATH
+    return f"{base_url}/{path}", model
 
 
 def _openai_image_size(video_aspect: VideoAspect) -> str:
@@ -1273,9 +1282,14 @@ def _parse_openai_image_response(
     return None, "image response has neither url nor b64_json"
 
 
-def _request_openai_image(endpoint: str, payload: dict) -> tuple[bytes | None, str]:
+def _request_openai_image(
+    endpoint: str, payload: dict, reference_image_bytes: bytes | None = None,
+) -> tuple[bytes | None, str]:
     """
-    调用 OpenAI 兼容 /images/generations 接口，带退避重试与 key 轮换。
+    调用 OpenAI 兼容 /images/generations（或带 reference_image_bytes 时的 /images/edits，#92）接口，
+    带退避重试与 key 轮换。两者共享全部重试/计费安全语义——唯一区别是请求体：JSON（generations）还是
+    multipart/form-data 外加参考图文件（edits）。每次重试都用同一份已读入内存的字节重建 files，
+    绝不复用可能已耗尽的文件流。
 
     429/5xx 按临时故障退避重试；401/403 只有在配置了多个 key 时才重试
     （借助 get_api_key 的轮换机制换 key）；其余 4xx 是明确拒绝，快速失败
@@ -1305,14 +1319,27 @@ def _request_openai_image(endpoint: str, payload: dict) -> tuple[bytes | None, s
             headers["Authorization"] = f"Bearer {api_key}"
         retryable = False
         try:
-            response = requests.post(
-                endpoint,
-                json=payload,
-                headers=headers,
-                proxies=config.proxy,
-                verify=_get_tls_verify(),
-                timeout=OPENAI_IMAGE_REQUEST_TIMEOUT,
-            )
+            if reference_image_bytes is not None:
+                # multipart/form-data : payload devient des champs de formulaire, l'image un fichier
+                # distinct — jamais réutilisé d'une tentative à l'autre (bytes déjà en mémoire, pas un flux).
+                response = requests.post(
+                    endpoint,
+                    data=payload,
+                    files={"image": ("reference.png", reference_image_bytes, "image/png")},
+                    headers=headers,
+                    proxies=config.proxy,
+                    verify=_get_tls_verify(),
+                    timeout=OPENAI_IMAGE_REQUEST_TIMEOUT,
+                )
+            else:
+                response = requests.post(
+                    endpoint,
+                    json=payload,
+                    headers=headers,
+                    proxies=config.proxy,
+                    verify=_get_tls_verify(),
+                    timeout=OPENAI_IMAGE_REQUEST_TIMEOUT,
+                )
         except requests.exceptions.ConnectTimeout as e:
             # 连接阶段超时：请求确定没有送达服务端，没有创建生成任务，
             # 可以安全重试。
@@ -1408,6 +1435,7 @@ def generate_images_openai(
     minimum_duration: int,
     video_aspect: VideoAspect = VideoAspect.portrait,
     save_dir: str = "",
+    reference_image_path: str | None = None,
 ) -> List[MaterialInfo]:
     """
     用 OpenAI 兼容文生图接口为一个脚本关键词生成一张图片并保存到本地。
@@ -1416,10 +1444,24 @@ def generate_images_openai(
     原生时长，``duration`` 记录目标片段时长（秒），供按需下载流程核算
     是否已经凑够配音时长。API 返回的实际尺寸可能与请求不一致，这里以
     图片真实尺寸写入 rendition，不依赖请求参数。
+
+    ``reference_image_path``（#92，连续性）：提供时改用 /images/edits，把该图片作为参考一并发送——
+    用于让同一角色在多个场景中保持外观、服装、比例一致。文件无法读取时记录警告并照常降级为纯文本
+    生成（/images/generations），绝不让一个失效的本地文件路径让整条任务失败。
     """
     aspect = VideoAspect(video_aspect)
     clip_duration = max(int(minimum_duration), 1)
-    endpoint, model = _openai_image_endpoint()
+    reference_bytes: bytes | None = None
+    if reference_image_path:
+        try:
+            with open(reference_image_path, "rb") as handle:
+                reference_bytes = handle.read()
+        except OSError as exc:
+            logger.warning(
+                "character reference image unreadable, falling back to text-only "
+                f"generation: path={reference_image_path}, error={type(exc).__name__}"
+            )
+    endpoint, model = _openai_image_endpoint(edit=reference_bytes is not None)
     image_size = _openai_image_size(aspect)
     payload = {
         "model": model,
@@ -1429,9 +1471,10 @@ def generate_images_openai(
     }
     logger.info(
         f"generating image via openai-compatible endpoint: model={model}, "
-        f"term={search_term!r}, size={image_size}"
+        f"term={search_term!r}, size={image_size}, "
+        f"with_reference={reference_bytes is not None}"
     )
-    image_bytes, failure_detail = _request_openai_image(endpoint, payload)
+    image_bytes, failure_detail = _request_openai_image(endpoint, payload, reference_bytes)
     if image_bytes is None:
         logger.error(
             f"openai image generation failed: term={search_term!r}, "
@@ -1490,14 +1533,25 @@ def _download_videos_openai_image_on_demand(
     audio_duration: float,
     max_clip_duration: int,
     material_directory: str,
+    match_script_order: bool = False,
+    reference_image_path: str | None = None,
 ) -> List[str]:
     """
-    按脚本片段顺序逐张生成 OpenAI 兼容文生图素材，凑够所需总时长立即停止。
+    按脚本片段顺序逐张生成 OpenAI 兼容文生图素材。
 
-    与 WaveSpeed 按需生成同一付费安全语义：文生图按张计费，先全量生成再
-    挑选会为用不到的画面付费。每张图片生成后立即渲染成 mp4 片段并累计
-    有效时长（与库存流程一致，按片段时长封顶），累计达到所需配音时长后
-    不再发起新的付费请求。单张失败按素材源约定跳过并继续下一个关键词。
+    默认（``match_script_order=False``）：与 WaveSpeed 按需生成同一付费安全语义——文生图按张计费，
+    累计达到所需配音时长后不再发起新的付费请求，凑够即止，即使 ``search_terms`` 还有剩余关键词。
+
+    ``match_script_order=True``（调用方要求关键词与画面逐一对应，例如 Lody 的
+    ``match_materials_to_script``，每个关键词对应脚本的一个片段）：每个关键词都必须生成自己的一张
+    图片，绝不能因为累计时长"已经够用"就静默跳过脚本末尾的片段——那些片段依旧会被剪辑进最终视频
+    （循环复用更早的画面），只是永远配不上自己的台词。因此在此模式下不再提前停止，但累计时长读数
+    仍然记录，供调用方诊断。
+
+    每张图片生成后立即渲染成 mp4 片段并累计有效时长（与库存流程一致，按片段时长封顶）。单张失败按
+    素材源约定跳过并继续下一个关键词——``match_script_order=True`` 时也一样：一个关键词生成失败不
+    会补发另一张顶替，该片段在最终视频里就会缺席自己的专属画面（由上层的场景–画面对应关系记录体现，
+    而不是在这里静默蒙混）。
     """
     if not material_directory:
         # 生成图片按任务计费且不可复用，默认落在任务目录便于追溯。
@@ -1527,6 +1581,7 @@ def _download_videos_openai_image_on_demand(
             minimum_duration=max_clip_duration,
             video_aspect=video_aspect,
             save_dir=material_directory,
+            reference_image_path=reference_image_path,
         )
         for item in items:
             video_file = _render_openai_image_video(item.url, max_clip_duration)
@@ -1545,11 +1600,15 @@ def _download_videos_openai_image_on_demand(
                     f"error={type(source_error).__name__}, detail={source_error}"
                 )
             total_duration += min(max_clip_duration, item.duration)
-            # 与 WaveSpeed 相同用 >= 判断：恰好凑够时再生成一张就多付一次费。
-            # 内外两处判断必须保持同一语义。
-            if total_duration >= required_duration:
+            # match_script_order=True : chaque terme a droit à EXACTEMENT une image, jamais écourté —
+            # voir le docstring de la fonction. Un terme ne produit de toute façon jamais plus d'un
+            # item ici (generate_images_openai renvoie au plus une image), donc cette boucle interne
+            # continue sans effet ; seule la boucle externe (sur search_terms) doit ne jamais s'arrêter.
+            if not match_script_order and total_duration >= required_duration:
+                # 与 WaveSpeed 相同用 >= 判断：恰好凑够时再生成一张就多付一次费。
+                # 内外两处判断必须保持同一语义。
                 break
-        if total_duration >= required_duration:
+        if not match_script_order and total_duration >= required_duration:
             logger.info(
                 "generated image materials cover the required duration, stop "
                 f"generating more images: generated={total_duration:.1f}s, "
@@ -1664,6 +1723,7 @@ def download_videos(
     audio_duration: float = 0.0,
     max_clip_duration: int = 5,
     match_script_order: bool = False,
+    reference_image_path: str | None = None,
 ) -> List[str]:
     provider = "pexels"
     remote_search_videos = search_videos_pexels
@@ -1742,9 +1802,11 @@ def download_videos(
             material_directory=material_directory,
         )
     if source == "openai_image":
-        # 与 WaveSpeed 相同的按需付费语义：文生图按张计费，逐段生成、凑够
-        # 所需时长立即停止。生成结果是一次性的本地图片文件，也不参与 24
-        # 小时搜索缓存——缓存会让不同任务反复拿到同一张图。
+        # 按需付费语义：文生图按张计费。match_script_order=False 时与 WaveSpeed 相同，逐段生成、凑够
+        # 所需时长立即停止；match_script_order=True 时（调用方要求关键词与画面逐一对应，例如 Lody 的
+        # match_materials_to_script）每个关键词都生成自己的一张图，绝不因为累计时长"够用"而静默跳过
+        # 脚本末尾的片段（见 _download_videos_openai_image_on_demand 的 docstring）。生成结果是一次性
+        # 的本地图片文件，也不参与 24 小时搜索缓存——缓存会让不同任务反复拿到同一张图。
         return _download_videos_openai_image_on_demand(
             task_id=task_id,
             search_terms=search_terms,
@@ -1752,6 +1814,8 @@ def download_videos(
             audio_duration=audio_duration,
             max_clip_duration=max_clip_duration,
             material_directory=material_directory,
+            match_script_order=match_script_order,
+            reference_image_path=reference_image_path,
         )
 
     if match_script_order:
