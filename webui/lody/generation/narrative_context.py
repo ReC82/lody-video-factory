@@ -316,6 +316,17 @@ def _scene_visual_lines(narration: str, characters: Sequence[dict[str, Any]], lo
     return lines
 
 
+def reference_character(narrative_context: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Le personnage de référence — EXACTEMENT celui de ``resolve_voice``/``script_mode``/
+    ``always_present_character_id`` (même ``_reference_character``, jamais une règle divergente), ``None``
+    sinon. Utilisé par #92 pour résoudre son ``reference_image`` éventuel avant l'envoi au moteur — MVP
+    mono-référence, la même limite que la voix (#70) et le mode dialogue (#77) : au maximum UNE image de
+    référence transmise par production, jamais une par personnage sélectionné."""
+    characters = (narrative_context or {}).get("characters") or []
+    reference, _ = _reference_character(characters)
+    return reference
+
+
 def always_present_character_id(narrative_context: dict[str, Any] | None) -> str:
     """Identifiant du personnage à considérer comme PRÉSENT DANS CHAQUE SCÈNE, sans dépendre de la mention de
     son nom dans la narration — uniquement le personnage de référence du mode dialogue (#77, EXACTEMENT la
