@@ -9,6 +9,7 @@ import streamlit as st
 from lody import catalog, nav, view_kit
 from lody.components import format_datetime
 from lody.generation import costing
+from lody.generation import export
 from lody.generation import progress as prog
 from lody.generation.kit_service import KitService
 from lody.generation.models import ACTIVE_STATUSES, STATUS_LABELS, ExternalTask, ProductionStatus as S
@@ -563,6 +564,16 @@ def render(service: ProductionService, project: Project, production_id: str, kit
                     if st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project_run"):
                         nav.go(nav.VIEW_PROJECT, project.id)
                         st.rerun()
+            # #91 : deux téléchargements directs, sans ZIP, disponibles pour une production en cours
+            # (instantané partiel explicitement identifié comme tel), échouée ou terminée — jamais un
+            # nouvel appel fournisseur, jamais reconstruit depuis la configuration ACTUELLE du projet.
+            with st.container(horizontal=True, key="run_exports"):
+                st.download_button("Télécharger les logs complets", data=export.logs_export_text(current),
+                                   file_name=f"production_{current.id}_logs.txt", mime="text/plain",
+                                   icon=":material/description:", key=f"export_logs_{current.id}")
+                st.download_button("Télécharger la configuration complète", data=export.config_export_text(current),
+                                   file_name=f"production_{current.id}_config.txt", mime="text/plain",
+                                   icon=":material/settings:", key=f"export_config_{current.id}")
         if production.is_active and not current.is_active:
             st.rerun()  # la production vient de se terminer : recharger toute la page pour afficher le résultat
 
