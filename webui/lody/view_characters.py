@@ -197,15 +197,28 @@ def _row(repo: CharacterRepository, project: Project, character: Character) -> N
                 st.button("Annuler", key=f"cancel_deactivate_{character.id}", on_click=_cancel_deactivate)
 
 
+# Contraintes GÉNÉRIQUES (jamais spécifiques à un personnage, donc jamais un codage en dur de nom/trait) :
+# sans elles, un prompt de fiche seul peut produire un montage à plusieurs vignettes avec un titre incrusté
+# (observé en validation réelle #92 — inutilisable comme référence de continuité visuelle, voir aussi
+# ``thumbnail.background_prompt`` qui pose la même garde pour le fond de miniature).
+_REFERENCE_PORTRAIT_GUARD = (
+    "Portrait de référence : une SEULE image, un seul personnage, jamais un montage ni une grille de "
+    "plusieurs scènes, jamais de bandeau ni de titre. Cadrage buste ou plan rapproché, pose neutre et "
+    "visage bien visible, fond simple et neutre. Aucun texte, aucune lettre, aucun chiffre, aucun logo, "
+    "aucune marque, aucun filigrane dans l'image."
+)
+
+
 def _reference_prompt_from_sheet(character: Character) -> str:
     """Prompt de proposition de référence, dérivé UNIQUEMENT de la fiche du personnage (#92) — jamais un
-    nom/trait codé en dur ailleurs dans la plateforme : tout vient de ces quatre champs, dans cet ordre."""
+    nom/trait codé en dur ailleurs dans la plateforme : tout vient de ces quatre champs, dans cet ordre.
+    La garde de cadrage/propreté (``_REFERENCE_PORTRAIT_GUARD``) est générique, jamais spécifique à un
+    personnage : elle s'applique à toute fiche, vide ou non."""
     parts = [part for part in (
         character.visual_description, character.reference_prompt, character.permanent_elements,
     ) if part.strip()]
-    if not parts:
-        return f"Portrait de {character.name}, personnage de fiction, style neutre, fond simple."
-    return " ".join(parts)
+    base = " ".join(parts) if parts else f"Portrait de {character.name}, personnage de fiction, style neutre, fond simple."
+    return base + " " + _REFERENCE_PORTRAIT_GUARD
 
 
 def _generate_reference_proposal(service: ProductionService, p: str, character: Character) -> None:
