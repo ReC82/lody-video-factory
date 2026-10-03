@@ -115,14 +115,18 @@ def test_location_only_applies_to_every_scene_even_without_being_named():
     assert "Atelier solaire" in result[0].prompt and "Atelier solaire" in result[1].prompt
 
 
-def test_repeated_mention_is_abbreviated_after_the_first_to_avoid_needless_repetition():
+def test_repeated_mention_gets_the_full_description_every_time_not_a_stale_backreference():
+    """Cause établie (#92, essai réel) : chaque appel d'image est un appel réseau indépendant et SANS ÉTAT
+    (aucun connecteur ne transmet de référence visuelle ni de mémoire de scène à scène). Un rappel du type
+    « déjà décrit·e à la scène 1 » ne transmettait donc RIEN d'utile au fournisseur — il n'a jamais eu accès
+    à la scène 1. La description complète doit apparaître à CHAQUE scène où le personnage est présent."""
     narrative = {"characters": [{"id": "1", "name": "Léa", "visual_description": "Cheveux roux et veste jaune vif"}],
                 "location": None}
     scenes = [Scene(1, "Léa sourit.", "p1", 3.0), Scene(2, "Léa repart au loin.", "p2", 3.0)]
     result = enrich_visual_prompts(scenes, narrative)
     assert "Cheveux roux et veste jaune vif" in result[0].prompt
-    assert "Cheveux roux et veste jaune vif" not in result[1].prompt  # pas de répétition inutile du long bloc
-    assert "scène 1" in result[1].prompt  # rappel court référençant la première apparition
+    assert "Cheveux roux et veste jaune vif" in result[1].prompt  # jamais un simple rappel sans contenu
+    assert "déjà décrit" not in result[1].prompt  # plus de rappel qui ne transmet rien à un fournisseur sans état
 
 
 def test_scene_count_order_and_narration_are_never_changed():

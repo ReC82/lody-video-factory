@@ -382,3 +382,20 @@ def test_connector_module_is_the_only_place_naming_the_legacy_engine():
     offenders = [path.name for path in root.rglob("*.py") if "moneyprinter" in path.read_text(encoding="utf-8").lower()
                  and path.name not in {"mpt_connector.py", "components.py"}]
     assert offenders == [], offenders
+
+
+# -- trace_prompts : modèle d'images réellement utilisé (#92) ---------------------------------------------
+def test_trace_prompts_reports_the_real_image_model(tmp_path):
+    connector, _ = _connector(tmp_path, config=CONFIG)
+    request = _crypto_request(script="Une phrase.", visual_prompts=("scène un",))
+    detail = connector.trace_prompts(request)
+    assert detail["image_model"] == "gpt-image"
+
+
+def test_trace_prompts_image_model_is_empty_when_config_is_unreadable(tmp_path):
+    connector = mpt.MoneyPrinterTurboConnector("http://engine:8080", tmp_path / "storage",
+                                               tmp_path / "missing-config.toml",
+                                               report_path=tmp_path / "missing-report.json")
+    request = _crypto_request(script="Une phrase.", visual_prompts=("scène un",))
+    detail = connector.trace_prompts(request)
+    assert detail["image_model"] == ""  # jamais inventé si la configuration n'est pas vérifiable
