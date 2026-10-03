@@ -446,3 +446,120 @@ def test_end_to_end_two_characters_no_primary_never_introduces_either_into_an_un
     middle = next(p for p in submitted_prompts if "bruit sourd" in p)
     assert "Nova" not in middle and "Theo" not in middle
     assert _TRAITS_A["visual_description"] not in middle and _TRAITS_B["visual_description"] not in middle
+
+
+# ======================================================================================================================
+# -- #92 : transmission RÉELLE d'une image de référence persistante, quand le fournisseur la supporte -------------
+# ======================================================================================================================
+@pytest.fixture(autouse=True)
+def _isolated_reference_storage_for_upload_tests(tmp_path, monkeypatch):
+    """Isole le stockage des images de référence (#38) — nécessaire ici car ces tests, contrairement au
+    reste du fichier, appellent réellement ``CharacterRepository.set_reference_image``."""
+    monkeypatch.setenv("LODY_DATA_DIR", str(tmp_path / "ref_storage_upload"))
+
+
+def _png_bytes() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (64, 64), color=(200, 100, 50)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_reference_image_is_uploaded_and_transmitted_when_the_provider_supports_it(env):  # noqa: F811
+    env.connector.supports_reference_images = True
+    reference_bytes = _png_bytes()
+    nova = env.add_character(**_TRAITS_A)
+    env.characters.set_reference_image(env.project.id, nova.id, reference_bytes)
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=_SCRIPT_ONE_CHARACTER,
+                                character_ids=[nova.id])
+    env.service.confirm(draft.id, accept_partial=True)
+
+    assert env.connector.reference_images_received == [(reference_bytes, env.connector.submitted[-1].image_asset_scope)]
+    assert env.connector.submitted[-1].character_reference_asset_id == env.connector.reference_asset_id
+    assert len(env.connector.submitted[-1].image_asset_scope) == 64  # jeton opaque, haute entropie
+
+
+def test_reference_image_is_never_transmitted_when_the_provider_does_not_support_it(env):  # noqa: F811
+    """supports_reference_images reste False par défaut (ScriptedConnector) : même avec une image de
+    référence configurée, rien n'est jamais uploadé ni prétendu transmis — repli honnête sur le texte seul."""
+    assert env.connector.supports_reference_images is False
+    nova = env.add_character(**_TRAITS_A)
+    env.characters.set_reference_image(env.project.id, nova.id, _png_bytes())
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=_SCRIPT_ONE_CHARACTER,
+                                character_ids=[nova.id])
+    env.service.confirm(draft.id, accept_partial=True)
+
+    assert env.connector.reference_images_received == []
+    assert env.connector.submitted[-1].character_reference_asset_id == ""
+
+
+def test_character_without_a_reference_image_never_triggers_an_upload(env):  # noqa: F811
+    env.connector.supports_reference_images = True
+    nova = env.add_character(**_TRAITS_A)  # jamais de set_reference_image : aucune référence configurée
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=_SCRIPT_ONE_CHARACTER,
+                                character_ids=[nova.id])
+    env.service.confirm(draft.id, accept_partial=True)
+
+    assert "upload_reference_image" not in env.connector.calls
+    assert env.connector.submitted[-1].character_reference_asset_id == ""
+
+
+def test_upload_failure_degrades_to_text_only_and_records_a_warning_never_fails_the_production(env):  # noqa: F811
+    """Un échec d'upload ne doit jamais faire échouer toute la production (la description textuelle
+    complète suffit déjà, #99) — mais doit être honnêtement signalé, jamais silencieux."""
+    from lody.generation.models import ErrorKind, ProviderError
+
+    env.connector.supports_reference_images = True
+    env.connector.reference_upload_error = ProviderError(ErrorKind.REJECTED, "upload refused")
+    nova = env.add_character(**_TRAITS_A)
+    env.characters.set_reference_image(env.project.id, nova.id, _png_bytes())
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=_SCRIPT_ONE_CHARACTER,
+                                character_ids=[nova.id])
+    launched = env.service.confirm(draft.id, accept_partial=True)
+
+    from lody.generation.store import ProductionRepository as PR
+
+    stored = PR(env.path).get(launched.id)
+    assert stored.status.value != "ECHEC"  # jamais un échec de toute la production pour ce seul motif
+    assert env.connector.submitted[-1].character_reference_asset_id == ""  # jamais prétendu transmis
+    assert any("référence" in warning.lower() for warning in stored.warnings)
+
+
+def test_multiple_characters_no_unique_primary_never_uploads_any_reference(env):  # noqa: F811
+    """Mode narration (ambiguïté non résolue, #39 hors scope) : pas de personnage de référence unique,
+    donc aucune référence visuelle n'est jamais transmise (MVP mono-référence, cohérent avec la voix #70)."""
+    env.connector.supports_reference_images = True
+    nova = env.add_character(**_TRAITS_A)
+    theo = env.add_character(**_TRAITS_B)
+    env.characters.set_reference_image(env.project.id, nova.id, _png_bytes())
+    env.characters.set_reference_image(env.project.id, theo.id, _png_bytes())
+    script = (
+        "Nova avance très prudemment le long de ce couloir désert et parfaitement silencieux, l'oreille aux "
+        "aguets, prête à réagir au moindre petit signe suspect. "
+        "Theo apparaît enfin tout au bout du couloir, visiblement soulagé de retrouver Nova parfaitement "
+        "saine et sauve après cette frayeur inattendue."
+    )
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=script,
+                                character_ids=[nova.id, theo.id])
+    env.service.confirm(draft.id, accept_partial=True)
+
+    assert env.connector.reference_images_received == []
+    assert env.connector.submitted[-1].character_reference_asset_id == ""
+
+
+def test_trace_records_whether_the_reference_was_actually_used(env):  # noqa: F811
+    env.connector.supports_reference_images = True
+    nova = env.add_character(**_TRAITS_A)
+    env.characters.set_reference_image(env.project.id, nova.id, _png_bytes())
+    draft = env.service.prepare(env.project, SUBJECT, provider_id="scripted", script=_SCRIPT_ONE_CHARACTER,
+                                character_ids=[nova.id])
+    launched = env.service.confirm(draft.id, accept_partial=True)
+
+    from lody.generation.store import ProductionRepository as PR
+
+    stored = PR(env.path).get(launched.id)
+    assert stored.trace["reference_image"]["used"] is True
+    assert stored.trace["reference_image"]["character_name"] == "Nova"

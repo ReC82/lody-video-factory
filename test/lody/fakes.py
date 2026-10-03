@@ -43,6 +43,7 @@ class ScriptedConnector(VideoGenerationProvider):
     id = "scripted"
     display_name = "Faux moteur"
     supports_thumbnail_background = False   # activable par les tests : le moteur historique ne sait pas générer une image seule
+    supports_reference_images = False   # #92 : activable par les tests (voir upload_reference_image ci-dessous)
 
     def __init__(self, root: Path, *, issues: list[ReadinessIssue] | None = None):
         self.root = Path(root)
@@ -61,6 +62,13 @@ class ScriptedConnector(VideoGenerationProvider):
         self.background_error: ProviderError | None = None
         self.narrative_blocks_received: list[str] = []  # #36 : ce que write_script a réellement reçu, dans l'ordre
         self.dialogue_characters_received: list[str] = []  # #77 : idem, pour le mode dialogue mono-personnage
+        # #92 : chaque upload de référence visuelle, dans l'ordre — (octets, scope) — jamais rejouée ni
+        # modifiée ici : les tests vérifient ce qui a été RÉELLEMENT envoyé.
+        self.reference_images_received: list[tuple[bytes, str]] = []
+        self.reference_upload_error: ProviderError | None = None
+        self.reference_asset_id = "fake-reference-asset-id-0001"
+        self.reference_proposal_bytes: bytes | None = None
+        self.reference_proposal_error: ProviderError | None = None
 
     # -- scénario -----------------------------------------------------------
     def queue(self, *items: TaskSnapshot | ProviderError) -> None:
@@ -89,6 +97,19 @@ class ScriptedConnector(VideoGenerationProvider):
         if self.background_error:
             raise self.background_error
         return self.background_bytes if self.background_bytes is not None else _png(prompt)
+
+    def upload_reference_image(self, image_bytes, scope):
+        self.calls.append("upload_reference_image")
+        if self.reference_upload_error:
+            raise self.reference_upload_error
+        self.reference_images_received.append((image_bytes, scope))
+        return self.reference_asset_id
+
+    def generate_reference_proposal(self, prompt):
+        self.calls.append("generate_reference_proposal")   # appel payant : les tests comptent chaque appel
+        if self.reference_proposal_error:
+            raise self.reference_proposal_error
+        return self.reference_proposal_bytes if self.reference_proposal_bytes is not None else _png(prompt)
 
     def describe_params(self, request):
         return {"video_aspect": request.aspect, "video_language": request.language, "subtitle_display_mode": "sentence"}
