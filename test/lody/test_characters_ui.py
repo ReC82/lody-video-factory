@@ -426,3 +426,17 @@ def test_provider_error_during_generation_is_shown_and_nothing_crashes(engine): 
     assert not app.exception
     assert "quota insuffisant" in _text(app)
     assert len(app.get("image")) == 0  # aucune proposition à prévisualiser
+
+
+def test_reference_prompt_always_guards_against_a_multi_panel_collage_with_embedded_text():
+    """Essai réel #92 : une fiche seule, sans garde, a produit un montage à 8 vignettes avec un titre
+    incrusté (inutilisable comme référence de continuité). La garde est GÉNÉRIQUE (jamais un nom/trait
+    codé en dur) : présente même pour une fiche vide, jamais seulement pour une fiche remplie."""
+    from lody.view_characters import _reference_prompt_from_sheet
+
+    project = _project()
+    filled = _char_repo().create(project.id, name="Gaston", visual_description="Cheveux roux, veste jaune")
+    empty = _char_repo().create(project.id, name="Léa")
+    for prompt in (_reference_prompt_from_sheet(filled), _reference_prompt_from_sheet(empty)):
+        assert "une SEULE image" in prompt and "jamais un montage ni une grille" in prompt
+        assert "Aucun texte" in prompt and "aucun logo" in prompt
