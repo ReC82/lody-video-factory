@@ -1443,6 +1443,80 @@ class TestElevenLabsVoice(unittest.TestCase):
             if os.path.exists(out_path):
                 os.remove(out_path)
 
+    @patch("app.services.voice.requests.post")
+    @patch("app.services.voice.AudioFileClip")
+    @patch("app.services.voice.config")
+    def test_elevenlabs_tts_sends_speed_derived_from_voice_rate(self, mock_config, mock_clip_cls, mock_post):
+        """#92 : voice_rate (ex. 1.1 pour narration_pace="rapide") était accepté mais jamais transmis à
+        ElevenLabs — "speed" est pourtant un champ officiel de voice_settings (toute voix, tout modèle
+        hors v4). La cadence configurée doit maintenant avoir un effet réel sur la voix générée."""
+        mock_config.elevenlabs.get.return_value = "fake-api-key"
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.content = b"fake-mp3-bytes"
+        mock_clip_cls.return_value.duration = 3.0
+        mock_clip_cls.return_value.close = lambda: None
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            out_path = f.name
+        try:
+            result = vs.elevenlabs_tts("Hello world", "abc123", out_path, voice_rate=1.1)
+            self.assertIsNotNone(result)
+            sent = mock_post.call_args.kwargs["json"]
+            self.assertAlmostEqual(sent["voice_settings"]["speed"], 1.1)
+            # Les autres réglages par défaut restent inchangés tant qu'aucun choix explicite n'a été fait.
+            self.assertEqual(sent["voice_settings"]["stability"], 0.5)
+            self.assertEqual(sent["voice_settings"]["style"], 0.0)
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+
+    @patch("app.services.voice.requests.post")
+    @patch("app.services.voice.AudioFileClip")
+    @patch("app.services.voice.config")
+    def test_elevenlabs_tts_clamps_speed_to_the_documented_range(self, mock_config, mock_clip_cls, mock_post):
+        """Plage officielle ElevenLabs pour "speed" : [0.25, 4.0]."""
+        mock_config.elevenlabs.get.return_value = "fake-api-key"
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.content = b"fake-mp3-bytes"
+        mock_clip_cls.return_value.duration = 3.0
+        mock_clip_cls.return_value.close = lambda: None
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            out_path = f.name
+        try:
+            vs.elevenlabs_tts("Hello world", "abc123", out_path, voice_rate=9.0)
+            self.assertEqual(mock_post.call_args.kwargs["json"]["voice_settings"]["speed"], 4.0)
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+
+    @patch("app.services.voice.requests.post")
+    @patch("app.services.voice.AudioFileClip")
+    @patch("app.services.voice.config")
+    def test_elevenlabs_tts_voice_settings_override_replaces_defaults_entirely(
+        self, mock_config, mock_clip_cls, mock_post
+    ):
+        """#92 (essai vocal comparatif) : un override explicite part de zéro, jamais fusionné avec les
+        valeurs par défaut — pour que chaque extrait comparé reflète EXACTEMENT les réglages annoncés."""
+        mock_config.elevenlabs.get.return_value = "fake-api-key"
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.content = b"fake-mp3-bytes"
+        mock_clip_cls.return_value.duration = 3.0
+        mock_clip_cls.return_value.close = lambda: None
+        override = {
+            "stability": 0.3, "similarity_boost": 0.75, "style": 0.35,
+            "use_speaker_boost": True, "speed": 1.0,
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            out_path = f.name
+        try:
+            vs.elevenlabs_tts("Hello world", "abc123", out_path, voice_settings_override=override)
+            self.assertEqual(mock_post.call_args.kwargs["json"]["voice_settings"], override)
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+
     @patch("app.services.voice.config")
     def test_elevenlabs_tts_no_api_key(self, mock_config):
         mock_config.elevenlabs.get.return_value = ""
