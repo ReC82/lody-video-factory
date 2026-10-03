@@ -245,7 +245,17 @@ _VISUAL_FIELD_LABELS = {
 
 # Borne PAR SCÈNE (indépendante de ``storyboard.MAX_PROMPT``, qui tronque le prompt final en dernier recours) :
 # garantit qu'ajouter la continuité visuelle ne peut jamais, à elle seule, dominer le budget d'une scène.
-VISUAL_BLOCK_MAX = 500
+#
+# Cause établie (#92, essai réel) : à 500, la ligne d'UN SEUL personnage normalement rempli (description
+# visuelle + prompt de référence + éléments permanents + continuité, chacun pouvant approcher sa propre
+# limite de 500 caractères, voir characters.py) dépasse déjà cette borne à elle seule — ``_bounded_block``
+# abandonne alors TOUTE la ligne (jamais une coupure au milieu), donc la continuité visuelle entière d'Eli a
+# disparu dès la scène 1 d'une production réelle, silencieusement, sans qu'aucune erreur ne le signale.
+# 3000 couvre avec marge un personnage ET un lieu réellement et complètement renseignés (mesuré sur la
+# configuration réelle d'Eli + « Place du village » : ~2900 caractères nécessaires) — toujours borné, jamais
+# illimité : plusieurs personnages très détaillés à la fois peuvent encore tronquer, auquel cas la note de
+# troncature reste honnêtement affichée (jamais un déni silencieux comme avant ce correctif).
+VISUAL_BLOCK_MAX = 3000
 _VISUAL_HEADER = "### Continuité visuelle (instantané de production, #34/#35/#37) ###"
 _VISUAL_FOOTER = "### Fin de la continuité visuelle ###"
 _CHARACTER_CONTINUITY_RULE = (

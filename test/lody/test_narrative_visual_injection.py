@@ -50,6 +50,32 @@ def test_missing_narrative_context_key_is_ignored_cleanly():
     assert enrich_visual_prompts(scenes, None) == scenes
 
 
+def test_a_single_richly_filled_character_and_location_are_not_silently_dropped():
+    """Non-régression #92 (essai réel) : avant correctif, VISUAL_BLOCK_MAX=500 était plus petit que la
+    ligne d'UN SEUL personnage normalement rempli (chaque champ pouvant approcher sa propre limite de 500
+    caractères, voir characters.py) — ``_bounded_block`` abandonnait alors la ligne ENTIÈRE, et la
+    continuité visuelle disparaissait silencieusement dès la toute première scène, sans même atteindre le
+    lieu. Tailles ci-dessous mesurées sur une configuration RÉELLE (projet de test, personnage seul +
+    lieu) : jamais un cas artificiellement petit qui masquerait le bug."""
+    character = {
+        "id": "1", "name": "Nova",
+        "visual_description": "D" * 308, "reference_prompt": "R" * 349,
+        "permanent_elements": "P" * 195, "continuity_notes": "C" * 255,
+    }
+    location = {
+        "id": "l1", "name": "Avant-poste", "location_type": "T" * 60,
+        "description": "E" * 292, "reference_prompt": "F" * 430, "continuity_notes": "G" * 348,
+    }
+    narrative = {"characters": [character], "location": location}
+    scenes = [Scene(1, "Nova arrive sur place.", "prompt", 5.0)]
+    result = enrich_visual_prompts(scenes, narrative)
+    block = result[0].prompt
+    assert MARKER in block
+    assert "D" * 308 in block  # description visuelle du personnage réellement présente, pas juste le marqueur
+    assert "E" * 292 in block  # description du lieu réellement présente
+    assert "(continuité tronquée" not in block  # tient dans le budget : rien n'est silencieusement perdu
+
+
 def test_character_is_only_added_to_scenes_that_mention_them():
     narrative = {"characters": [{"id": "1", "name": "Léa", "visual_description": "Cheveux roux, veste jaune"}],
                 "location": None}
@@ -112,14 +138,18 @@ def test_scene_count_order_and_narration_are_never_changed():
 def test_truncation_is_deterministic_and_never_cuts_a_field_in_the_middle():
     marker = "DESCRIPTIONVISUELLEMARQUEUR"  # motif distinctif, jamais un sous-mot du français
     long_field = marker * 20  # 560 caractères
+    # 10 personnages (jamais 1 seul) : même à VISUAL_BLOCK_MAX=3000 (#92, dimensionné sur un SEUL personnage
+    # réellement rempli), un nombre suffisant de personnages très détaillés continue de tronquer — la
+    # troncature reste un cas réel à couvrir, pas un vestige de l'ancienne borne à 500.
     narrative = {"characters": [
-        {"id": str(i), "name": f"Perso{i}", "visual_description": long_field} for i in range(5)
+        {"id": str(i), "name": f"Perso{i}", "visual_description": long_field} for i in range(10)
     ], "location": None}
-    narration = " ".join(f"Perso{i}" for i in range(5)) + " sont réunis dans la même scène."
+    narration = " ".join(f"Perso{i}" for i in range(10)) + " sont réunis dans la même scène."
     scenes = [Scene(1, narration, "prompt", 5.0)]
     result = enrich_visual_prompts(scenes, narrative)
     block_addition = result[0].prompt[len("prompt"):]
     assert len(block_addition) <= VISUAL_BLOCK_MAX + 100  # marge d'en-tête/pied, jamais illimité
+    assert "(continuité tronquée" in block_addition  # la troncature se déclenche bien, pas un test devenu vide
     assert all(line.count(marker) in (0, 20) for line in block_addition.splitlines())
 
 
