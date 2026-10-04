@@ -169,3 +169,29 @@ def test_character_reference_image_usage_is_explicitly_unavailable_before_the_ti
     production = _production_with_storyboard(trace={})
     config = export.build_config_export(production)
     assert config["reference_visuelle_personnage"] == export.UNAVAILABLE
+
+
+def test_voice_direction_is_exported_with_model_settings_and_tagged_text():
+    """#92 : modèle/réglages RÉELLEMENT appliqués et texte RÉELLEMENT envoyé (balises incluses) —
+    jamais recalculé après coup."""
+    production = _production_with_storyboard(trace={
+        "voice_direction": {
+            "applied": True, "model_id": "eleven_v3",
+            "voice_settings": {"stability": 0.3, "similarity_boost": 0.75, "style": 0.35,
+                              "use_speaker_boost": True, "speed": 1.0},
+            "spoken_text_sent": "[hesitates] Enfin, c'est ce que je dis à chaque fois.",
+            "subtitle_text": "Enfin, c'est ce que je dis à chaque fois.",
+        },
+    })
+    config = export.build_config_export(production)
+    direction = config["voix"]["direction_vocale"]
+    assert direction["applied"] is True and direction["model_id"] == "eleven_v3"
+    assert direction["voice_settings"]["stability"] == 0.3
+    assert direction["spoken_text_sent"] == "[hesitates] Enfin, c'est ce que je dis à chaque fois."
+    assert direction["subtitle_text"] == "Enfin, c'est ce que je dis à chaque fois."
+
+
+def test_voice_direction_is_explicitly_unavailable_before_the_ticket():
+    production = _production_with_storyboard(trace={})
+    config = export.build_config_export(production)
+    assert config["voix"]["direction_vocale"] == export.UNAVAILABLE
