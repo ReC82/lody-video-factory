@@ -14,6 +14,7 @@ un JSON arbitraire reviendrait à faire confiance à un chemin non validé. Seul
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import uuid
@@ -40,6 +41,50 @@ VOICE_NAME_MAX = 80
 EXTERNAL_VOICE_ID_MAX = 100
 PERMANENT_ELEMENTS_MAX = 500
 CONTINUITY_NOTES_MAX = 500
+
+# #92 : réglages de jeu vocal ElevenLabs qu'un personnage peut enregistrer après écoute comparative —
+# uniquement des champs officiellement documentés par ElevenLabs (voir mpt_connector.generate_voice_preview),
+# jamais une balise ou un champ arbitraire. model_id est un texte court (nom de modèle, jamais un secret,
+# vérifié comme les autres champs texte) ; les autres sont des nombres/booléens dans leur plage documentée.
+VOICE_DIRECTION_MODEL_ID_MAX = 60
+_VOICE_DIRECTION_RANGES: dict[str, tuple[float, float]] = {
+    "stability": (0.0, 1.0), "similarity_boost": (0.0, 1.0), "style": (0.0, 1.0), "speed": (0.25, 4.0),
+}
+_VOICE_DIRECTION_KEYS = frozenset({*_VOICE_DIRECTION_RANGES, "model_id", "use_speaker_boost"})
+
+
+def validate_voice_direction(settings: dict[str, Any]) -> dict[str, Any]:
+    """Nettoie et valide des réglages de jeu vocal (#92). Lève ``CharacterValidationError`` (clé
+    ``voice_direction``) — jamais une clé inconnue, jamais une valeur hors plage, jamais un secret."""
+    if not isinstance(settings, dict):
+        raise CharacterValidationError({"voice_direction": "Réglages de jeu vocal invalides."})
+    unknown = set(settings) - _VOICE_DIRECTION_KEYS
+    if unknown:
+        raise CharacterValidationError(
+            {"voice_direction": f"Réglage(s) de jeu vocal inconnu(s) : {', '.join(sorted(unknown))}."})
+    clean: dict[str, Any] = {}
+    if "model_id" in settings:
+        model_id = " ".join(str(settings["model_id"] or "").split())
+        if len(model_id) > VOICE_DIRECTION_MODEL_ID_MAX:
+            raise CharacterValidationError({"voice_direction": "Le nom du modèle est trop long."})
+        if model_id and find_secret_path(model_id):
+            raise CharacterValidationError({"voice_direction": SECRET_MESSAGE})
+        if model_id:
+            clean["model_id"] = model_id
+    if "use_speaker_boost" in settings:
+        clean["use_speaker_boost"] = bool(settings["use_speaker_boost"])
+    for key, (low, high) in _VOICE_DIRECTION_RANGES.items():
+        if key not in settings:
+            continue
+        try:
+            value = float(settings[key])
+        except (TypeError, ValueError) as error:
+            raise CharacterValidationError({"voice_direction": f"« {key} » doit être un nombre."}) from error
+        if not low <= value <= high:
+            raise CharacterValidationError(
+                {"voice_direction": f"« {key} » doit être compris entre {low} et {high}."})
+        clean[key] = value
+    return clean
 
 EDITABLE_FIELDS = (
     "name", "role", "personality", "visual_description", "reference_prompt", "speech_style",
@@ -89,6 +134,7 @@ class Character:
     is_active: bool
     created_at: str
     updated_at: str
+    voice_direction: dict[str, Any]
 
 
 def _utc_now() -> str:
@@ -194,6 +240,11 @@ class CharacterRepository:
         data = dict(row)
         data["is_primary"] = bool(data["is_primary"])
         data["is_active"] = bool(data["is_active"])
+        try:
+            parsed = json.loads(data.get("voice_direction") or "{}")
+        except ValueError:
+            parsed = {}
+        data["voice_direction"] = parsed if isinstance(parsed, dict) else {}
         return Character(**data)
 
     @staticmethod
@@ -330,4 +381,35 @@ class CharacterRepository:
                 (self._clock(), character_id, project_id),
             )
         logger.info("image de référence retirée : %s", character_id)
+        return self.get(project_id, character_id)
+
+    # -- direction vocale (#92) -------------------------------------------------------------------------------
+    def set_voice_direction(self, project_id: str, character_id: str, settings: dict[str, Any]) -> Character:
+        """Enregistre le modèle/réglages ElevenLabs choisis pour CE personnage après écoute comparative
+        (voir ``lody.generation.mpt_connector.generate_voice_preview``) — jamais imposé à un autre
+        personnage ou projet : une colonne par personnage, jamais un défaut global. Ne touche à aucun
+        autre champ, ni à la voix (``voice_provider``/``external_voice_id``) elle-même.
+
+        Lève ``CharacterNotFound`` si l'identifiant n'existe pas ou appartient à un autre projet ;
+        ``CharacterValidationError`` si ``settings`` porte une clé inconnue ou une valeur hors plage."""
+        self.get(project_id, character_id)
+        clean = validate_voice_direction(settings)
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE characters SET voice_direction = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+                (json.dumps(clean, ensure_ascii=False), self._clock(), character_id, project_id),
+            )
+        logger.info("direction vocale enregistrée : %s", character_id)
+        return self.get(project_id, character_id)
+
+    def clear_voice_direction(self, project_id: str, character_id: str) -> Character:
+        """Retire les réglages de jeu vocal propres à ce personnage : il reprend le modèle/les paramètres
+        par défaut du moteur, exactement comme avant ce ticket."""
+        self.get(project_id, character_id)
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE characters SET voice_direction = '{}', updated_at = ? WHERE id = ? AND project_id = ?",
+                (self._clock(), character_id, project_id),
+            )
+        logger.info("direction vocale retirée : %s", character_id)
         return self.get(project_id, character_id)

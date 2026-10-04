@@ -142,6 +142,9 @@ def build_config_export(production: Production, images: list[dict[str, str]] | N
             "resolue": params.get("voice_resolution") or UNAVAILABLE,
             "snapshotee": (snapshot.get("request") or {}).get("voice") or UNAVAILABLE,
             "transmise_trace": trace.get("voice") or UNAVAILABLE,
+            # #92 : modèle/réglages RÉELLEMENT appliqués et texte RÉELLEMENT envoyé au fournisseur de voix
+            # (balises de jeu entre crochets incluses, voir reprise_audio.py) — jamais recalculé après coup.
+            "direction_vocale": trace.get("voice_direction") or UNAVAILABLE,
         },
         "mode_script": trace.get("script_mode") or UNAVAILABLE,
         "script": {
