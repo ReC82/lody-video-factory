@@ -289,3 +289,55 @@ def test_reprise_script_targets_both_containers_correctly():
     assert 'register --production "$PROD"' in script and "set -eu" in script
     for forbidden in ("curl", "wget"):
         assert forbidden not in script
+
+
+# -- régression réelle : video_concat_mode doit être un VideoConcatMode, jamais une chaîne brute ------------------
+def test_combine_videos_wrapper_converts_the_raw_concat_mode_string_to_an_enum():
+    """Bug observé en essai réel #92 : combine_videos() accède à video_concat_mode.value directement — une
+    chaîne brute ("sequential", telle que stockée dans script.json) faisait planter l'appel avec
+    AttributeError. _combine_videos_with_enum_concat_mode() doit convertir AVANT de déléguer."""
+    received = {}
+
+    def fake_combine_videos(**kwargs):
+        received.update(kwargs)
+        return "ok"
+
+    class FakeConcatMode:
+        def __init__(self, value):
+            self.value = value
+
+    result = ra._combine_videos_with_enum_concat_mode(
+        fake_combine_videos, FakeConcatMode, video_concat_mode="sequential", other="x")
+
+    assert result == "ok"
+    assert isinstance(received["video_concat_mode"], FakeConcatMode)
+    assert received["video_concat_mode"].value == "sequential"
+    assert received["other"] == "x"
+
+
+def test_combine_videos_wrapper_leaves_an_already_converted_mode_untouched():
+    class FakeConcatMode:
+        def __init__(self, value):
+            self.value = value
+
+    already = FakeConcatMode("random")
+    received = {}
+    ra._combine_videos_with_enum_concat_mode(
+        lambda **kw: received.update(kw), FakeConcatMode, video_concat_mode=already)
+    assert received["video_concat_mode"] is already  # jamais re-converti
+
+
+def test_combine_videos_wrapper_works_with_the_real_engine_enum_and_function():
+    """Preuve directe sur les vraies fonctions du moteur (pas seulement des faux) : reproduit exactement
+    l'appel qui plantait avant la correction."""
+    from app.models.schema import VideoConcatMode
+    from app.services import video
+
+    calls = []
+    real_combine = video.combine_videos
+    try:
+        video.combine_videos = lambda **kw: calls.append(kw)
+        ra._combine_videos_with_enum_concat_mode(video.combine_videos, VideoConcatMode, video_concat_mode="sequential")
+    finally:
+        video.combine_videos = real_combine
+    assert calls[0]["video_concat_mode"] is VideoConcatMode.sequential

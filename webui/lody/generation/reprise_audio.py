@@ -187,24 +187,39 @@ def reprise(
     return report
 
 
+def _combine_videos_with_enum_concat_mode(combine_videos: Callable[..., Any], concat_mode_cls: Any,
+                                          **kwargs: Any) -> Any:
+    """``combine_videos()`` accède à ``video_concat_mode.value`` directement (jamais ``getattr`` défensif,
+    contrairement à ``video_transition_mode``) — même conversion que ``task.py:_run_pipeline`` avant
+    d'appeler ``generate_final_videos()``, nécessaire ici puisque ``script.json`` stocke la valeur brute."""
+    mode = kwargs.get("video_concat_mode")
+    if isinstance(mode, str):
+        kwargs["video_concat_mode"] = concat_mode_cls(mode)
+    return combine_videos(**kwargs)
+
+
 def _engine_reprise(
     task_dir: Path, *, spoken_text: str, subtitle_text: str, voice_id: str, model_id: str,
     voice_settings: dict[str, Any],
 ) -> dict[str, Any]:  # pragma: no cover - exécuté dans le conteneur du moteur
     """Câblage réel : fonctions du moteur (ce conteneur les possède déjà)."""
-    from app.models.schema import VideoParams
+    from functools import partial
+
+    from app.models.schema import VideoConcatMode, VideoParams
     from app.services import task as task_service
     from app.services import video
     from app.services import voice as voice_service
     from app.utils import utils
 
     names = set(getattr(VideoParams, "model_fields", None) or getattr(VideoParams, "__pydantic_fields__", {}))
+    combine_videos = partial(_combine_videos_with_enum_concat_mode, video.combine_videos, VideoConcatMode)
+
     with _allow_network_only_for((".elevenlabs.io",)):
         return reprise(
             task_dir, spoken_text=spoken_text, subtitle_text=subtitle_text, voice_id=voice_id,
             model_id=model_id, voice_settings=voice_settings,
             elevenlabs_tts=voice_service.elevenlabs_tts, get_audio_duration=voice_service.get_audio_duration,
-            generate_subtitle=task_service.generate_subtitle, combine_videos=video.combine_videos,
+            generate_subtitle=task_service.generate_subtitle, combine_videos=combine_videos,
             generate_video=video.generate_video,
             make_video_params=lambda params: VideoParams(**{k: v for k, v in params.items() if k in names}),
             task_dir_for=utils.task_dir,
