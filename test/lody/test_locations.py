@@ -42,7 +42,7 @@ def test_fresh_database_has_zero_locations_and_reaches_the_latest_schema(tmp_pat
     assert repo.list_for_project(project.id) == []
     assert repo.count_for_project(project.id) == 0
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 6
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 7
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
 
@@ -71,7 +71,7 @@ def test_upgrade_from_currently_deployed_schema_v4_keeps_existing_data(tmp_path)
     assert repo.list_for_project("prj_old") == []  # zéro lieu par défaut, même pour un projet ancien
 
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 7
     # Rien de préexistant n'a bougé.
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT script FROM productions WHERE id = 'prd_old'").fetchone() == \
@@ -85,7 +85,7 @@ def test_migration_replayed_is_a_no_op(tmp_path):
     LocationRepository(path)  # rejeu explicite
     LocationRepository(path)  # une troisième fois, pour faire bonne mesure
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 7
     assert connection.execute("SELECT COUNT(*) FROM locations").fetchone()[0] == 0
 
 

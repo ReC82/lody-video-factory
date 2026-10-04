@@ -42,7 +42,7 @@ def test_fresh_database_has_zero_characters_and_reaches_the_latest_schema(tmp_pa
     assert repo.list_for_project(project.id) == []
     assert repo.count_for_project(project.id) == 0
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 6
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 7
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
 
@@ -71,7 +71,7 @@ def test_upgrade_from_currently_deployed_schema_v4_keeps_existing_data(tmp_path)
     assert repo.list_for_project("prj_old") == []  # zéro personnage par défaut, même pour un projet ancien
 
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 7
     # Rien de préexistant n'a bougé.
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT script FROM productions WHERE id = 'prd_old'").fetchone() == \
@@ -85,7 +85,7 @@ def test_migration_replayed_is_a_no_op(tmp_path):
     CharacterRepository(path)  # rejeu explicite
     CharacterRepository(path)  # une troisième fois, pour faire bonne mesure
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 7
     assert connection.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 0
 
 
@@ -534,3 +534,102 @@ def test_reference_image_is_excluded_from_editable_fields_and_generic_update(rep
         repo.update(project.id, character.id, reference_image="references/evil/path")
     assert "Champ inconnu" in str(error.value)
     assert repo.get(project.id, character.id).reference_image == ""
+
+
+# -- direction vocale (#92) ------------------------------------------------------------------------------------
+_V3_SETTINGS = {"model_id": "eleven_v3", "stability": 0.3, "similarity_boost": 0.75, "style": 0.35,
+                "use_speaker_boost": True, "speed": 1.0}
+
+
+def test_new_character_has_no_voice_direction_by_default(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    assert character.voice_direction == {}
+
+
+def test_set_voice_direction_stores_exactly_the_given_settings(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    updated = repo.set_voice_direction(project.id, character.id, _V3_SETTINGS)
+    assert updated.voice_direction == _V3_SETTINGS
+    assert repo.get(project.id, character.id).voice_direction == _V3_SETTINGS
+
+
+def test_set_voice_direction_does_not_change_other_fields_or_the_voice_itself(repo, project):
+    character = repo.create(project.id, name="Gaston", voice_provider="elevenlabs",
+                            external_voice_id="voice-abc", voice_name="Kev")
+    updated = repo.set_voice_direction(project.id, character.id, _V3_SETTINGS)
+    assert updated.voice_provider == "elevenlabs" and updated.external_voice_id == "voice-abc"
+    assert updated.voice_name == "Kev"
+
+
+def test_set_voice_direction_accepts_a_partial_subset(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    updated = repo.set_voice_direction(project.id, character.id, {"stability": 0.3})
+    assert updated.voice_direction == {"stability": 0.3}
+
+
+def test_set_voice_direction_rejects_an_unknown_key(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    with pytest.raises(CharacterValidationError) as error:
+        repo.set_voice_direction(project.id, character.id, {"unknown_field": 1})
+    assert "voice_direction" in error.value.errors
+    assert repo.get(project.id, character.id).voice_direction == {}
+
+
+@pytest.mark.parametrize("field,value", [
+    ("stability", 1.5), ("stability", -0.1), ("similarity_boost", 2.0),
+    ("style", -0.5), ("speed", 0.1), ("speed", 5.0),
+])
+def test_set_voice_direction_rejects_an_out_of_range_value(repo, project, field, value):
+    character = repo.create(project.id, name="Gaston")
+    with pytest.raises(CharacterValidationError) as error:
+        repo.set_voice_direction(project.id, character.id, {field: value})
+    assert "voice_direction" in error.value.errors
+
+
+def test_set_voice_direction_rejects_a_non_numeric_value(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    with pytest.raises(CharacterValidationError):
+        repo.set_voice_direction(project.id, character.id, {"stability": "beaucoup"})
+
+
+def test_set_voice_direction_on_an_unknown_character_raises_not_found(repo, project):
+    with pytest.raises(CharacterNotFound):
+        repo.set_voice_direction(project.id, "chr_doesnotexist0", _V3_SETTINGS)
+
+
+def test_set_voice_direction_never_writes_into_another_projects_character(repo, projects, project):
+    other_project = projects.create(name="Autre projet")
+    character = repo.create(other_project.id, name="Gaston")
+    with pytest.raises(CharacterNotFound):
+        repo.set_voice_direction(project.id, character.id, _V3_SETTINGS)
+
+
+def test_clear_voice_direction_resets_to_empty(repo, project):
+    character = repo.create(project.id, name="Gaston")
+    repo.set_voice_direction(project.id, character.id, _V3_SETTINGS)
+    cleared = repo.clear_voice_direction(project.id, character.id)
+    assert cleared.voice_direction == {}
+
+
+def test_voice_direction_is_excluded_from_editable_fields_and_generic_update(repo, project):
+    """Jamais settable via ``update`` générique (donc jamais via l'import JSON #44/#57) — seuls
+    set_voice_direction/clear_voice_direction le peuvent."""
+    from lody.characters import EDITABLE_FIELDS
+
+    assert "voice_direction" not in EDITABLE_FIELDS
+    character = repo.create(project.id, name="Gaston")
+    with pytest.raises(CharacterValidationError) as error:
+        repo.update(project.id, character.id, voice_direction={"model_id": "eleven_v3"})
+    assert "Champ inconnu" in str(error.value)
+    assert repo.get(project.id, character.id).voice_direction == {}
+
+
+def test_voice_direction_never_imposed_on_other_characters_or_projects(repo, projects, project):
+    """Exigence explicite (#92) : une colonne par personnage, jamais un défaut global."""
+    other_project = projects.create(name="Autre projet")
+    eli = repo.create(project.id, name="Eli")
+    repo.set_voice_direction(project.id, eli.id, _V3_SETTINGS)
+    sibling = repo.create(project.id, name="Léa")
+    other = repo.create(other_project.id, name="Gaston")
+    assert sibling.voice_direction == {}
+    assert other.voice_direction == {}

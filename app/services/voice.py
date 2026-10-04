@@ -2028,12 +2028,19 @@ def elevenlabs_tts(
     voice_volume: float = 1.0,
     model_id: str = "",
     voice_settings_override: dict | None = None,
+    subtitle_text: str | None = None,
 ) -> Union[SubMaker, None]:
     """
     ``voice_settings_override`` (#92, diagnostic du jeu vocal) : remplace ENTIÈREMENT les réglages par
-    défaut ci-dessous — réservé à l'essai vocal comparatif (voir ``create_voice_preview``), jamais utilisé
-    par le pipeline de production normal (qui laisse ce paramètre à ``None``). Permet de comparer stability/
-    style/speed sans toucher à la voix réellement configurée tant qu'aucun choix n'a été fait.
+    défaut ci-dessous — réservé à l'essai vocal comparatif (voir ``create_voice_preview``) et à la direction
+    vocale par personnage une fois choisie, jamais un défaut silencieux pour le reste du pipeline. Permet de
+    comparer stability/style/speed sans toucher à la voix réellement configurée tant qu'aucun choix n'a été fait.
+
+    ``subtitle_text`` (#92, direction vocale par réplique) : quand ``text`` porte des balises de jeu entre
+    crochets (ex. ``[hesitates]``, interprétées par ElevenLabs mais jamais prononcées), ces balises ne
+    doivent JAMAIS apparaître dans les sous-titres. Si fourni, c'est CE texte (sans balise) qui sert à
+    construire le ``SubMaker`` — ``text`` (avec balises) reste seul envoyé à l'API. ``None`` (par défaut) :
+    comportement inchangé, les sous-titres reprennent ``text`` tel quel, comme avant cette option.
     """
     text = (text or "").strip()
     if not text:
@@ -2123,7 +2130,7 @@ def elevenlabs_tts(
             logger.success(f"elevenlabs tts succeeded: {voice_file}")
             return populate_legacy_submaker_with_full_text(
                 sub_maker=sub_maker,
-                text=text,
+                text=subtitle_text if subtitle_text is not None else text,
                 audio_duration_seconds=audio_duration,
             )
         except Exception as e:

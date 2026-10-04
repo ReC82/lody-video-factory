@@ -173,6 +173,16 @@ def _reference_images(connection: sqlite3.Connection) -> None:
     _add_columns(connection, "locations", {"reference_image": "TEXT NOT NULL DEFAULT ''"})
 
 
+def _voice_direction(connection: sqlite3.Connection) -> None:
+    """v7 (#92) : réglages de jeu vocal ElevenLabs choisis pour CE personnage après écoute comparative
+    (modèle, stability/similarity_boost/style/use_speaker_boost/speed — voir
+    ``lody.generation.mpt_connector.generate_voice_preview``), en JSON ('{}' par défaut = aucun réglage
+    propre : la voix suit alors le modèle/les paramètres par défaut du moteur, exactement comme avant ce
+    ticket). Jamais imposé à un autre personnage ou projet : une colonne par personnage, jamais un défaut
+    global ni un champ de projet."""
+    _add_columns(connection, "characters", {"voice_direction": "TEXT NOT NULL DEFAULT '{}'"})
+
+
 MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
@@ -180,6 +190,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (4, KITS_SCHEMA),
     (5, CHARACTERS_SCHEMA + LOCATIONS_SCHEMA),
     (6, _reference_images),
+    (7, _voice_direction),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 

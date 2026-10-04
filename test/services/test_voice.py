@@ -1517,6 +1517,59 @@ class TestElevenLabsVoice(unittest.TestCase):
             if os.path.exists(out_path):
                 os.remove(out_path)
 
+    @patch("app.services.voice.requests.post")
+    @patch("app.services.voice.AudioFileClip")
+    @patch("app.services.voice.config")
+    def test_elevenlabs_tts_sends_tagged_text_but_subtitles_use_the_clean_text(
+        self, mock_config, mock_clip_cls, mock_post
+    ):
+        """#92 (direction vocale par réplique) : les balises de jeu ([hesitates]...) sont envoyées à
+        ElevenLabs mais ne doivent JAMAIS apparaître dans les sous-titres — subtitle_text (sans balise)
+        sert seul à construire le SubMaker, text (avec balises) reste seul envoyé à l'API."""
+        mock_config.elevenlabs.get.return_value = "fake-api-key"
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.content = b"fake-mp3-bytes"
+        mock_clip_cls.return_value.duration = 3.0
+        mock_clip_cls.return_value.close = lambda: None
+        tagged = "[hesitates] Enfin, c'est ce que je dis à chaque fois."
+        clean = "Enfin, c'est ce que je dis à chaque fois."
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            out_path = f.name
+        try:
+            result = vs.elevenlabs_tts(tagged, "abc123", out_path, subtitle_text=clean)
+            self.assertEqual(mock_post.call_args.kwargs["json"]["text"], tagged)
+            full_text = " ".join(result.subs)
+            self.assertNotIn("[hesitates]", full_text)
+            self.assertIn("Enfin", full_text)
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+
+    @patch("app.services.voice.requests.post")
+    @patch("app.services.voice.AudioFileClip")
+    @patch("app.services.voice.config")
+    def test_elevenlabs_tts_without_subtitle_text_keeps_prior_behavior(
+        self, mock_config, mock_clip_cls, mock_post
+    ):
+        """Non-régression : subtitle_text omis (défaut None) -> les sous-titres reprennent text tel quel,
+        exactement comme avant l'ajout de ce paramètre."""
+        mock_config.elevenlabs.get.return_value = "fake-api-key"
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.content = b"fake-mp3-bytes"
+        mock_clip_cls.return_value.duration = 3.0
+        mock_clip_cls.return_value.close = lambda: None
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            out_path = f.name
+        try:
+            result = vs.elevenlabs_tts("Hello world", "abc123", out_path)
+            full_text = " ".join(result.subs)
+            self.assertIn("Hello world", full_text)
+        finally:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+
     @patch("app.services.voice.config")
     def test_elevenlabs_tts_no_api_key(self, mock_config):
         mock_config.elevenlabs.get.return_value = ""
