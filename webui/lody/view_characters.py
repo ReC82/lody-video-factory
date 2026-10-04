@@ -363,7 +363,8 @@ _VOICE_LAB_V3_PRESETS: list[tuple[str, str, str]] = [
 ]
 
 
-def _render_voice_lab(service: ProductionService, project: Project, current: Character | None) -> None:
+def _render_voice_lab(repo: CharacterRepository, service: ProductionService, project: Project,
+                      current: Character | None) -> None:
     """Essai vocal comparatif pour LA MÊME voix déjà configurée (#92, diagnostic du jeu vocal) — ne
     remplace jamais la voix utilisée en production : les réglages comparés ici ne s'appliquent nulle part
     ailleurs tant qu'aucun choix explicite n'est fait. HORS du formulaire, comme la proposition de
@@ -414,6 +415,41 @@ def _render_voice_lab(service: ProductionService, project: Project, current: Cha
             st.button(button_label, key=f"{p}_voice_preview_{preset_key}_generate",
                       on_click=_generate_voice_preview,
                       args=(service, p, current, preset_key, tagged_text, _VOICE_LAB_V3_SETTINGS))
+
+        _render_voice_direction_apply(repo, project, current)
+
+
+def _apply_voice_direction(repo: CharacterRepository, project_id: str, character_id: str, p: str) -> None:
+    try:
+        repo.set_voice_direction(project_id, character_id, _VOICE_LAB_V3_SETTINGS)
+    except CharacterValidationError as error:
+        nav.flash("error", f"Réglages non enregistrés : {error.errors.get('voice_direction', 'erreur inconnue')}")
+        return
+    nav.flash("success", "Modèle et réglages eleven_v3 enregistrés pour ce personnage.")
+
+
+def _clear_voice_direction(repo: CharacterRepository, project_id: str, character_id: str) -> None:
+    repo.clear_voice_direction(project_id, character_id)
+    nav.flash("success", "Direction vocale retirée : ce personnage reprend les réglages par défaut du moteur.")
+
+
+def _render_voice_direction_apply(repo: CharacterRepository, project: Project, current: Character) -> None:
+    """Applique le modèle/réglages eleven_v3 choisis APRÈS écoute (#92) — un choix explicite, jamais un
+    défaut silencieux : ce personnage seul est concerné, jamais les autres personnages ni le projet. Ne
+    touche jamais à ``voice_provider``/``external_voice_id`` (la voix elle-même reste celle déjà
+    configurée)."""
+    applied = current.voice_direction
+    st.markdown('<p class="card-eyebrow">Appliquer un choix</p>', unsafe_allow_html=True)
+    if applied:
+        st.caption(f"Déjà appliqué à {esc(current.name)} : " + ", ".join(f"{k}={v}" for k, v in applied.items()))
+        st.button("Retirer (revenir aux réglages par défaut du moteur)", key=f"voice_direction_clear_{current.id}",
+                  on_click=_clear_voice_direction, args=(repo, project.id, current.id))
+    else:
+        st.caption(f"Après écoute, applique le modèle et les réglages eleven_v3 ci-dessus à {esc(current.name)} "
+                  "uniquement (jamais aux autres personnages ni au projet). La voix elle-même ne change pas.")
+        st.button("Appliquer ce réglage eleven_v3 à ce personnage", type="primary",
+                  key=f"voice_direction_apply_{current.id}",
+                  on_click=_apply_voice_direction, args=(repo, project.id, current.id, _prefix(project.id, current.id)))
 
 
 def _render_form(repo: CharacterRepository, project: Project, target: str | None, current: Character | None) -> None:
@@ -659,7 +695,7 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
                   on_click=_start_create, args=(project.id,))
     else:
         _render_reference_proposal(repo, project, service, current)
-        _render_voice_lab(service, project, current)
+        _render_voice_lab(repo, service, project, current)
         _render_form(repo, project, target, current)
 
     _render_import_export(repo, project)

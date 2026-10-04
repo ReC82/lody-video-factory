@@ -563,3 +563,57 @@ def test_voice_lab_v3_presets_show_up_and_generate_a_single_continuous_clip_per_
     assert settings.get("model_id") == "eleven_v3"
     assert voice_id == "voice-abc123"
     assert "[matter-of-fact]" in text and "[hesitates]" in text  # la variante "subtile", balises incluses
+
+
+def test_voice_direction_apply_button_persists_the_v3_settings(engine):  # noqa: F811
+    from lody.view_characters import _VOICE_LAB_V3_SETTINGS
+
+    engine.supports_voice_preview = True
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston", voice_provider="elevenlabs", voice_name="Kev",
+                                    external_voice_id="voice-abc123")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+
+    assert "Appliquer ce réglage eleven_v3 à ce personnage" in _labels(app)
+    assert _char_repo().get(project.id, character.id).voice_direction == {}
+
+    app = _button(app, "Appliquer ce réglage eleven_v3 à ce personnage").click().run()
+
+    assert not app.exception
+    assert _char_repo().get(project.id, character.id).voice_direction == _VOICE_LAB_V3_SETTINGS
+    assert "enregistrés" in _text(app).lower()
+    assert "Retirer (revenir aux réglages par défaut du moteur)" in _labels(app)
+
+
+def test_voice_direction_clear_button_resets_to_default(engine):  # noqa: F811
+    from lody.view_characters import _VOICE_LAB_V3_SETTINGS
+
+    engine.supports_voice_preview = True
+    project = _project()
+    character = _char_repo().create(project.id, name="Gaston", voice_provider="elevenlabs", voice_name="Kev",
+                                    external_voice_id="voice-abc123")
+    _char_repo().set_voice_direction(project.id, character.id, _VOICE_LAB_V3_SETTINGS)
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+
+    app = _button(app, "Retirer (revenir aux réglages par défaut du moteur)").click().run()
+
+    assert not app.exception
+    assert _char_repo().get(project.id, character.id).voice_direction == {}
+    assert "Appliquer ce réglage eleven_v3 à ce personnage" in _labels(app)
+
+
+def test_voice_direction_apply_never_affects_another_character_or_project(engine):  # noqa: F811
+    engine.supports_voice_preview = True
+    project = _project()
+    eli = _char_repo().create(project.id, name="Eli", voice_provider="elevenlabs", voice_name="Kev",
+                              external_voice_id="voice-abc123")
+    sibling = _char_repo().create(project.id, name="Léa")
+    app = _open(project)
+    app = _button(app, "Modifier").click().run()
+    app = _button(app, "Appliquer ce réglage eleven_v3 à ce personnage").click().run()
+
+    assert not app.exception
+    assert _char_repo().get(project.id, eli.id).voice_direction != {}
+    assert _char_repo().get(project.id, sibling.id).voice_direction == {}
