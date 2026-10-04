@@ -424,6 +424,9 @@ CHARACTER_FIELDS_EXCLUDED = {
     "updated_at": "horodatage interne — régénéré à l'import",
     "reference_image": "référence de fichier déjà validée (#38) — jamais acceptée depuis un JSON arbitraire, "
                         "voir characters.set_reference_image ; un import ne transfère donc pas l'image",
+    "voice_direction": "réglages de jeu vocal ElevenLabs choisis après écoute comparative (#92) — validés "
+                        "séparément (plages officielles uniquement), voir characters.set_voice_direction ; "
+                        "un import ne transfère donc pas cette direction vocale",
 }
 LOCATION_FIELDS_EXCLUDED = {
     "id": "identifiant interne — régénéré à l'import",
