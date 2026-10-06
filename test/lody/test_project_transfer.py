@@ -27,7 +27,7 @@ from lody.project_transfer import (
     preview_import,
     preview_update,
 )
-from lody.projects import Project, ProjectRepository
+from lody.projects import VISUAL_STYLE_MAX, Project, ProjectRepository
 
 
 @pytest.fixture
@@ -141,6 +141,52 @@ def test_complete_import_accepts_the_ui_label_for_voice_provider(db_path):
     created = commit_import(db_path, preview)
     characters_repo = CharacterRepository(db_path)
     assert [c.voice_provider for c in characters_repo.list_for_project(created.id)] == ["elevenlabs"]
+
+
+_DETAILED_VISUAL_STYLE = (
+    "Audiovisuel broadcast moderne et photoréaliste. Ambiance sombre premium, accents cyan et bleu "
+    "électrique subtils, régies TV, caméras broadcast, équipements professionnels. Aucun texte intégré "
+    "aux images, aucun logo, aucune marque, aucun watermark. Composition verticale 9:16 pensée pour "
+    "TikTok et YouTube Shorts. Visuels variés et dynamiques, éviter les plans statiques trop longs."
+)
+
+
+def test_complete_import_accepts_a_detailed_visual_style(db_path):
+    """CAS E : un JSON portant une direction artistique de plusieurs centaines de caractères s'importe."""
+    assert len(_DETAILED_VISUAL_STYLE) > 200  # échouait avant sur « trop long (200 caractères maximum) »
+    payload = _payload(visual_style=_DETAILED_VISUAL_STYLE)
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    created = commit_import(db_path, preview)
+    assert ProjectRepository(db_path).get(created.id).visual_style == _DETAILED_VISUAL_STYLE
+
+
+def test_export_after_import_keeps_the_visual_style_intact(db_path):
+    """CAS F : aller-retour import → export, contenu complet, aucune troncature."""
+    preview = preview_import(json.dumps(_payload(visual_style=_DETAILED_VISUAL_STYLE)).encode("utf-8"),
+                             existing_project_names=[])
+    created = commit_import(db_path, preview)
+    exported = export_project(created, [], [])
+    assert exported["project"]["visual_style"] == _DETAILED_VISUAL_STYLE
+    # et le JSON sérialisé (ce que l'utilisateur télécharge) porte le texte entier
+    assert json.loads(json.dumps(exported))["project"]["visual_style"] == _DETAILED_VISUAL_STYLE
+
+
+def test_import_refuses_a_visual_style_beyond_the_maximum():
+    """CAS D côté import : refus propre sur le chemin `project.visual_style`, message à jour."""
+    payload = _payload(visual_style="x" * (VISUAL_STYLE_MAX + 1))
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert not preview.is_valid
+    issue = next(issue for issue in preview.errors if issue.path == "project.visual_style")
+    assert "2000 caractères maximum" in issue.message
+
+
+def test_import_accepts_a_visual_style_of_exactly_the_maximum(db_path):
+    """CAS C côté import : la borne elle-même passe."""
+    value = "x" * VISUAL_STYLE_MAX
+    preview = preview_import(json.dumps(_payload(visual_style=value)).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    assert export_project(commit_import(db_path, preview), [], [])["project"]["visual_style"] == value
 
 
 def test_complete_import_refuses_an_unknown_voice_provider_with_the_accepted_values():

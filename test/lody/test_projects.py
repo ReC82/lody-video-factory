@@ -9,6 +9,7 @@ from lody import catalog
 from lody.projects import (
     STATUS_ACTIVE,
     STATUS_ARCHIVED,
+    VISUAL_STYLE_MAX,
     ProjectNotFound,
     ProjectRepository,
     ProjectValidationError,
@@ -57,6 +58,63 @@ def test_unknown_choices_are_refused(repo, field):
     with pytest.raises(ProjectValidationError) as error:
         repo.create(name="Test", **{field: "inconnu"})
     assert field in error.value.errors
+
+
+# -- style visuel : direction artistique complète, jusqu'à VISUAL_STYLE_MAX caractères --------------------
+_DETAILED_VISUAL_STYLE = (
+    "Audiovisuel broadcast moderne et photoréaliste. Ambiance sombre premium, accents cyan et bleu "
+    "électrique subtils, régies TV, caméras broadcast, équipements professionnels. Aucun texte intégré "
+    "aux images, aucun logo, aucune marque, aucun watermark. Composition verticale 9:16 pensée pour "
+    "TikTok et YouTube Shorts. Visuels variés et dynamiques, éviter les plans statiques trop longs."
+)
+
+
+@pytest.mark.parametrize(
+    ("length", "case"),
+    [(150, "A : sous l'ancienne limite de 200"), (900, "B : entre 200 et 2000"), (VISUAL_STYLE_MAX, "C : pile la limite")],
+)
+def test_visual_style_is_accepted_up_to_the_maximum(repo, length, case):
+    """Le style visuel guide la génération d'images — il doit tenir une direction artistique entière."""
+    value = "x" * length
+    project = repo.create(name=f"Projet {length}", visual_style=value)
+    assert project.visual_style == value, case
+    assert repo.get(project.id).visual_style == value  # relu depuis SQLite, sans troncature
+
+
+def test_visual_style_beyond_the_maximum_is_refused_with_the_right_limit(repo):
+    """CAS D : au-delà de la limite, refus propre — et le message annonce bien 2000, jamais 200."""
+    with pytest.raises(ProjectValidationError) as error:
+        repo.create(name="Trop long", visual_style="x" * (VISUAL_STYLE_MAX + 1))
+    message = error.value.errors["visual_style"]
+    assert "trop long" in message and "2000 caractères maximum" in message
+    assert "200 caractères" not in message.replace("2000 caractères", "")
+    assert repo.count() == 0
+
+
+def test_visual_style_maximum_applies_to_update_as_well_as_create(repo):
+    """La limite doit être la même à l'édition qu'à la création : même validateur, même message."""
+    project = repo.create(name="Projet", visual_style="Court")
+    updated = repo.update(project.id, visual_style=_DETAILED_VISUAL_STYLE)
+    assert updated.visual_style == _DETAILED_VISUAL_STYLE
+    with pytest.raises(ProjectValidationError) as error:
+        repo.update(project.id, visual_style="x" * (VISUAL_STYLE_MAX + 1))
+    assert "2000 caractères maximum" in error.value.errors["visual_style"]
+    assert repo.get(project.id).visual_style == _DETAILED_VISUAL_STYLE  # refus sans écriture partielle
+
+
+def test_the_detailed_real_world_visual_style_is_accepted(repo):
+    """Le contenu réel attendu (plusieurs centaines de caractères) passe la validation tel quel."""
+    assert 200 < len(_DETAILED_VISUAL_STYLE) <= VISUAL_STYLE_MAX
+    project = repo.create(name="Audiovisuel", visual_style=_DETAILED_VISUAL_STYLE)
+    assert project.visual_style == _DETAILED_VISUAL_STYLE
+
+
+def test_an_existing_project_with_a_short_visual_style_still_works(repo):
+    """CAS G : rétrocompatibilité — un projet déjà en base garde sa valeur courte, relecture et édition OK."""
+    project = repo.create(name="Ancien projet", visual_style="Sombre et moderne")
+    assert repo.get(project.id).visual_style == "Sombre et moderne"
+    renamed = repo.update(project.id, name="Ancien projet renommé")
+    assert renamed.visual_style == "Sombre et moderne"  # inchangé, aucune remise à zéro
 
 
 def test_unknown_voice_provider_message_lists_accepted_values(repo):
