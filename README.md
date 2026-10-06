@@ -252,9 +252,9 @@ L’interface, le modèle de données et les workflows peuvent encore évoluer r
 
 ## Origine et crédits
 
-Lody Video Factory est basé à l’origine sur le projet open source **MoneyPrinterTurbo** de Harry Zhang / harry0703 :
-
-https://github.com/harry0703/MoneyPrinterTurbo
+Lody Video Factory est basé à l’origine sur le projet open source **MoneyPrinterTurbo** de Harry Zhang,
+distribué sous licence MIT. La notice de copyright d’origine est conservée telle quelle dans
+[`LICENSE`](LICENSE).
 
 Une partie importante du moteur de génération, des intégrations et de la structure historique du dépôt provient de ce projet.
 

@@ -2,26 +2,21 @@
 # qu'un correctif comme #86 (nouvel endpoint POST /api/v1/audio_assets, prérequis #39) soit réellement
 # joignable.
 #
-# Pourquoi ce fichier plutôt que les deux déjà présents :
-#   - docker-compose.release.yml utilise l'image publique non épinglée du projet upstream
-#     (MoneyPrinterTurbo) : jamais le code de ce dépôt, quel que soit son état (voir
-#     docs/audits/moneyprinterturbo_initial_audit.md, §13-14).
+# Pourquoi ce fichier plutôt que docker-compose.yml :
 #   - docker-compose.yml (variante "build") monte TOUT le dépôt en direct (`./:/MoneyPrinterTurbo`) :
 #     aucune image reproductible/épinglée, le code tourné dépend de l'état courant du clone sur l'hôte,
 #     pas d'un commit précis.
 # Ici : image construite une fois depuis ce dépôt (Dockerfile standard, inchangé), étiquetée par
 # MPT_IMAGE_TAG (convention identique à LODY_IMAGE_TAG de docker-compose.lody.yml). Mêmes noms de
-# conteneur, mêmes ports, mêmes volumes (uniquement config.toml + storage, comme release.yml) : rien ne
+# conteneur, mêmes ports, mêmes volumes (uniquement config.toml + storage) : rien ne
 # change côté Lody (qui joint "moneyprinterturbo-api" par nom sur le réseau "moneyprinterturbo_default")
 # ni côté l'ancienne WebUI — seule la SOURCE du code change.
 #
 # Usage :
-#   docker compose -f docker-compose.release.yml down        # libère les noms de conteneur
 #   MPT_IMAGE_TAG=<hash> docker compose -f docker-compose.engine-local.yml up -d --build
 #
 # Retour arrière (image précédente conservée dans le cache local Docker, jamais supprimée par ceci) :
-#   docker compose -f docker-compose.engine-local.yml down
-#   docker compose -f docker-compose.release.yml up -d
+#   MPT_IMAGE_TAG=<hash-précédent> docker compose -f docker-compose.engine-local.yml up -d --no-build
 #
 # Une seule des deux images construit réellement (service "api") : les deux services partagent le MÊME
 # Dockerfile/contexte et produisent donc une image identique — laisser chacun définir son propre `build:`

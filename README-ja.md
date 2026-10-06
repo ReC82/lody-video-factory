@@ -6,15 +6,13 @@
 
 動画の<b>テーマ</b>または<b>キーワード</b>を指定するだけで、MoneyPrinterTurbo が台本の生成、素材のマッチング、字幕と BGM の作成を行い、高画質のショート動画を出力します。
 
-[![Version](https://img.shields.io/github/v/release/harry0703/MoneyPrinterTurbo?color=blue&label=version)](https://github.com/harry0703/MoneyPrinterTurbo/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/harry0703/MoneyPrinterTurbo/releases/latest)
+[![Version](https://img.shields.io/github/v/release/ReC82/lody-video-factory?color=blue&label=version)](https://github.com/ReC82/lody-video-factory/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/ReC82/lody-video-factory/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Downloads](https://img.shields.io/github/downloads/harry0703/MoneyPrinterTurbo/total)](https://github.com/harry0703/MoneyPrinterTurbo/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ReC82/lody-video-factory/total)](https://github.com/ReC82/lody-video-factory/releases/latest)
 
-<a href="https://trendshift.io/repositories/8731" target="_blank"><img src="https://trendshift.io/api/badge/repositories/8731" alt="harry0703%2FMoneyPrinterTurbo | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-<a href="https://www.star-history.com/harry0703/moneyprinterturbo"><img src="https://api.star-history.com/badge?repo=harry0703/MoneyPrinterTurbo" alt="Star History Rank" style="height: 55px;" height="55"/></a>
 
-日本語 | [English](README-en.md) | [简体中文](README.md) | [リリース](https://github.com/harry0703/MoneyPrinterTurbo/releases) | [Issues](https://github.com/harry0703/MoneyPrinterTurbo/issues)
+日本語 | [English](README-en.md) | [简体中文](README.md) | [リリース](https://github.com/ReC82/lody-video-factory/releases) | [Issues](https://github.com/ReC82/lody-video-factory/issues)
 
 </div>
 
@@ -141,7 +139,7 @@
 </p>
 
 <p align="center">
-  <a href="https://mangodisk.app/ja">MangoDisk 公式サイト</a> · <a href="https://github.com/harry0703/MangoDisk">GitHub で見る</a>
+  <a href="https://mangodisk.app/ja">MangoDisk 公式サイト</a> · <a href="https://mangodisk.app">GitHub で見る</a>
 </p>
 
 ---
@@ -183,44 +181,6 @@
 - [x] 縦型 `9:16（1080×1920）`、横型 `16:9（1920×1080）`、正方形 `1:1（1080×1080）` に対応
 - [x] 動画生成後、**TikTok、Instagram、YouTube Shorts** へワンクリックで自動公開可能
 
-## ギャラリー 🎬
-
-以下の例はすべて MoneyPrinterTurbo で生成されたものです。
-
-### 縦型 9:16
-
-<table width="100%">
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=03-zh-portrait-city-morning.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/03-zh-portrait-city-morning.jpg" width="180" alt="When the City Wakes"></a><br><strong>When the City Wakes</strong><br>中国語 · 14 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=05-zh-portrait-clean-energy.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/05-zh-portrait-clean-energy.jpg" width="180" alt="The Future of Clean Energy"></a><br><strong>The Future of Clean Energy</strong><br>中国語 · 24 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=07-zh-portrait-space-exploration.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/07-zh-portrait-space-exploration.jpg" width="180" alt="Why We Still Explore Space"></a><br><strong>Why We Still Explore Space</strong><br>中国語 · 27 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=17-zh-portrait-seed-journey.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/17-zh-portrait-seed-journey.jpg" width="180" alt="A Seed's Journey"></a><br><strong>A Seed's Journey</strong><br>中国語 · 44 秒</td>
-</tr>
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=09-en-portrait-future-robotics.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/09-en-portrait-future-robotics.jpg" width="180" alt="The Future of Everyday Robotics"></a><br><strong>The Future of Everyday Robotics</strong><br>英語 · 21 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=11-en-portrait-small-habits.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/11-en-portrait-small-habits.jpg" width="180" alt="Small Habits, Lasting Change"></a><br><strong>Small Habits, Lasting Change</strong><br>英語 · 19 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=13-en-portrait-creative-work.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/13-en-portrait-creative-work.jpg" width="180" alt="Making Space for Creative Work"></a><br><strong>Making Space for Creative Work</strong><br>英語 · 20 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=15-en-portrait-coffee-science.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/15-en-portrait-coffee-science.jpg" width="180" alt="The Science Inside Coffee"></a><br><strong>The Science Inside Coffee</strong><br>英語 · 23 秒</td>
-</tr>
-</table>
-
-### 横型 16:9
-
-<table width="100%">
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=02-zh-landscape-deep-ocean.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/02-zh-landscape-deep-ocean.jpg" width="280" alt="Light in the Deep Ocean"></a><br><strong>Light in the Deep Ocean</strong><br>中国語 · 23 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=04-zh-landscape-reading-power.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/04-zh-landscape-reading-power.jpg" width="280" alt="How Reading Shapes Us"></a><br><strong>How Reading Shapes Us</strong><br>中国語 · 23 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=06-zh-landscape-pour-over-coffee.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/06-zh-landscape-pour-over-coffee.jpg" width="280" alt="The Details of Pour-Over Coffee"></a><br><strong>The Details of Pour-Over Coffee</strong><br>中国語 · 23 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=08-zh-landscape-spring-journey.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/08-zh-landscape-spring-journey.jpg" width="280" alt="Spring Is Made for Travel"></a><br><strong>Spring Is Made for Travel</strong><br>中国語 · 14 秒</td>
-</tr>
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=10-en-landscape-ocean-conservation.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/10-en-landscape-ocean-conservation.jpg" width="280" alt="Why Ocean Conservation Matters"></a><br><strong>Why Ocean Conservation Matters</strong><br>英語 · 25 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=14-en-landscape-sustainable-cities.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/14-en-landscape-sustainable-cities.jpg" width="280" alt="Designing More Sustainable Cities"></a><br><strong>Designing More Sustainable Cities</strong><br>英語 · 27 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=16-en-landscape-mountain-perspective.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/16-en-landscape-mountain-perspective.jpg" width="280" alt="What Mountains Teach Us"></a><br><strong>What Mountains Teach Us</strong><br>英語 · 18 秒</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=18-en-landscape-history-of-flight.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/18-en-landscape-history-of-flight.jpg" width="280" alt="A Brief History of Human Flight"></a><br><strong>A Brief History of Human Flight</strong><br>英語 · 59 秒</td>
-</tr>
-</table>
-
 ## 動作環境 📦
 
 - 推奨プラットフォーム: Windows 10 以降、macOS 11 以降、または主要な Linux ディストリビューション
@@ -250,7 +210,7 @@
 お使いの AI エージェントが Skill ドキュメントを読み、ローカルのターミナルを操作できるなら、以下のプロンプトを送ってください。エージェントが MoneyPrinterTurbo のインストールと設定を行い、動画を生成して、動画ファイルのパスを返します。未設定の必須 API キーだけを尋ねてきます。このワークフローは現在 macOS と Windows に対応しています。
 
 ```text
-Use this Skill: https://raw.githubusercontent.com/harry0703/MoneyPrinterTurbo/main/docs/skill/SKILL.md
+Use this Skill: https://raw.githubusercontent.com/ReC82/lody-video-factory/main/docs/skill/SKILL.md
 Create a video with the topic "How AI is changing everyday life."
 ```
 
@@ -258,13 +218,13 @@ Create a video with the topic "How AI is changing everyday life."
 
 ローカル環境を用意せずに MoneyPrinterTurbo を試したいですか？ Google Colab で直接実行できます！
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/harry0703/MoneyPrinterTurbo/blob/main/docs/MoneyPrinterTurbo.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ReC82/lody-video-factory/blob/main/docs/MoneyPrinterTurbo.ipynb)
 
 ### Windows
 
 GitHub Releases から最新の Windows 用ワンクリックパッケージをダウンロードし、そのまま展開してください。
 
-- [最新の Windows 用ワンクリックパッケージをダウンロード](https://github.com/harry0703/MoneyPrinterTurbo/releases/latest)
+- [最新の Windows 用ワンクリックパッケージをダウンロード](https://github.com/ReC82/lody-video-factory/releases/latest)
 
 > 同ページの **Assets** から `.7z` ファイルをダウンロードしてください。GitHub が
 > 自動生成する `Source code (zip)` / `Source code (tar.gz)` はソースコードのみで、
@@ -288,7 +248,7 @@ GitHub Releases から最新の Windows 用ワンクリックパッケージを�
 #### ① プロジェクトをクローンする
 
 ```shell
-git clone https://github.com/harry0703/MoneyPrinterTurbo.git
+git clone https://github.com/ReC82/lody-video-factory.git
 ```
 
 #### ② 初期設定を行う
@@ -306,12 +266,12 @@ Windows をお使いの場合は、Microsoft のドキュメントを参照し�
 2. [WSL で Docker コンテナを使用する](https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-containers)
 
 ```shell
-cd MoneyPrinterTurbo
-docker compose -f docker-compose.release.yml up
+cd lody-video-factory
+MPT_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose -f docker-compose.engine-local.yml up -d --build
 ```
 
-> 既定では `docker-compose.release.yml` を推奨します。GitHub Container Registry からビルド済みイメージ `ghcr.io/harry0703/moneyprinterturbo:latest` を取得します。
-> ローカルでイメージをビルドする必要がある場合は、これまでどおり `docker compose up` を実行できます。
+> `docker-compose.engine-local.yml` は**このリポジトリ**からエンジンイメージをビルドし、タグで固定します。
+> 実行中のコードが常に特定のコミットと一致し、レジストリからイメージを取得することはありません。
 > 初回起動の前に、`config.example.toml` を `config.toml` にコピーしておくと、コンテナにマウントされます。
 
 #### ② WebUI にアクセスする
@@ -331,7 +291,7 @@ docker compose -f docker-compose.release.yml up
 [uv](https://docs.astral.sh/uv/) を使って Python 環境と依存関係を管理します。本プロジェクトは Python 3.11 以降に対応しており、以下の例では Python 3.11 を使用します。
 
 ```shell
-git clone https://github.com/harry0703/MoneyPrinterTurbo.git
+git clone https://github.com/ReC82/lody-video-factory.git
 cd MoneyPrinterTurbo
 uv python install 3.11
 uv sync --frozen
@@ -534,7 +494,7 @@ Trying to load the model directly from the local cache, if it exists.
 
 ## フィードバックと提案 📢
 
-- [issue](https://github.com/harry0703/MoneyPrinterTurbo/issues) または [pull request](https://github.com/harry0703/MoneyPrinterTurbo/pulls) を送っていただけます。
+- [issue](https://github.com/ReC82/lody-video-factory/issues) または [pull request](https://github.com/ReC82/lody-video-factory/pulls) を送っていただけます。
 
 ## ライセンス 📝
 

@@ -3,6 +3,11 @@
 - Date de l'audit : 2026-09-20 (serveur AWS, `/srv/moneyprinterturbo`)
 - Mode : **lecture seule** (aucun fichier du dépôt modifié, aucun commit, aucun build, aucun redémarrage, aucune génération, aucun appel fournisseur payant, aucune tâche créée).
 - Convention de preuve : `chemin:lignes` — *commande de diagnostic* — résultat résumé.
+- **Rédaction postérieure (2026-10-06)** : le nom du compte GitHub d'origine a été remplacé par « le projet
+  upstream MoneyPrinterTurbo » partout dans ce document — le dépôt ne conserve plus aucune référence à ce
+  namespace (voir `test/lody/test_no_legacy_namespace.py`). Les constats, chemins et conclusions de l'audit
+  sont inchangés. `docker-compose.release.yml`, cité ici comme le déploiement observé à l'époque, a depuis
+  été supprimé et remplacé par `docker-compose.engine-local.yml`.
 - Aucune valeur de clé/token/mot de passe n'est reproduite. Pour `config.toml` : noms de sections/paramètres, et `présent` / `vide` / `absent` pour les valeurs sensibles.
 - Limites de l'audit (à garder en tête) :
   - L'utilisateur `ubuntu` **n'a pas accès au socket Docker** (`permission denied`). Je n'ai pas utilisé `sudo`. Le digest d'image, les variables d'environnement, l'état de santé et la politique de redémarrage réels **n'ont pas pu être relevés** ; j'ai reconstitué ce qui est observable via `ps`, `ss`, `/proc/<pid>/mountinfo` et l'API locale.
@@ -46,7 +51,7 @@
 |---|---|---|
 | Branche courante | `main` (seule branche locale ; `origin/main` suivie) | `git branch -a` |
 | Commit courant | `92bebeefb55046cbb28846a43915c7d389794c31` — « Merge pull request #1363 … docs(config): document the ElevenLabs music base URL » (2026-09-14 20:55 +0800) | `git log -1` |
-| Remotes | `origin` = `https://github.com/harry0703/MoneyPrinterTurbo.git` (fetch+push). **Pas de remote `upstream`, pas de fork privé.** | `git remote -v` |
+| Remotes | `origin` = dépôt GitHub du projet upstream MoneyPrinterTurbo (fetch+push). **Pas de remote `upstream`, pas de fork privé.** | `git remote -v` |
 | Tags | `v1.3.7` … `v1.2.8` ; `git describe` = `v1.3.7-14-g92bebee` (14 commits après v1.3.7) | `git tag`, `git describe --tags` |
 | Fichiers modifiés | 0 | `git status --porcelain` (vide) |
 | Fichiers non suivis | 0 ; ignorés : `config.toml`, `storage/` | `git status --porcelain --ignored` |
@@ -81,7 +86,7 @@
 ### 3.2 Ce qui **n'a pas pu être relevé** (à récupérer par un utilisateur avec accès Docker)
 `docker ps -a`, `docker inspect` (digest `RepoDigests`, `Config.Env` — **attention : contient potentiellement des secrets, ne pas coller dans un ticket**, `HostConfig.RestartPolicy`, `Health`), `docker images --digests`, `docker compose config`. Commande sûre pour le digest seul : `docker inspect --format '{{.Image}} {{index .RepoDigests 0}}' moneyprinterturbo-api`.
 
-Déduction : le déploiement correspond à **`docker-compose.release.yml`** (ou un `docker run` équivalent) : image `ghcr.io/harry0703/moneyprinterturbo:latest`, deux services, deux volumes. Le fichier compose réellement lancé et son dossier de travail **restent à confirmer**.
+Déduction : le déploiement correspond à **`docker-compose.release.yml`** (ou un `docker run` équivalent) : image publique `:latest` du projet upstream sur GHCR, deux services, deux volumes. Le fichier compose réellement lancé et son dossier de travail **restent à confirmer**.
 
 ### 3.3 Inventaire des fichiers Docker du dépôt
 
@@ -89,9 +94,9 @@ Déduction : le déploiement correspond à **`docker-compose.release.yml`** (ou 
 |---|---|---|
 | `Dockerfile` (l.1-111) | Image CPU `python:3.11-slim-bullseye` + `git ffmpeg` + `pip install -r requirements.txt` + `COPY . .` | **`ARG DOCKER_BUILD_MIRROR=china` et `PIP_USE_OFFICIAL=0` par défaut** : un build local sur AWS tente d'abord les miroirs Aliyun/Tsinghua (apt + PyPI) ; pour AWS passer `--build-arg DOCKER_BUILD_MIRROR=default --build-arg PIP_USE_OFFICIAL=1`. `chmod 777 /MoneyPrinterTurbo`. Pas de `USER` (root). Pas de `HEALTHCHECK`. Base Debian **bullseye** (ancienne). `CMD` = Streamlit. |
 | `Dockerfile.gpu` (l.1-55) | Base `nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04`, Python 3.11 via deadsnakes | Sans intérêt ici (pas de GPU sur l'hôte ; `whisper.device=cpu`). Miroirs chinois en tête pour pip. |
-| `Dockerfile.claude` (l.1-24) | `FROM ghcr.io/harry0703/moneyprinterturbo:latest` + Node + `@anthropic-ai/claude-code` (version 2.1.260 figée) pour le provider LLM `claude_code` | Hors périmètre. Montre le patron « surcouche sur l'image officielle ». |
+| `Dockerfile.claude` (l.1-24) | `FROM` l'image publique upstream sur GHCR + Node + `@anthropic-ai/claude-code` (version 2.1.260 figée) pour le provider LLM `claude_code` | Hors périmètre. Montre le patron « surcouche sur l'image officielle ». |
 | `docker-compose.yml` | Services `webui`+`api`, **`build:` local**, volume **`./:/MoneyPrinterTurbo`** (tout le dépôt), ports `127.0.0.1`, `restart: always` | Le code du clone est exécuté en direct ; `config.toml`/`storage` inclus par ce bind. |
-| `docker-compose.release.yml` | Mêmes services, **`image: ghcr.io/harry0703/moneyprinterturbo:latest`**, volumes `./config.toml` et `./storage` uniquement | ← **Correspond au déploiement observé.** `:latest` non épinglé. |
+| `docker-compose.release.yml` | Mêmes services, **`image:` l'image publique `:latest` du projet upstream sur GHCR**, volumes `./config.toml` et `./storage` uniquement | ← **Correspond au déploiement observé.** `:latest` non épinglé. |
 | `docker-compose.gpu.yml` | Override GPU (`deploy.resources.reservations.devices`) | Non utilisé. |
 | `docker-compose.claude.yml` | Variante Claude CLI (token OAuth via env) | Non utilisée. |
 | `.dockerignore` | exclut `storage/`, `config.toml`, `.git/`, `.env*` | Bon : secrets non copiés dans l'image lors d'un build. |
@@ -638,7 +643,7 @@ Règle d'or : le compilateur écrit **tous** les champs explicitement (jamais de
 | **Dépôt privé dérivé** avec remotes `origin` (privé) + `upstream` | Oui, sauvegardé | Facile (`fetch`/`merge`/`rebase` de `upstream/main`) | Bon si `.gitignore` + scan de secrets + `env_file` hors dépôt | Oui (build depuis le dépôt, tag image = tag Git) | Excellent (tags Git + tags d'image) | ✅ **Recommandé** |
 | Quelques patchs au-dessus de l'image officielle (`FROM ghcr.io/…` + `COPY` de fichiers patchés) | Oui si les patchs sont versionnés ailleurs | Automatique *mais* non contrôlé (`latest`) ou à épingler par digest | Bon | Rapide (pas de réinstallation des dépendances) | Bon si digest épinglé | ✅ Complément acceptable pour les tout premiers patchs, **à condition d'épingler le digest** |
 
-**Recommandation** : dépôt **privé dérivé** (`origin` privé, `upstream` = harry0703/MoneyPrinterTurbo), branche `lodylands/main` créée depuis `v1.3.7-14-g92bebee`, nos ajouts **majoritairement dans de nouveaux fichiers** (`app/lodylands/`, `profiles/`, `test/lodylands/`) + patchs moteur courts et isolés (M1-M11) pour limiter les conflits ; intégration de l'upstream par `merge` régulier (jamais par `docker pull :latest`) avec le job CI de merge à blanc. L'image est construite depuis ce dépôt : `lodylands/mpt:<date>-<sha>`, le tag précédent restant disponible pour le rollback. Les secrets vivent dans un `env_file` hors dépôt (`0600`) ; `profiles/` ne contient que du non-secret (validateur). Les correctifs génériques (M1 surtout) peuvent être proposés à l'upstream pour réduire la divergence.
+**Recommandation** : dépôt **privé dérivé** (`origin` privé, `upstream` = le dépôt MoneyPrinterTurbo d'origine), branche `lodylands/main` créée depuis `v1.3.7-14-g92bebee`, nos ajouts **majoritairement dans de nouveaux fichiers** (`app/lodylands/`, `profiles/`, `test/lodylands/`) + patchs moteur courts et isolés (M1-M11) pour limiter les conflits ; intégration de l'upstream par `merge` régulier (jamais par `docker pull :latest`) avec le job CI de merge à blanc. L'image est construite depuis ce dépôt : `lodylands/mpt:<date>-<sha>`, le tag précédent restant disponible pour le rollback. Les secrets vivent dans un `env_file` hors dépôt (`0600`) ; `profiles/` ne contient que du non-secret (validateur). Les correctifs génériques (M1 surtout) peuvent être proposés à l'upstream pour réduire la divergence.
 
 ---
 
@@ -690,7 +695,7 @@ Format : **Objectif** · **Fichiers** · **Critères d'acceptation** · **Tests*
 **T0.3 — Dépôt privé dérivé avec remote `upstream`**
 - Objectif : versionner nos changements et recevoir l'upstream.
 - Fichiers : `.git/config` ; `.gitignore` (+ `profiles/*.local.json`, `.env*`, `storage/`).
-- Acceptation : `origin`=privé, `upstream`=harry0703/MoneyPrinterTurbo ; branche `lodylands/main` depuis `v1.3.7-14-g92bebee` ; tag `base-upstream-2026-09-14` ; aucun secret dans l'historique (scan).
+- Acceptation : `origin`=privé, `upstream`=dépôt MoneyPrinterTurbo d'origine ; branche `lodylands/main` depuis `v1.3.7-14-g92bebee` ; tag `base-upstream-2026-09-14` ; aucun secret dans l'historique (scan).
 - Tests : `git fetch upstream && git merge --no-commit upstream/main` (à blanc) ; scan de secrets.
 - Risques : mauvaise configuration de visibilité du dépôt. · Dépendances : compte GitHub privé (**non créé ici**). · Migration : non · Rebuild : non.
 
@@ -1745,7 +1750,7 @@ Volumes à **ajouter** (T0.4/T1.x) : `./profiles:/MoneyPrinterTurbo/profiles:ro`
 ### A9. Structure de dossiers proposée
 
 ```
-/srv/lodylands-mpt/                      # dépôt privé dérivé (origin privé, upstream = harry0703)
+/srv/lodylands-mpt/                      # dépôt privé dérivé (origin privé, upstream = MoneyPrinterTurbo)
 ├── app/                                  # upstream (patchs M1-M11 isolés)
 │   └── lodylands/                        # NOUVEAU — couche multichaîne
 │       ├── profiles.py  manifest.py  compiler.py  providers.py

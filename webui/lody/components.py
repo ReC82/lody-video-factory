@@ -105,9 +105,11 @@ def render_flash() -> None:
 
 
 def render_footer() -> None:
+    # Attribution MIT du projet d'origine : le NOM du projet et sa licence sont ce que la licence exige
+    # (la notice complète vit dans LICENSE, à la racine du dépôt). Aucun lien vers le compte d'origine :
+    # l'attribution ne doit pas créer de dépendance au namespace historique.
     st.markdown(
         '<p class="footnote">Lody Video Factory est construit sur '
-        '<a href="https://github.com/harry0703/MoneyPrinterTurbo" target="_blank" rel="noopener">'
-        "MoneyPrinterTurbo</a> (licence MIT).</p>",
+        "MoneyPrinterTurbo (licence MIT).</p>",
         unsafe_allow_html=True,
     )
