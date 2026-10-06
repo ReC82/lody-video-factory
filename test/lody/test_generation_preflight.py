@@ -270,6 +270,38 @@ def test_no_voice_selected_points_to_the_project_settings(tmp_path):
     assert _status(report, Cap.VOICE).fix == "project" and "voix" in _status(report, Cap.SETTINGS).message
 
 
+def test_a_project_imported_with_a_voice_id_is_immediately_productible(tmp_path):
+    """Test 6 du ticket #109 : après import d'un projet portant un Voice ID valide, la production réelle doit
+    être possible sans saisie manuelle — ni VOICE ni SETTINGS ne doivent bloquer.
+
+    On passe par le vrai chemin : fichier JSON → preview_import/commit_import → build_request → preflight.
+    """
+    import json
+
+    from lody.generation.service import build_request
+    from lody.project_transfer import SCHEMA_VERSION, commit_import, preview_import
+
+    voice_id = "jGpnMdbhtKgQbVrYezOx"
+    payload = {"schema_version": SCHEMA_VERSION,
+               "project": {"name": "Projet importé", "voice_provider": "elevenlabs",
+                           "voice_name": "Kev - Young, Dynamic and Bright",
+                           "text_provider": "openai", "visual_provider": "openai_image",
+                           "settings": {"brief": {"voice_id": voice_id}}},
+               "characters": [], "locations": []}
+    db_path = tmp_path / "importe.sqlite3"
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    imported = ProjectRepository(db_path).get(commit_import(db_path, preview).id)
+
+    connector, _ = _connector(tmp_path)
+    report = connector.preflight(build_request(imported, "Explique la chaîne de diffusion"))
+    assert _status(report, Cap.VOICE).state is CS.READY, _status(report, Cap.VOICE).message
+    assert _status(report, Cap.SETTINGS).state is CS.READY, _status(report, Cap.SETTINGS).message
+    assert Cap.VOICE not in {i.capability for i in report.blocking}
+    assert voice_id in _status(report, Cap.VOICE).message or "Kev" in _status(report, Cap.VOICE).message
+    _no_secret(report)
+
+
 def test_configured_providers_but_engine_unreachable_blocks(tmp_path):
     connector, _ = _connector(tmp_path, responses=(ConnectionRefusedError(),))
     report = connector.preflight(_crypto_request())

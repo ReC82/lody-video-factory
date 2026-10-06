@@ -11,6 +11,7 @@ import sqlite3
 import pytest
 
 from lody.characters import Character, CharacterRepository
+from lody.generation.service import build_request
 from lody.locations import Location, LocationRepository
 from lody.project_transfer import (
     CHARACTER_FIELDS,
@@ -187,6 +188,137 @@ def test_import_accepts_a_visual_style_of_exactly_the_maximum(db_path):
     preview = preview_import(json.dumps(_payload(visual_style=value)).encode("utf-8"), existing_project_names=[])
     assert preview.is_valid, preview.errors
     assert export_project(commit_import(db_path, preview), [], [])["project"]["visual_style"] == value
+
+
+# -- #109 : la voix ElevenLabs du projet survit aux allers-retours, et un identifiant mal placé est signalé --
+VOICE_ID = "jGpnMdbhtKgQbVrYezOx"
+
+
+def _with_voice(voice_id=VOICE_ID, **brief_extra):
+    """Section ``project`` d'un fichier portant une voix ElevenLabs à l'emplacement attendu."""
+    brief = {"voice_id": voice_id, **brief_extra} if voice_id is not None else dict(brief_extra)
+    return {"voice_provider": "elevenlabs", "voice_name": "Kev - Young, Dynamic and Bright",
+            "settings": {"brief": brief}}
+
+
+def _voice_of(project):
+    """L'identifiant RÉELLEMENT vu par la validation de production réelle (même chemin que le preflight)."""
+    return build_request(project, "un sujet").voice.voice_id
+
+
+def test_import_with_a_valid_voice_id_is_recognized_immediately(db_path):
+    """Test 1 du ticket #109 : après import, aucune saisie manuelle ne doit être nécessaire."""
+    preview = preview_import(json.dumps(_payload(**_with_voice())).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    imported = ProjectRepository(db_path).get(commit_import(db_path, preview).id)
+    assert _voice_of(imported) == VOICE_ID
+    assert imported.voice_provider == "elevenlabs"
+    assert imported.voice_name == "Kev - Young, Dynamic and Bright"
+    assert not [w for w in preview.warnings if "voix" in w.lower()]  # rien à signaler : la voix est configurée
+
+
+def test_import_without_a_voice_id_stays_incomplete_and_says_so(db_path):
+    """Test 2 du ticket : aucun identifiant inventé, aucune valeur par défaut — mais plus de silence."""
+    preview = preview_import(json.dumps(_payload(**_with_voice(voice_id=None))).encode("utf-8"),
+                             existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    imported = ProjectRepository(db_path).get(commit_import(db_path, preview).id)
+    assert _voice_of(imported) == ""  # toujours signalé comme incomplet, jamais masqué
+    assert any("production réelle restera bloquée" in w for w in preview.warnings)
+
+
+def test_export_after_import_restores_the_same_voice_id(db_path):
+    """Test 3 du ticket."""
+    preview = preview_import(json.dumps(_payload(**_with_voice())).encode("utf-8"), existing_project_names=[])
+    imported = ProjectRepository(db_path).get(commit_import(db_path, preview).id)
+    exported = export_project(imported, [], [])
+    assert exported["project"]["settings"]["brief"]["voice_id"] == VOICE_ID
+    assert exported["project"]["voice_name"] == "Kev - Young, Dynamic and Bright"
+    assert exported["project"]["voice_provider"] == "elevenlabs"
+
+
+def test_export_then_reimport_keeps_the_voice_id_and_the_configured_state(db_path, tmp_path):
+    """Test 4 du ticket : export → réimport → même identifiant ET même état de configuration."""
+    first = preview_import(json.dumps(_payload(**_with_voice())).encode("utf-8"), existing_project_names=[])
+    imported = ProjectRepository(db_path).get(commit_import(db_path, first).id)
+    payload = export_project(imported, [], [])
+
+    second_db = tmp_path / "second.sqlite3"
+    again = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert again.is_valid, again.errors
+    reimported = ProjectRepository(second_db).get(commit_import(second_db, again).id)
+    assert _voice_of(reimported) == _voice_of(imported) == VOICE_ID
+    assert export_project(reimported, [], [])["project"] == payload["project"]  # état identique, pas de dérive
+
+
+def test_update_by_import_keeps_the_voice_id(projects, db_path):
+    """Test 5 du ticket : mise à jour d'un projet existant — l'identifiant du fichier est appliqué."""
+    target = projects.create(name="Cible", voice_provider="elevenlabs", voice_name="Kev",
+                             settings={"brief": {"voice_id": "ANCIEN-identifiant"}})
+    payload = {"schema_version": SCHEMA_VERSION, "project": {"name": "Cible", **_with_voice()},
+               "characters": [], "locations": []}
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=target,
+                             target_characters=[], target_locations=[])
+    assert preview.is_valid, preview.errors
+    updated = commit_update(db_path, preview)
+    assert _voice_of(updated) == VOICE_ID and updated.id == target.id
+
+
+def test_update_by_import_warns_before_clearing_an_existing_voice_id(projects, db_path):
+    """Un fichier sans bloc ``brief`` efface la voix de la cible (sémantique « remplacer » documentée du
+    mode mise à jour) : l'effacement doit apparaître dans l'aperçu AVANT confirmation, jamais en silence."""
+    target = projects.create(name="Cible", voice_provider="elevenlabs", voice_name="Kev",
+                             settings={"brief": {"voice_id": VOICE_ID}})
+    payload = {"schema_version": SCHEMA_VERSION,
+               "project": {"name": "Cible", "voice_provider": "elevenlabs"}, "characters": [], "locations": []}
+    preview = preview_update(json.dumps(payload).encode("utf-8"), target=target,
+                             target_characters=[], target_locations=[])
+    assert any(VOICE_ID in w and "EFFACÉ" in w for w in preview.warnings), preview.warnings
+
+
+def test_a_voice_id_placed_outside_the_expected_key_is_reported_not_applied():
+    """Le cas réellement rencontré dans #109 : le fichier portait l'identifiant dans
+    ``settings.external_voice_id`` (nom du champ d'un PERSONNAGE). Il n'est PAS relu — ce serait un repli
+    silencieux sur une clé inventée — mais l'import nomme désormais l'emplacement attendu."""
+    payload = _payload(voice_provider="elevenlabs", voice_name="Kev",
+                       settings={"external_voice_id": VOICE_ID, "brief": {"audience": "Débutants"}})
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors  # le fichier reste importable : c'est un avertissement, pas une erreur
+    assert any("project.settings.external_voice_id" in w and "NON appliquée" in w for w in preview.warnings)
+    assert any("project.settings.brief.voice_id" in w for w in preview.warnings)  # l'emplacement attendu est nommé
+    assert preview.clean["project"]["settings"]["external_voice_id"] == VOICE_ID  # conservé tel quel, jamais relu
+
+
+def test_a_legacy_top_level_voice_id_survives_the_round_trip(db_path):
+    """Un projet d'avant le bloc ``brief`` (identifiant au premier niveau de ``settings``) garde sa voix à
+    l'import, même si le fichier porte aussi un bloc ``brief`` incomplet."""
+    payload = _payload(voice_provider="elevenlabs", voice_name="Kev",
+                       settings={"voice_id": VOICE_ID, "brief": {"audience": "Débutants"}})
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    imported = ProjectRepository(db_path).get(commit_import(db_path, preview).id)
+    assert _voice_of(imported) == VOICE_ID
+
+
+def test_other_voice_providers_get_no_voice_warning(db_path):
+    """« Aucun autre provider n'est modifié » : la voix gratuite n'a pas d'identifiant à configurer."""
+    payload = _payload(voice_provider="edge", voice_name="fr-FR-DeniseNeural")
+    preview = preview_import(json.dumps(payload).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    assert not [w for w in preview.warnings if "voix" in w.lower() or "voice" in w.lower()]
+
+
+def test_the_blank_template_gives_the_project_voice_id_a_home(db_path):
+    """Cause proximale de #109 : le modèle téléchargeable laissait ``settings`` vide alors que la section
+    « personnage » montrait ``external_voice_id`` — un fichier rédigé à la main n'avait rien à imiter."""
+    template = blank_template()
+    assert template["project"]["settings"]["brief"]["voice_id"]
+    preview = preview_import(json.dumps(template).encode("utf-8"), existing_project_names=[])
+    assert preview.is_valid, preview.errors
+    imported = ProjectRepository(db_path).get(commit_import(db_path, preview).id)
+    assert _voice_of(imported) == template["project"]["settings"]["brief"]["voice_id"]
+    # le modèle est donc directement productible : aucun avertissement de voix manquante
+    assert not [w for w in preview.warnings if "production réelle restera bloquée" in w]
 
 
 def test_complete_import_refuses_an_unknown_voice_provider_with_the_accepted_values():

@@ -50,6 +50,33 @@ tester une nouvelle génération sans recréer le projet).
 - **Hors périmètre** : fusion interactive champ par champ, restauration automatique d'une ancienne version,
   suppression physique d'assets, modification des snapshots historiques (voir le ticket #66).
 
+## Voix ElevenLabs du projet (#109)
+
+L'identifiant de voix **du projet** vit dans le bloc `brief` de ses réglages :
+
+```json
+{ "project": { "voice_provider": "elevenlabs",
+               "voice_name": "Kev - Young, Dynamic and Bright",
+               "settings": { "brief": { "voice_id": "jGpnMdbhtKgQbVrYezOx" } } } }
+```
+
+- **C'est le seul champ lu par la validation de production réelle** : `brief_settings(settings)["voice_id"]`
+  → `VoiceSpec.voice_id` → `mpt_connector._voice_status` / `_settings_status`. Un identifiant placé
+  ailleurs ne configure rien.
+- `external_voice_id` est le champ d'un **personnage**, jamais celui du projet. Un identifiant trouvé dans
+  `project.external_voice_id` ou `project.settings.external_voice_id` n'est **pas** relu (ce serait un repli
+  silencieux sur une clé inventée) : l'import émet un avertissement nommant l'emplacement attendu.
+- Un `voice_provider: "elevenlabs"` sans identifiant est **signalé à l'import** (avertissement, pas erreur) :
+  le fichier reste importable, mais la production réelle restera bloquée — jamais de valeur par défaut.
+- **Projets hérités** : avant l'existence du bloc `brief`, l'identifiant vivait au premier niveau
+  (`settings.voice_id`). Il est repris **uniquement si le bloc `brief` ne porte pas du tout la clé**
+  (`with_legacy_voice`), à la lecture comme à l'écriture — un `brief.voice_id: ""` décrit une voix effacée
+  volontairement et n'est jamais ressuscité.
+- **Mode mise à jour** : les champs projet étant *remplacés* par ceux du fichier, un fichier sans bloc
+  `brief` efface l'identifiant de la cible. L'aperçu l'annonce explicitement avant confirmation.
+- Le modèle téléchargeable (`blank_template()`) porte ce bloc, construit depuis `DEFAULT_BRIEF` : un fichier
+  rédigé à la main a un emplacement à imiter.
+
 ## Source de vérité unique
 
 `project_transfer.PROJECT_FIELDS` / `CHARACTER_FIELDS` / `LOCATION_FIELDS` **SONT** les tuples

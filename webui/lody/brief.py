@@ -67,6 +67,29 @@ _VOICE_MODEL = re.compile(r"^[A-Za-z0-9_.\-]{3,60}$")
 _LEGACY_DURATION = re.compile(r"(\d+)\D+(\d+)")
 
 
+# Clés de voix d'AVANT le bloc ``brief`` : elles vivaient au premier niveau de ``settings``. Voir
+# ``with_legacy_voice`` pour la règle de reprise.
+LEGACY_VOICE_KEYS = ("voice_id", "voice_model")
+
+
+def with_legacy_voice(settings: dict[str, Any], brief: dict[str, Any]) -> dict[str, Any]:
+    """``brief`` complété par les clés de voix restées au premier niveau de ``settings`` (#109).
+
+    Une clé n'est reprise que si le bloc ``brief`` ne la porte PAS DU TOUT : un bloc qui contient
+    ``voice_id: ""`` décrit une voix VOLONTAIREMENT effacée dans l'interface et ne doit jamais être
+    ressuscitée depuis l'ancien emplacement — ce serait un repli silencieux. Seule l'absence de la clé
+    signifie « ce projet n'a jamais été migré ».
+
+    Même règle à la lecture (``brief_settings``) et à l'écriture (``projects.validate_fields``) : un projet
+    hérité est donc migré une fois pour de bon au premier enregistrement, au lieu de perdre son identifiant.
+    """
+    completed = dict(brief)
+    for key in LEGACY_VOICE_KEYS:
+        if key not in completed and settings.get(key):
+            completed[key] = settings[key]
+    return completed
+
+
 def brief_settings(settings: dict[str, Any]) -> dict[str, Any]:
     """Paramètres de production d'un projet, complétés par des valeurs par défaut.
 
@@ -77,6 +100,10 @@ def brief_settings(settings: dict[str, Any]) -> dict[str, Any]:
     merged = copy.deepcopy(DEFAULT_BRIEF)  # copie profonde : jamais d'objet mutable partagé entre projets
     stored = settings.get(BRIEF_KEY)
     if isinstance(stored, dict):
+        # #109 : un bloc ``brief`` partiel ne doit plus masquer les clés de voix héritées du premier niveau.
+        # L'ancien court-circuit rendait ``settings["voice_id"]`` invisible dès qu'un bloc existait, donc la
+        # validation de production réelle ne voyait aucune voix (« Aucune voix n’est choisie pour ce projet »).
+        stored = with_legacy_voice(settings, stored)
         merged.update({key: copy.deepcopy(stored[key]) for key in DEFAULT_BRIEF if key in stored})
         return merged
     legacy_duration = _LEGACY_DURATION.search(str(settings.get("target_duration", "")))
