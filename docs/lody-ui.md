@@ -9,6 +9,7 @@ et peuvent tourner à côté (ports 8501 / 8080), mais ne sont plus l'identité 
 |---|---|
 | Compose | `docker-compose.lody.yml` (projet `lody-video-factory`) |
 | Image / conteneur | `lody-video-factory:<tag>` (Debian 13, `Dockerfile.lody`) / `lody-video-factory-ui` |
+| Image canonique publiée | `ghcr.io/rec82/lody-video-factory` (`.github/workflows/docker-ghcr.yml`, push sur `main` et tags `v*`) |
 | Port | `127.0.0.1:8601` (nginx `video.lodylands.com` y pointe) |
 | Projets | SQLite `/data/lody.sqlite3`, volume nommé `lody-video-factory-data` |
 | Configuration | `./config.toml` monté en lecture seule — **jamais copié dans l'image** |
@@ -30,6 +31,20 @@ docker compose -f docker-compose.lody.yml down                     # arrêt (SAN
 
 `config.toml` doit exister à la racine (`cp config.example.toml config.toml` sur une
 installation neuve), sinon Docker crée un *dossier* de ce nom.
+
+### Image publiée et image déployée
+
+Le déploiement **construit toujours l'image localement** et ne tire jamais d'un registre
+(`pull_policy: never` dans le Compose) : c'est volontaire, le code déployé vient donc du clone vérifié sur
+l'hôte, jamais d'un artefact distant. L'image locale s'appelle `lody-video-factory:<tag>`.
+
+En parallèle, chaque push sur `main` publie la **même image** (même `Dockerfile.lody`, même contexte) sous
+son nom canonique `ghcr.io/rec82/lody-video-factory`, étiquetée entre autres avec le SHA court — la même
+convention que `LODY_IMAGE_TAG` ci-dessus. Le namespace doit rester **en minuscules** (exigence GHCR) et
+appartenir à ce dépôt, sinon le `GITHUB_TOKEN` n'a pas le droit d'y publier.
+
+Le moteur de génération (`moneyprinterturbo-api`) est un **service distinct** : il n'est pas publié par ce
+workflow et reste construit par `docker-compose.engine-local.yml`.
 
 ## Paramètres d'un projet et brief
 

@@ -11,11 +11,14 @@ from loguru import logger
 from packaging.version import InvalidVersion, Version
 
 
+# Dépôt de CE projet : la vérification de mise à jour doit interroger les publications de Lody Video
+# Factory, jamais celles du dépôt upstream historique — sinon elle proposerait aux exploitants de ce
+# déploiement des versions qui ne correspondent pas au code installé.
 LATEST_RELEASE_API_URL: Final = (
-    "https://api.github.com/repos/harry0703/MoneyPrinterTurbo/releases/latest"
+    "https://api.github.com/repos/ReC82/lody-video-factory/releases/latest"
 )
 LATEST_RELEASE_PAGE_URL: Final = (
-    "https://github.com/harry0703/MoneyPrinterTurbo/releases/latest"
+    "https://github.com/ReC82/lody-video-factory/releases/latest"
 )
 # 更新检查只是辅助功能，网络异常不能明显拖慢本地 WebUI。连接与读取分别限制
 # 超时时间，既允许 GitHub 在普通网络下完成响应，也避免离线环境长时间等待。

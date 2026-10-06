@@ -1,7 +1,8 @@
 # Lody Video Factory — prototype d'interface (ticket #8).
 #
 # Service INDÉPENDANT de l'ancienne WebUI MoneyPrinterTurbo :
-#   - image construite depuis CE dépôt (jamais ghcr.io/harry0703/...:latest) ;
+#   - image construite depuis CE dépôt, jamais tirée d'un registre (`pull_policy: never`) ; l'image
+#     canonique publiée est `ghcr.io/rec82/lody-video-factory` (voir .github/workflows/docker-ghcr.yml) ;
 #   - projet Compose, conteneur, image, réseau et port distincts ;
 #   - config.toml et storage/ montés depuis l'hôte, non versionnés ;
 #   - projets et productions dans une base SQLite d'un volume nommé (survit aux rebuilds) ;

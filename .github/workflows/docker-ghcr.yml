@@ -9,7 +9,9 @@ on:
     paths-ignore:
       - "README*.md"
       - "docs/**"
-      - ".github/workflows/docker-ghcr.yml"
+      # Ce fichier n'est plus exclu : une modification de la cible de publication ou des identifiants doit
+      # déclencher une publication réelle, sinon la correction ne peut pas être vérifiée avant le prochain
+      # changement de code.
   workflow_dispatch:
 
 permissions:
@@ -21,7 +23,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: ghcr.io/harry0703/moneyprinterturbo
+  # Image canonique de Lody Video Factory, dans le namespace GHCR DE CE DÉPÔT : c'est la seule cible que le
+  # GITHUB_TOKEN du dépôt (permission packages: write ci-dessus) a le droit d'écrire. L'ancienne valeur
+  # (namespace historique de l'upstream) provoquait à chaque push sur main :
+  #   denied: permission_denied: The requested installation does not exist
+  # Tout en MINUSCULES : GHCR refuse les majuscules, alors que ${{ github.repository_owner }} vaut « ReC82 ».
+  # Littéral volontaire (et non une expression) pour qu'une validation statique puisse le vérifier —
+  # voir test/lody/test_no_legacy_namespace.py.
+  IMAGE_NAME: ghcr.io/rec82/lody-video-factory
 
 jobs:
   publish:
@@ -46,6 +55,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # `type=sha,format=short` reprend la convention d'étiquette du déploiement
+      # (LODY_IMAGE_TAG=$(git rev-parse --short HEAD), voir docs/lody-ui.md) : un tag publié correspond donc
+      # à un tag déployable. Aucun commentaire DANS le bloc `tags:` ci-dessous — chaque ligne y est une
+      # définition de tag, pas du YAML.
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -56,19 +69,21 @@ jobs:
             type=ref,event=tag
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          # Image de Lody Video Factory (interface du projet, webui/Lody.py), et non l'ancienne image du
+          # moteur MoneyPrinterTurbo construite depuis ./Dockerfile : c'est ce dépôt-ci que ce workflow
+          # publie. Le moteur reste un service distinct, construit localement
+          # (docker-compose.engine-local.yml) — il n'est pas publié ici.
+          file: ./Dockerfile.lody
           push: true
           provenance: mode=max
           sbom: true
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            DOCKER_BUILD_MIRROR=default
-            PIP_USE_OFFICIAL=1
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

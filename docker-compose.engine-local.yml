@@ -3,8 +3,8 @@
 # joignable.
 #
 # Pourquoi ce fichier plutôt que les deux déjà présents :
-#   - docker-compose.release.yml utilise l'image publique non épinglée `ghcr.io/harry0703/
-#     moneyprinterturbo:latest` : jamais le code de ce dépôt, quel que soit son état (voir
+#   - docker-compose.release.yml utilise l'image publique non épinglée du projet upstream
+#     (MoneyPrinterTurbo) : jamais le code de ce dépôt, quel que soit son état (voir
 #     docs/audits/moneyprinterturbo_initial_audit.md, §13-14).
 #   - docker-compose.yml (variante "build") monte TOUT le dépôt en direct (`./:/MoneyPrinterTurbo`) :
 #     aucune image reproductible/épinglée, le code tourné dépend de l'état courant du clone sur l'hôte,
