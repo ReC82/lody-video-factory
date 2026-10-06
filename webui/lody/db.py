@@ -173,6 +173,45 @@ def _reference_images(connection: sqlite3.Connection) -> None:
     _add_columns(connection, "locations", {"reference_image": "TEXT NOT NULL DEFAULT ''"})
 
 
+# Templates de production (#110) : recettes réutilisables d'un PROJET, appliquées à une nouvelle production
+# sans jamais modifier les réglages permanents du projet. ``payload`` est un recouvrement PARTIEL du brief
+# (une clé absente = hériter du projet), validé par ``lody.templates`` en réutilisant les limites de
+# ``lody.brief`` — jamais un second vocabulaire. Portée par projet, comme les personnages et les lieux :
+# un projet n'hérite jamais des règles d'un autre (la duplication vers un autre projet est explicite).
+TEMPLATES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS production_templates (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL REFERENCES projects (id),
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    payload     TEXT NOT NULL DEFAULT '{}',
+    is_active   INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_templates_project
+    ON production_templates (project_id, is_active DESC, name COLLATE NOCASE);
+"""
+
+
+def _production_templates(connection: sqlite3.Connection) -> None:
+    """v8 (#110) : table des templates, et lien de traçabilité depuis une production.
+
+    ``template_id`` est un TEXT NU, volontairement SANS clé étrangère : la reproductibilité d'une production
+    repose sur ``template_snapshot`` (copie figée du payload au moment de l'application), jamais sur la ligne
+    du template, qui peut être désactivée ou — une fois #114 livré — supprimée avec son projet. Une contrainte
+    ici ferait échouer cette suppression sans rien garantir de plus.
+
+    ``template_snapshot`` vaut '{}' pour toutes les productions existantes : aucune n'est réécrite, et une
+    production sans template (``template_id`` NULL) reste le cas normal, pleinement supporté.
+    """
+    connection.executescript(TEMPLATES_SCHEMA)
+    _add_columns(connection, "productions", {
+        "template_id": "TEXT",
+        "template_snapshot": "TEXT NOT NULL DEFAULT '{}'",
+    })
+
+
 def _voice_direction(connection: sqlite3.Connection) -> None:
     """v7 (#92) : réglages de jeu vocal ElevenLabs choisis pour CE personnage après écoute comparative
     (modèle, stability/similarity_boost/style/use_speaker_boost/speed — voir
@@ -191,6 +230,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (5, CHARACTERS_SCHEMA + LOCATIONS_SCHEMA),
     (6, _reference_images),
     (7, _voice_direction),
+    (8, _production_templates),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 

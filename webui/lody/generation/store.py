@@ -22,10 +22,11 @@ from lody import db
 from lody.generation.models import ACTIVE_STATUSES, ProductionStatus
 from lody.secrets_guard import find_secret_path
 
-JSON_COLUMNS = ("brief", "storyboard", "visual_prompts", "params", "cost_detail", "assets", "warnings", "snapshot", "trace")
+JSON_COLUMNS = ("brief", "storyboard", "visual_prompts", "params", "cost_detail", "assets", "warnings", "snapshot",
+                "trace", "template_snapshot")
 _JSON_DEFAULTS: dict[str, Any] = {
     "brief": {}, "storyboard": [], "visual_prompts": [], "params": {}, "cost_detail": {}, "assets": [], "warnings": [],
-    "snapshot": {}, "trace": {},
+    "snapshot": {}, "trace": {}, "template_snapshot": {},
 }
 UPDATABLE = frozenset({
     "subject", "brief", "script", "script_source", "storyboard", "visual_prompts", "params",
@@ -84,6 +85,12 @@ class Production:
     warnings: list[str] = field(default_factory=list)
     snapshot: dict[str, Any] = field(default_factory=dict)
     trace: dict[str, Any] = field(default_factory=dict)
+    # #110 : template de production appliqué, s'il y en a un. ``template_id`` n'est qu'une trace de
+    # provenance (le template peut être désactivé ensuite) ; c'est ``template_snapshot``, copie FIGÉE du
+    # payload au moment de l'application, qui rend la production reproductible et qui sera exportée.
+    # Valeurs neutres par défaut : une production sans template reste le cas normal.
+    template_id: str | None = None
+    template_snapshot: dict[str, Any] = field(default_factory=dict)
 
     @property
     def label(self) -> str:
