@@ -43,7 +43,7 @@ def create(audio_file, subtitle_file: str = "", word_level: bool = False):
                 f"********************************************\n"
                 f"this may be caused by network issue. \n"
                 f"please download the model manually and put it in the 'models' folder. \n"
-                f"see [README.md FAQ](https://github.com/harry0703/MoneyPrinterTurbo) for more details.\n"
+                f"see [README.md FAQ](https://github.com/ReC82/lody-video-factory) for more details.\n"
                 f"********************************************\n\n"
             )
             return None

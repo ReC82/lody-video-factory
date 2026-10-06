@@ -1,9 +1,15 @@
-# Claude Code 变体镜像：在官方发布镜像的基础上安装 claude CLI。
+# Claude Code 变体镜像：在本仓库构建的引擎镜像基础上安装 claude CLI。
 #
 # Claude 订阅（Pro / Max / Team）不签发 API Key，只有 Claude Code 官方客户端
 # 能使用订阅凭证，所以 `claude_code` Provider 依赖容器内存在可执行的 claude
-# CLI。这里复用发布镜像，避免重新安装 Python 依赖。
-FROM ghcr.io/harry0703/moneyprinterturbo:latest
+# CLI。这里复用引擎镜像，避免重新安装 Python 依赖。
+#
+# 基础镜像由 docker-compose.engine-local.yml 在本地构建（`moneyprinterturbo:<tag>`），
+# 不再从外部镜像仓库拉取：构建前先执行
+#   MPT_IMAGE_TAG=<tag> docker compose -f docker-compose.engine-local.yml build
+# 需要指定其它标签时覆盖 BASE_IMAGE 即可。
+ARG BASE_IMAGE=moneyprinterturbo:local
+FROM ${BASE_IMAGE}
 
 # CLI 版本固定，避免镜像重建时行为漂移；升级时改这里的版本号即可。
 ARG CLAUDE_CODE_VERSION=2.1.260

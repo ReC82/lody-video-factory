@@ -6,15 +6,13 @@
 
 Provide a video <b>topic</b> or <b>keyword</b>, and MoneyPrinterTurbo will generate the script, match footage, create subtitles and background music, and produce an HD short video.
 
-[![Version](https://img.shields.io/github/v/release/harry0703/MoneyPrinterTurbo?color=blue&label=version)](https://github.com/harry0703/MoneyPrinterTurbo/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/harry0703/MoneyPrinterTurbo/releases/latest)
+[![Version](https://img.shields.io/github/v/release/ReC82/lody-video-factory?color=blue&label=version)](https://github.com/ReC82/lody-video-factory/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/ReC82/lody-video-factory/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Downloads](https://img.shields.io/github/downloads/harry0703/MoneyPrinterTurbo/total)](https://github.com/harry0703/MoneyPrinterTurbo/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ReC82/lody-video-factory/total)](https://github.com/ReC82/lody-video-factory/releases/latest)
 
-<a href="https://trendshift.io/repositories/8731" target="_blank"><img src="https://trendshift.io/api/badge/repositories/8731" alt="harry0703%2FMoneyPrinterTurbo | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-<a href="https://www.star-history.com/harry0703/moneyprinterturbo"><img src="https://api.star-history.com/badge?repo=harry0703/MoneyPrinterTurbo" alt="Star History Rank" style="height: 55px;" height="55"/></a>
 
-English | [简体中文](README.md) | [日本語](README-ja.md) | [Releases](https://github.com/harry0703/MoneyPrinterTurbo/releases) | [Issues](https://github.com/harry0703/MoneyPrinterTurbo/issues)
+English | [简体中文](README.md) | [日本語](README-ja.md) | [Releases](https://github.com/ReC82/lody-video-factory/releases) | [Issues](https://github.com/ReC82/lody-video-factory/issues)
 
 </div>
 
@@ -162,7 +160,7 @@ Thanks to [Kimi](https://platform.kimi.ai?track_id=track-f6b0a640d35c41deb03b247
 </p>
 
 <p align="center">
-  <a href="https://mangodisk.app">Visit the MangoDisk Website</a> · <a href="https://github.com/harry0703/MangoDisk">View on GitHub</a>
+  <a href="https://mangodisk.app">Visit the MangoDisk Website</a> · <a href="https://mangodisk.app">View on GitHub</a>
 </p>
 
 ---
@@ -204,44 +202,6 @@ Thanks to [Kimi](https://platform.kimi.ai?track_id=track-f6b0a640d35c41deb03b247
 - [x] Export portrait `9:16 (1080×1920)`, landscape `16:9 (1920×1080)`, or square `1:1 (1080×1080)` videos
 - [x] Publish completed videos directly to **TikTok, Instagram, and YouTube Shorts**
 
-## Gallery 🎬
-
-All examples below were generated with MoneyPrinterTurbo.
-
-### Portrait 9:16
-
-<table width="100%">
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=03-zh-portrait-city-morning.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/03-zh-portrait-city-morning.jpg" width="180" alt="When the City Wakes"></a><br><strong>When the City Wakes</strong><br>Chinese · 14 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=05-zh-portrait-clean-energy.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/05-zh-portrait-clean-energy.jpg" width="180" alt="The Future of Clean Energy"></a><br><strong>The Future of Clean Energy</strong><br>Chinese · 24 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=07-zh-portrait-space-exploration.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/07-zh-portrait-space-exploration.jpg" width="180" alt="Why We Still Explore Space"></a><br><strong>Why We Still Explore Space</strong><br>Chinese · 27 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=17-zh-portrait-seed-journey.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/17-zh-portrait-seed-journey.jpg" width="180" alt="A Seed's Journey"></a><br><strong>A Seed's Journey</strong><br>Chinese · 44 sec</td>
-</tr>
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=09-en-portrait-future-robotics.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/09-en-portrait-future-robotics.jpg" width="180" alt="The Future of Everyday Robotics"></a><br><strong>The Future of Everyday Robotics</strong><br>English · 21 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=11-en-portrait-small-habits.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/11-en-portrait-small-habits.jpg" width="180" alt="Small Habits, Lasting Change"></a><br><strong>Small Habits, Lasting Change</strong><br>English · 19 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=13-en-portrait-creative-work.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/13-en-portrait-creative-work.jpg" width="180" alt="Making Space for Creative Work"></a><br><strong>Making Space for Creative Work</strong><br>English · 20 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=15-en-portrait-coffee-science.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/15-en-portrait-coffee-science.jpg" width="180" alt="The Science Inside Coffee"></a><br><strong>The Science Inside Coffee</strong><br>English · 23 sec</td>
-</tr>
-</table>
-
-### Landscape 16:9
-
-<table width="100%">
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=02-zh-landscape-deep-ocean.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/02-zh-landscape-deep-ocean.jpg" width="280" alt="Light in the Deep Ocean"></a><br><strong>Light in the Deep Ocean</strong><br>Chinese · 23 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=04-zh-landscape-reading-power.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/04-zh-landscape-reading-power.jpg" width="280" alt="How Reading Shapes Us"></a><br><strong>How Reading Shapes Us</strong><br>Chinese · 23 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=06-zh-landscape-pour-over-coffee.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/06-zh-landscape-pour-over-coffee.jpg" width="280" alt="The Details of Pour-Over Coffee"></a><br><strong>The Details of Pour-Over Coffee</strong><br>Chinese · 23 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=08-zh-landscape-spring-journey.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/08-zh-landscape-spring-journey.jpg" width="280" alt="Spring Is Made for Travel"></a><br><strong>Spring Is Made for Travel</strong><br>Chinese · 14 sec</td>
-</tr>
-<tr>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=10-en-landscape-ocean-conservation.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/10-en-landscape-ocean-conservation.jpg" width="280" alt="Why Ocean Conservation Matters"></a><br><strong>Why Ocean Conservation Matters</strong><br>English · 25 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=14-en-landscape-sustainable-cities.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/14-en-landscape-sustainable-cities.jpg" width="280" alt="Designing More Sustainable Cities"></a><br><strong>Designing More Sustainable Cities</strong><br>English · 27 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=16-en-landscape-mountain-perspective.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/16-en-landscape-mountain-perspective.jpg" width="280" alt="What Mountains Teach Us"></a><br><strong>What Mountains Teach Us</strong><br>English · 18 sec</td>
-<td align="center" width="25%"><a href="https://harry0703.github.io/mpt-assets/?video=18-en-landscape-history-of-flight.mp4"><img src="https://github.com/harry0703/mpt-assets/releases/download/assets/18-en-landscape-history-of-flight.jpg" width="280" alt="A Brief History of Human Flight"></a><br><strong>A Brief History of Human Flight</strong><br>English · 59 sec</td>
-</tr>
-</table>
-
 ## System Requirements 📦
 
 - Recommended platforms: Windows 10+, macOS 11+, or a mainstream Linux distribution
@@ -271,7 +231,7 @@ All examples below were generated with MoneyPrinterTurbo.
 If your AI Agent can read Skill documents and operate a local terminal, send it the prompt below. The Agent will install and configure MoneyPrinterTurbo, generate the video, and return the video file path. It will ask only for required API keys that are not already configured. This workflow currently supports macOS and Windows.
 
 ```text
-Use this Skill: https://raw.githubusercontent.com/harry0703/MoneyPrinterTurbo/main/docs/skill/SKILL.md
+Use this Skill: https://raw.githubusercontent.com/ReC82/lody-video-factory/main/docs/skill/SKILL.md
 Create a video with the topic "How AI is changing everyday life."
 ```
 
@@ -279,13 +239,13 @@ Create a video with the topic "How AI is changing everyday life."
 
 Want to try MoneyPrinterTurbo without setting up a local environment? Run it directly in Google Colab!
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/harry0703/MoneyPrinterTurbo/blob/main/docs/MoneyPrinterTurbo.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ReC82/lody-video-factory/blob/main/docs/MoneyPrinterTurbo.ipynb)
 
 ### Windows
 
 Download the latest Windows one-click package from GitHub Releases, then extract it directly.
 
-- [Download the latest Windows one-click package](https://github.com/harry0703/MoneyPrinterTurbo/releases/latest)
+- [Download the latest Windows one-click package](https://github.com/ReC82/lody-video-factory/releases/latest)
 
 > Download the `.7z` archive from the **Assets** section of that page. The
 > auto-generated `Source code (zip)` / `Source code (tar.gz)` archives contain
@@ -310,7 +270,7 @@ Use the local setup or Docker instructions below.
 #### ① Clone the Project
 
 ```shell
-git clone https://github.com/harry0703/MoneyPrinterTurbo.git
+git clone https://github.com/ReC82/lody-video-factory.git
 ```
 
 #### ② Complete the Initial Setup
@@ -328,12 +288,12 @@ If you are using a Windows system, please refer to Microsoft's documentation:
 2. [Use Docker containers with WSL](https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-containers)
 
 ```shell
-cd MoneyPrinterTurbo
-docker compose -f docker-compose.release.yml up
+cd lody-video-factory
+MPT_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose -f docker-compose.engine-local.yml up -d --build
 ```
 
-> The recommended default is `docker-compose.release.yml`, which pulls the prebuilt image from GitHub Container Registry: `ghcr.io/harry0703/moneyprinterturbo:latest`.
-> If you need to build the image locally, you can still run `docker compose up`.
+> `docker-compose.engine-local.yml` builds the engine image from **this** repository and pins it with a tag,
+> so the running code always matches a known commit. No image is pulled from a registry.
 > Before the first start, copy `config.example.toml` to `config.toml` so it can be mounted into the containers.
 
 #### ② Access the WebUI
@@ -353,7 +313,7 @@ Open your browser and visit http://127.0.0.1:8080/docs or http://127.0.0.1:8080/
 Use [uv](https://docs.astral.sh/uv/) to manage the Python environment and dependencies. The project supports Python 3.11 or later; the example below uses Python 3.11.
 
 ```shell
-git clone https://github.com/harry0703/MoneyPrinterTurbo.git
+git clone https://github.com/ReC82/lody-video-factory.git
 cd MoneyPrinterTurbo
 uv python install 3.11
 uv sync --frozen
@@ -579,7 +539,7 @@ Solution: [See how to download the model manually from Hugging Face](#subtitle-g
 
 ## Feedback & Suggestions 📢
 
-- You can submit an [issue](https://github.com/harry0703/MoneyPrinterTurbo/issues) or a [pull request](https://github.com/harry0703/MoneyPrinterTurbo/pulls).
+- You can submit an [issue](https://github.com/ReC82/lody-video-factory/issues) or a [pull request](https://github.com/ReC82/lody-video-factory/pulls).
 
 ## License 📝
 
