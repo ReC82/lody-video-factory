@@ -41,6 +41,15 @@ def test_dockerfile_never_copies_configuration_or_secrets():
         assert re.search(rf"^{re.escape(ignored)}$", DOCKERIGNORE, re.MULTILINE), ignored
 
 
+def test_dockerfile_ships_the_license_with_the_image():
+    """L'image est publiée publiquement sur GHCR : la notice MIT du projet d'origine doit voyager avec
+    l'artefact distribué, pas seulement vivre dans le dépôt."""
+    assert re.search(r"^COPY[^\n]*\bLICENSE\b[^\n]*\./\s*$", DOCKERFILE, re.MULTILINE)
+    # et le contexte de build ne doit pas l'exclure, sinon le COPY échouerait au build
+    assert not re.search(r"^LICENSE", DOCKERIGNORE, re.MULTILINE)
+    assert "MIT" in (ROOT / "LICENSE").read_text(encoding="utf-8")
+
+
 def test_compose_file_is_isolated_and_keeps_existing_mounts():
     yaml = pytest.importorskip("yaml")
     compose = yaml.safe_load((ROOT / "docker-compose.lody.yml").read_text(encoding="utf-8"))

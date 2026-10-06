@@ -36,7 +36,11 @@ COPY resource ./resource
 COPY app ./app
 COPY webui ./webui
 COPY test ./test
-COPY main.py cli.py config.example.toml pyproject.toml ./
+# LICENSE voyage avec l'artefact : l'image est publiée publiquement
+# (ghcr.io/rec82/lody-video-factory) et la licence MIT du projet d'origine exige que sa
+# notice de copyright accompagne les copies distribuées. Lisible à /MoneyPrinterTurbo/LICENSE,
+# à la racine du projet dans l'image, comme dans le dépôt.
+COPY main.py cli.py config.example.toml pyproject.toml LICENSE ./
 USER lody
 
 EXPOSE 8601
