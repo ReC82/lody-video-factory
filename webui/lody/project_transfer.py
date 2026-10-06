@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from lody.brief import BRIEF_KEY, DEFAULT_BRIEF, brief_settings
 from lody.characters import (
     DEFAULTS as CHARACTER_DEFAULTS,
     EDITABLE_FIELDS as CHARACTER_FIELDS,
@@ -178,6 +179,20 @@ _PROJECT_EXAMPLE = {
     "visual_style": "Décris ici le style visuel voulu (univers, ambiance, ce qu'il faut éviter).",
     "tone": "Clair et précis",
     "platforms": ["youtube_shorts", "tiktok"],
+    # #109 : le modèle laissait « settings » vide alors que la voix ElevenLabs du PROJET se configure dans
+    # son bloc « brief » — un fichier rédigé à la main n'avait donc aucun emplacement à imiter, et plaçait
+    # l'identifiant ailleurs (où rien ne le lit). Le bloc vient de DEFAULT_BRIEF, même source de vérité que
+    # la validation : il ne peut pas diverger en silence.
+    "voice_name": "Ex. Kev - Young, Dynamic and Bright",
+    "settings": {
+        BRIEF_KEY: {
+            **copy.deepcopy(DEFAULT_BRIEF),
+            # Identifiant ElevenLabs du projet : c'est CE champ que lit la validation de production réelle.
+            "voice_id": "21m00Tcm4TlvDq8ikWAM",
+            "audience": "À qui s'adresse cette série (ex. débutants curieux).",
+            "orientation": "L'angle éditorial permanent de la série.",
+        },
+    },
 }
 CHARACTER_EXAMPLE_PRIMARY = {
     "name": "Personnage principal", "role": "Protagoniste",
@@ -251,6 +266,42 @@ def _reject_non_bool(raw_item: dict[str, Any], path: str, keys: tuple[str, ...])
             for key in keys if key in raw_item and not isinstance(raw_item[key], bool)]
 
 
+PROJECT_VOICE_ID_PATH = f"project.settings.{BRIEF_KEY}.voice_id"
+# Emplacements où un identifiant de voix de PROJET a déjà été écrit par erreur dans un fichier rédigé à la
+# main : `external_voice_id` est le nom du champ d'un PERSONNAGE (voir characters.EDITABLE_FIELDS), il n'a
+# jamais désigné la voix du projet. On ne les relit JAMAIS (ce serait un repli silencieux sur une clé
+# inventée) : on signale précisément l'emplacement attendu. Voir #109.
+_MISPLACED_VOICE_KEYS = ("external_voice_id", "voice_id_elevenlabs", "elevenlabs_voice_id")
+
+
+def _voice_warnings(raw: dict[str, Any], clean: dict[str, Any]) -> list[str]:
+    """Avertissements explicites sur la voix du projet (#109) — jamais une valeur de repli.
+
+    Le symptôme corrigé par ce ticket était MUET : un identifiant placé hors de l'emplacement lu par la
+    validation de production réelle était accepté sans un mot, et le blocage n'apparaissait que plus tard
+    (« Aucune voix n’est choisie pour ce projet »). ``settings`` étant volontairement libre (une clé
+    personnalisée y est conservée, voir le test du round-trip #66), on ne peut pas refuser ces clés : on les
+    nomme.
+    """
+    if clean.get("voice_provider") != "elevenlabs":
+        return []  # autres fournisseurs : aucune voix à configurer, rien à signaler
+    warnings: list[str] = []
+    raw_settings = raw.get("settings") if isinstance(raw.get("settings"), dict) else {}
+    for container, prefix in ((raw, "project"), (raw_settings, "project.settings")):
+        for key in _MISPLACED_VOICE_KEYS:
+            if container.get(key):
+                warnings.append(
+                    f"{prefix}.{key} n’est pas l’emplacement de l’identifiant de voix d’un projet : "
+                    f"valeur NON appliquée. Place-le dans « {PROJECT_VOICE_ID_PATH} »."
+                )
+    if not brief_settings(clean.get("settings") or {})["voice_id"]:
+        warnings.append(
+            "Voix ElevenLabs sans identifiant : la production réelle restera bloquée tant que "
+            f"« {PROJECT_VOICE_ID_PATH} » sera vide."
+        )
+    return warnings
+
+
 def _validate_project(raw: Any) -> tuple[dict[str, Any] | None, list[str], list[FieldIssue]]:
     if raw is None:
         return None, [], [FieldIssue("project", "La section « project » est obligatoire.")]
@@ -266,7 +317,7 @@ def _validate_project(raw: Any) -> tuple[dict[str, Any] | None, list[str], list[
     except ProjectValidationError as error:
         return None, warnings, [FieldIssue(f"project.{f}" if f != "_" else "project", m)
                                 for f, m in error.errors.items()]
-    return clean, warnings, []
+    return clean, warnings + _voice_warnings(raw, clean), []
 
 
 def validate_items(raw: Any, section: str, known_fields: tuple[str, ...], defaults: dict[str, Any],
@@ -454,6 +505,17 @@ def preview_update(raw: bytes | str, *, target: Project, target_characters: Iter
 
     project_changes = {key: (getattr(target, key), clean_project[key])
                        for key in PROJECT_FIELDS if getattr(target, key) != clean_project[key]}
+
+    # #109 : les champs projet sont REMPLACÉS par ceux du fichier (comportement documenté du mode mise à
+    # jour), donc un fichier sans section ``settings`` efface l'identifiant de voix du projet cible. On ne
+    # change pas cette sémantique ici, mais l'effacement ne doit plus être muet : il apparaît dans l'aperçu,
+    # AVANT la confirmation.
+    voice_before = brief_settings(target.settings)["voice_id"]
+    if voice_before and not brief_settings(clean_project["settings"])["voice_id"]:
+        warnings.append(
+            f"L’identifiant de voix du projet (« {voice_before} ») sera EFFACÉ : le fichier n’en fournit "
+            f"aucun dans « {PROJECT_VOICE_ID_PATH} »."
+        )
 
     (chars_update, chars_create, chars_deactivate, chars_added, chars_modified, chars_unchanged,
      chars_deactivated) = _match_items(clean_characters, list(target_characters), CHARACTER_FIELDS)

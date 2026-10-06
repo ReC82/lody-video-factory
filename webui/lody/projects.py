@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from lody import catalog, db
-from lody.brief import BRIEF_KEY, validate_brief
+from lody.brief import BRIEF_KEY, validate_brief, with_legacy_voice
 from lody.seeds import ADDITIVE_BRIEF_KEYS
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
 
@@ -188,7 +188,10 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
         if BRIEF_KEY in raw_settings:
             raw_brief = raw_settings[BRIEF_KEY]
             if isinstance(raw_brief, dict):
-                clean_brief, brief_errors = validate_brief(raw_brief)
+                # #109 : même règle qu'à la lecture (``brief_settings``) — un identifiant de voix resté au
+                # premier niveau de ``settings`` est repris dans le bloc ``brief`` AVANT validation, sinon le
+                # premier enregistrement l'écrasait définitivement par la valeur par défaut (vide).
+                clean_brief, brief_errors = validate_brief(with_legacy_voice(raw_settings, raw_brief))
                 errors.update(brief_errors)
                 clean["settings"] = {**raw_settings, BRIEF_KEY: clean_brief}
             else:

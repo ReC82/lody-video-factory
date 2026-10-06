@@ -68,6 +68,49 @@ def test_audiovisuel_without_brief_block_falls_back_to_legacy_fields(repo):
     assert settings["voice_id"] == "jGpnMdbhtKgQbVrYezOx"
 
 
+# -- #109 : un bloc « brief » partiel ne doit plus masquer la voix héritée du premier niveau ---------------
+VOICE_ID = "jGpnMdbhtKgQbVrYezOx"
+
+
+def test_a_partial_brief_no_longer_hides_the_legacy_voice_id():
+    """Cause racine de #109 : le court-circuit de ``brief_settings`` rendait ``settings["voice_id"]``
+    invisible dès qu'un bloc ``brief`` existait, même incomplet — la validation de production réelle ne
+    voyait donc aucune voix alors que le projet en portait une."""
+    settings = brief.brief_settings({"voice_id": VOICE_ID, "brief": {"audience": "Débutants"}})
+    assert settings["voice_id"] == VOICE_ID
+    assert settings["audience"] == "Débutants"  # le bloc brief reste prioritaire pour ses propres clés
+
+
+def test_a_brief_voice_id_always_wins_over_the_legacy_one():
+    settings = brief.brief_settings({"voice_id": "ANCIEN-id-legacy", "brief": {"voice_id": VOICE_ID}})
+    assert settings["voice_id"] == VOICE_ID
+
+
+def test_a_voice_id_cleared_on_purpose_is_never_resurrected():
+    """Garde-fou anti-repli silencieux : ``voice_id: ""`` dans le bloc ``brief`` décrit une voix EFFACÉE
+    volontairement dans l'interface. L'ancienne valeur restée au premier niveau ne doit pas revenir."""
+    settings = brief.brief_settings({"voice_id": VOICE_ID, "brief": {"voice_id": "", "audience": "X"}})
+    assert settings["voice_id"] == ""
+
+
+def test_the_legacy_voice_model_follows_the_same_rule():
+    assert brief.brief_settings({"voice_model": "eleven_v3", "brief": {}})["voice_model"] == "eleven_v3"
+    assert brief.brief_settings({"voice_model": "eleven_v3", "brief": {"voice_model": ""}})["voice_model"] == ""
+
+
+def test_saving_a_legacy_project_migrates_the_voice_id_instead_of_losing_it(repo):
+    """Même règle à l'écriture : sans elle, le premier enregistrement d'un projet hérité écrasait son
+    identifiant par la valeur par défaut (vide) — perte définitive, et production réelle bloquée."""
+    project = repo.create(name="Projet hérité", voice_provider="elevenlabs", voice_name="Kev",
+                          settings={"voice_id": VOICE_ID, "brief": {"audience": "Débutants"}})
+    stored = repo.get(project.id)
+    assert stored.settings["brief"]["voice_id"] == VOICE_ID  # migré dans le bloc brief, une fois pour de bon
+    assert brief.brief_settings(stored.settings)["voice_id"] == VOICE_ID
+    # et une voix effacée volontairement le reste après enregistrement
+    cleared = repo.update(project.id, settings={"voice_id": VOICE_ID, "brief": {"voice_id": ""}})
+    assert brief.brief_settings(cleared.settings)["voice_id"] == ""
+
+
 @pytest.mark.parametrize(
     ("raw", "field"),
     [
