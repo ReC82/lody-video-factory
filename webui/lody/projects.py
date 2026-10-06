@@ -32,7 +32,9 @@ SCHEMA_VERSION = db.SCHEMA_VERSION
 NAME_MIN, NAME_MAX = 2, 80
 DESCRIPTION_MAX = 500
 TONE_MAX = 60
-VISUAL_STYLE_MAX = 200
+# Direction artistique complète attendue ici (univers, ambiance, cadrage, interdits) : ce texte sert de
+# consigne de style aux générateurs d'images, 200 caractères ne suffisaient pas.
+VISUAL_STYLE_MAX = 2000
 VOICE_NAME_MAX = 80
 SETTINGS_MAX_BYTES = 16 * 1024
 

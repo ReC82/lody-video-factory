@@ -6,7 +6,7 @@ import streamlit as st
 
 from lody import catalog, nav
 from lody.catalog import PROVIDER_KIND_BY_FIELD
-from lody.projects import ProjectValidationError, ProjectRepository
+from lody.projects import VISUAL_STYLE_MAX, ProjectValidationError, ProjectRepository
 from lody.generation.models import CapabilityState as CS
 from lody.theme import esc
 
@@ -167,9 +167,11 @@ def render(repo: ProjectRepository, states: States) -> None:
                 tones = list(catalog.values(catalog.TONES))
                 st.selectbox("Ton éditorial", tones, key=f"{PREFIX}_tone")
                 error_under("tone")
-                st.text_input(
+                # Zone de texte (comme dans les réglages du projet) : la limite autorise une direction
+                # artistique complète, illisible dans un champ d'une seule ligne.
+                st.text_area(
                     "Style visuel", placeholder="Ex. Sombre et moderne, tons bleus, sans texte",
-                    max_chars=200, key=f"{PREFIX}_visual_style",
+                    height=110, max_chars=VISUAL_STYLE_MAX, key=f"{PREFIX}_visual_style",
                 )
                 error_under("visual_style")
                 provider_select(PREFIX, "text_provider", "Rédaction du script", catalog.TEXT_PROVIDERS,

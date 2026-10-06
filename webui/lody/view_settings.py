@@ -15,7 +15,7 @@ from lody import catalog, nav, project_transfer, voice_picker
 from lody.characters import CharacterRepository
 from lody.generation.publication import slugify
 from lody.locations import LocationRepository
-from lody.projects import Project, ProjectNotFound, ProjectRepository, ProjectValidationError
+from lody.projects import VISUAL_STYLE_MAX, Project, ProjectNotFound, ProjectRepository, ProjectValidationError
 from lody.theme import esc
 from lody.view_form import ERRORS_KEY, States, error_under, provider_select
 
@@ -380,7 +380,7 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
                                 value=bool(pub.get("no_financial_claims")), key=f"{p}_pub_nofin")
 
             with tab_visual:
-                st.text_area("Style visuel", value=project.visual_style, height=110, max_chars=200,
+                st.text_area("Style visuel", value=project.visual_style, height=110, max_chars=VISUAL_STYLE_MAX,
                              key=f"{p}_visual_style", placeholder="Ex. Univers sombre et moderne, sans texte")
                 error_under("visual_style")
                 st.text_area("Consignes visuelles du projet", value=current["visual_rules"], height=110,
