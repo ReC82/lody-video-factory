@@ -42,7 +42,7 @@ def test_fresh_database_has_zero_characters_and_reaches_the_latest_schema(tmp_pa
     assert repo.list_for_project(project.id) == []
     assert repo.count_for_project(project.id) == 0
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 7
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 8
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
 
@@ -71,7 +71,7 @@ def test_upgrade_from_currently_deployed_schema_v4_keeps_existing_data(tmp_path)
     assert repo.list_for_project("prj_old") == []  # zéro personnage par défaut, même pour un projet ancien
 
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
     # Rien de préexistant n'a bougé.
     assert upgraded.execute("SELECT name FROM projects").fetchall() == [("Ancien",)]
     assert upgraded.execute("SELECT script FROM productions WHERE id = 'prd_old'").fetchone() == \
@@ -85,7 +85,7 @@ def test_migration_replayed_is_a_no_op(tmp_path):
     CharacterRepository(path)  # rejeu explicite
     CharacterRepository(path)  # une troisième fois, pour faire bonne mesure
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
     assert connection.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 0
 
 
