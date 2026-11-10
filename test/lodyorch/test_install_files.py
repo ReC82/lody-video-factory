@@ -63,6 +63,8 @@ def test_instance_config_selects_agent_auto_and_contains_no_secret():
     assert labels["RUNNING"] == "agent:in-progress" and labels["BLOCKED"] == "agent:blocked"
     assert env["LQ_DEPS_DONE_STATES"] == "DONE"
     assert env["LQ_REQUIRE_AUTH"] == "1" and env["LQ_STRICT_MCP"] == "1"
+    assert env["LQ_CLAIM_COMMENT"] == "1" and env["LQ_REQUIRE_PR"] == "1"
+    assert env["LQ_LABELS_FILE"] == "/opt/lodyorch/labels.json"
     text = (ORCH_DIR / "lodyorch.env").read_text(encoding="utf-8")
     assert not re.search(r"(?im)^\s*\w*(TOKEN|PASSWORD|SECRET|API_KEY)\w*\s*=", text)
 
@@ -83,6 +85,7 @@ def test_install_dry_run_changes_nothing_and_starts_nothing(tmp_path):
     actions = [line for line in out.stdout.splitlines() if "[dry-run]" in line]
     assert any("/opt/lodyorch/guard.py" in a for a in actions)
     assert any("/usr/local/bin/lodyorch" in a for a in actions)
+    assert any("/opt/lodyorch/labels.json" in a for a in actions)
     assert not any(re.search(r"systemctl (enable|start|restart)|tmux", a) for a in actions)
     assert "lodyorch-console" not in out.stdout
     assert "rien n'a été démarré" in out.stdout

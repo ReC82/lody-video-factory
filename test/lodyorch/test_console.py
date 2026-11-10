@@ -148,4 +148,4 @@ def test_statusline_summarises_queue_for_the_console(orch):
     orch.sync()
     out = subprocess.run([sys.executable, str(ORCH_DIR / "lodyorch.py"), "statusline"], capture_output=True,
                          text=True, timeout=30).stdout
-    assert out.startswith("lodyorch · ") and "1 à faire" in out and "1 PR en revue" in out
+    assert out.startswith("lodyorch · ") and "1 à faire" in out and "1 CI en cours" in out and "0 PR en revue" in out

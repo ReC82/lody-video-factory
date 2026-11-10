@@ -29,7 +29,7 @@ if [ "$DRY" = 0 ] && [ "$(id -u)" != 0 ]; then
     exit 1
 fi
 [ -n "$SVC_HOME" ] || { echo "Compte $SVC_USER introuvable." >&2; exit 1; }
-for f in lodyorch.py guard.py session_prompt.md lodyorch.env claude-settings.json lodyorch \
+for f in lodyorch.py guard.py session_prompt.md lodyorch.env claude-settings.json labels.json lodyorch \
          console-settings.json console_settings.py systemd/lodyorch.service; do
     [ -f "$SRC/$f" ] || { echo "Fichier manquant : $SRC/$f" >&2; exit 1; }
 done
@@ -51,7 +51,7 @@ run install -d -o root -g root -m 0755 "$DEST"
 for f in lodyorch.py guard.py console_settings.py; do
     run install -o root -g root -m 0755 "$SRC/$f" "$DEST/$f"
 done
-for f in session_prompt.md lodyorch.env claude-settings.json console-settings.json; do
+for f in session_prompt.md lodyorch.env claude-settings.json labels.json console-settings.json; do
     run install -o root -g root -m 0644 "$SRC/$f" "$DEST/$f"
 done
 run install -o root -g root -m 0755 "$SRC/lodyorch" /usr/local/bin/lodyorch
@@ -91,6 +91,7 @@ cat <<'TXT'
 Installation terminée — rien n'a été démarré. Pour lancer l'orchestrateur :
   lodyorch check                                   # tout doit être ✓
   Dans la console Claude « lodyorch » : /hooks (valider les nouveaux crochets) ou relancer Claude
+  lodyorch labels                                  # labels du protocole (#117) ; --apply pour les créer
   sudo systemctl enable --now lodyorch.service      # file automatique, sans fenêtre
   lodyorch console                                  # rattache LA console (la crée seulement si absente)
 Après une mise à jour du code : lodyorch reload (sans couper la session en cours).

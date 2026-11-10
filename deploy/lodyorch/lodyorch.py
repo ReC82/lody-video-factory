@@ -34,6 +34,7 @@ Commandes :
   lodyorch set N champ valeur                               corriger un champ d'un ticket
   lodyorch sync              synchroniser maintenant les tickets GitHub (si LQ_GH_SYNC=1)
   lodyorch phase TEXTE       phase de travail de la session en cours (appelé par la session)
+  lodyorch labels [--apply]  labels du dépôt comparés au protocole (#117) ; --apply crée/aligne
   lodyorch console           ouvrir LA console (session tmux interactive, créée seulement si absente)
   lodyorch human busy|idle   appelé par les crochets de la console : priorité au propriétaire
   lodyorch statusline        ligne d'état affichée dans la console Claude
@@ -117,6 +118,22 @@ STATUS_LABELS = {"RUNNING": "statut: en cours", "BLOCKED": "statut: bloqué", "F
 STATUS_LABELS.update(json.loads(os.environ.get("LQ_STATUS_LABELS") or "{}"))
 HOLD_LABELS = {"statut: suspendu", "statut: abandonné", "wontfix", "duplicate", "invalid"}
 HOLD_LABELS |= {x.strip() for x in os.environ.get("LQ_HOLD_LABELS", "").split(",") if x.strip()}
+# Protocole de labels (#117) : référentiel des labels attendus sur le dépôt (`lodyorch labels`).
+LABELS_FILE = Path(os.environ.get("LQ_LABELS_FILE", Path(__file__).with_name("labels.json")))
+# Commentaire de prise en charge publié par le superviseur, une seule fois par ticket.
+CLAIM_COMMENT = os.environ.get("LQ_CLAIM_COMMENT", "0") == "1"
+CLAIM_MARKER = "<!-- lodyorch:prise-en-charge -->"
+# Une livraison (WAITING_OWNER) doit nommer sa PR ; sans PR, le ticket n'est pas considéré livré.
+REQUIRE_PR = os.environ.get("LQ_REQUIRE_PR", "0") == "1"
+# Suivi de la CI par le superviseur (#117/#127) : aucune session Claude n'attend la CI. Une PR livrée
+# passe en « CI en attente » ; le superviseur interroge GitHub toutes les LQ_CI_POLL s, puis la déclare
+# prête pour revue, relance une correction bornée (LQ_CI_MAX_FIXES) ou bloque avec un diagnostic.
+CI_WATCH = os.environ.get("LQ_CI_WATCH", "0") == "1"
+CI_POLL_SECONDS = int(os.environ.get("LQ_CI_POLL", 300))
+CI_MAX_FIXES = int(os.environ.get("LQ_CI_MAX_FIXES", 2))
+CI_TIMEOUT_SECONDS = int(os.environ.get("LQ_CI_TIMEOUT", 3 * 3600))
+CI_FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
+PRIORITY_RE = re.compile(r"(?i)^priority\s*:\s*(.*)$")
 TRUSTED_AUTHORS = {"OWNER", "MEMBER", "COLLABORATOR"}
 DEPS_RE = re.compile(r"(?:d[ée]pend(?:ance)?s?\s+(?:de|du|des|d'|on)|bloqu[ée]e?\s+par|blocked\s+by|"
                      r"pr[ée]requis|requires)\s*:?\s*((?:#\d+(?:\s*(?:,|et|and|&)?\s*)?)+)", re.I)
@@ -240,7 +257,10 @@ def db():
     for col, decl in (("gh_labels", "TEXT DEFAULT '[]'"), ("gh_since", "TEXT DEFAULT ''"),
                       ("gh_cursor", "INTEGER NOT NULL DEFAULT 0"), ("questions", "TEXT DEFAULT '[]'"),
                       ("test_links", "TEXT DEFAULT '[]'"), ("report_url", "TEXT DEFAULT ''"),
-                      ("own_lock", "INTEGER NOT NULL DEFAULT 0")):
+                      ("own_lock", "INTEGER NOT NULL DEFAULT 0"), ("claimed", "INTEGER NOT NULL DEFAULT 0"),
+                      ("label_issues", "TEXT DEFAULT ''"),
+                      ("ci_state", "TEXT DEFAULT ''"), ("ci_detail", "TEXT DEFAULT ''"), ("ci_since", "TEXT DEFAULT ''"),
+                      ("ci_checked_at", "TEXT DEFAULT ''"), ("ci_fixes", "INTEGER NOT NULL DEFAULT 0")):
         try:
             con.execute(f"ALTER TABLE tasks ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
@@ -589,6 +609,8 @@ def run_session(con, t):
     event(con, t["issue"], "session_start", f"Session {session_id} (tentative {t['attempts'] + 1})")
     if GH_SYNC and t["issue"] != TRIAGE:
         set_status_label(con, t["issue"], "RUNNING")
+        if CLAIM_COMMENT:
+            claim_issue(con, t["issue"], session_id)
     session_started = iso()
     env = dict(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
                LQ_YIELD_FILE=str(yield_file))
@@ -652,6 +674,12 @@ def run_session(con, t):
             if finished:
                 proc.wait()
                 break
+            if CI_WATCH:
+                # La CI des PR déjà livrées reste suivie pendant que cette session avance sur un autre ticket.
+                try:
+                    watch_ci(con)
+                except Exception as exc:  # noqa: BLE001 — un suivi de CI raté ne doit jamais tuer la session
+                    event(con, None, "ci_error", f"{type(exc).__name__}: {exc}"[:500])
             reason = ""
             if human_state(con)[0] == "busy":
                 # Le propriétaire parle dans la console : la session de file range son travail
@@ -707,6 +735,28 @@ def run_session(con, t):
     return outcome
 
 
+def claim_issue(con, issue, session_id):
+    """Commentaire de prise en charge, UNE fois par ticket : déjà publié (base) → rien ; trouvé
+    sur GitHub (crash entre publication et enregistrement) → seulement enregistré."""
+    t = task(con, issue)
+    if not t or t["claimed"]:
+        return
+    comments = gh_list(f"repos/{REPO}/issues/{issue}/comments")
+    if comments is None:
+        event(con, issue, "gh_error", "Commentaires illisibles : prise en charge reportée à la session suivante.")
+        return
+    if not any(CLAIM_MARKER in (c.get("body") or "") for c in comments):
+        body = (f"{BOT_MARKER}\n{CLAIM_MARKER}\n**Prise en charge par {INSTANCE}** (session `{session_id[:8]}`).\n\n"
+                "La session publie ici son plan et sa branche, puis le résultat avec la pull request. "
+                "Aucune fusion ni aucun déploiement automatique : la PR attend votre revue.\n\n"
+                f"Pour l'arrêter : retirer `{ELIGIBLE_LABEL or 'le label'}` ou poser `{STATUS_LABELS['BLOCKED']}`.")
+        if not gh_call("-X", "POST", f"repos/{REPO}/issues/{issue}/comments", "-f", f"body={body}"):
+            event(con, issue, "gh_error", "Commentaire de prise en charge non publié.")
+            return
+        event(con, issue, "claim", "Prise en charge publiée sur GitHub.")
+    update_task(con, issue, claimed=1)
+
+
 def set_phase(con, issue, text):
     """Phase de travail courante (affichée par `status` et `pulse`), journalisée comme événement."""
     text = redact(" ".join(str(text).split()))[:200]
@@ -758,8 +808,10 @@ def apply_outcome(con, issue, outcome, detail, reset, report):
         ctl_set(con, "consecutive_failures", 0)
     if outcome == "STOPPED":
         # Arrêt volontaire : ni échec, ni tentative ; le ticket sera repris tel quel après « resume ».
+        why = ("priorité à la console du propriétaire" if detail.startswith("Priorité humaine")
+               else "session arrêtée volontairement (stop --now)")
         update_task(con, issue, status="RUNNING", attempts=max(0, t["attempts"] - 1), not_before="",
-                    next_action="Reprendre : session arrêtée volontairement (stop --now).")
+                    next_action=f"Reprendre : {why}.")
         return
     if report.get("status") in STATUSES:
         fields = {k: report[k] for k in ("branch", "pr", "commit_sha", "summary", "tests", "blockers", "next_action",
@@ -767,8 +819,20 @@ def apply_outcome(con, issue, outcome, detail, reset, report):
                   if k in report and report[k] is not None}
         fields = {k: (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)) for k, v in fields.items()}
         status = report["status"]
+        if status == "WAITING_OWNER" and REQUIRE_PR and not str(report.get("pr") or "").strip():
+            # Livré sans PR : pas une livraison. Reprise bornée par max_attempts, puis blocage.
+            if t["attempts"] >= setting(con, "max_attempts")[0]:
+                status = "BLOCKED"
+                fields["blockers"] = f"Livraison déclarée sans PR après {t['attempts']} sessions."
+            else:
+                status = "RUNNING"
+                fields["next_action"] = "Livraison déclarée sans PR : ouvrir l'unique PR du ticket (ou la retrouver)."
+            event(con, issue, "no_pr", f"Rapport WAITING_OWNER sans PR → {status}.")
         if status in ("DONE", "WAITING_OWNER", "BLOCKED"):
             fields["attempts"] = 0
+        if status == "WAITING_OWNER" and CI_WATCH and str(fields.get("pr") or t["pr"] or "").strip():
+            fields.update(ci_state="pending", ci_detail="", ci_since=iso(), ci_checked_at="")
+            fields.setdefault("next_action", "CI suivie par le superviseur : rien à faire avant son verdict.")
         update_task(con, issue, status=status, **fields)
         for extra in report.get("enqueue", []) or []:
             try:
@@ -839,6 +903,28 @@ def priority_level(labels):
               for m in [re.search(r"(?:^|[\s:/_-])P([0-3])$", name.strip(), re.I) or
                         re.fullmatch(r"P([0-3])", name.strip(), re.I)] if m]
     return min(levels) if levels else DEFAULT_PRIORITY_LEVEL
+
+
+def label_anomalies(labels):
+    """Labels incohérents d'un ticket éligible, en clair (vide si tout va bien). Rien n'est corrigé
+    sur GitHub : la règle appliquée est annoncée (priorité la plus haute, exclusion l'emporte)."""
+    out = []
+    prios = [(name, PRIORITY_RE.match(name).group(1).strip()) for name in labels if PRIORITY_RE.match(name)]
+    valid = sorted({v.upper() for _, v in prios if re.fullmatch(r"(?i)P[0-3]", v)})
+    for name, value in prios:
+        if not re.fullmatch(r"(?i)P[0-3]", value):
+            out.append(f"priorité invalide « {name} » (attendu priority:P0…P3)")
+    if len(valid) > 1:
+        out.append(f"plusieurs priorités ({', '.join(valid)}) : {valid[0]} retenue")
+    if not valid:
+        out.append(f"aucune priorité valide : P{DEFAULT_PRIORITY_LEVEL} appliquée")
+    held = sorted(set(labels) & HOLD_LABELS)
+    if ELIGIBLE_LABEL and ELIGIBLE_LABEL in labels and held:
+        out.append(f"{ELIGIBLE_LABEL} avec {', '.join(held)} : exclu de la file")
+    known = {ELIGIBLE_LABEL, *HOLD_LABELS, *STATUS_LABELS.values()}
+    if ELIGIBLE_LABEL.startswith("agent:"):
+        out += [f"label inconnu « {name} »" for name in labels if name.startswith("agent:") and name not in known]
+    return out
 
 
 def parse_deps(body):
@@ -913,10 +999,19 @@ def sync_github(con):
                          "découvert par synchronisation GitHub", json.dumps(labels), iso(), why, why, iso()))
             con.commit()
             event(con, n, "discovered", f"Ticket découvert ({status}, P{prio // 10}).")
+            issues = "; ".join(label_anomalies(labels))
+            if issues:
+                update_task(con, n, label_issues=issues)
+                event(con, n, "labels", f"Labels incohérents : {issues}.")
             if status == "READY" and "READY" in STATUS_LABELS:
                 set_status_label(con, n, "READY")
             continue
         fields = {"title": it.get("title", "") or t["title"], "gh_labels": json.dumps(labels)}
+        issues = "; ".join(label_anomalies(labels)) if eligible else ""
+        if issues != (t["label_issues"] or ""):
+            fields["label_issues"] = issues
+            if issues:
+                event(con, n, "labels", f"Labels incohérents : {issues}.")
         if t["priority"] != prio:
             fields["priority"] = prio
             event(con, n, "priority", f"Priorité GitHub : P{prio // 10}.")
@@ -958,6 +1053,121 @@ def sync_github(con):
     ctl_set(con, "comments_since", started)
 
 
+def pr_number(pr):
+    m = re.search(r"(\d+)\s*$", str(pr or ""))
+    return int(m.group(1)) if m else None
+
+
+def ci_verdict(sha):
+    """("pending" | "success" | "failure" | "none", détail) pour les vérifications d'un commit."""
+    data = gh_json(f"repos/{REPO}/commits/{sha}/check-runs?per_page=100")
+    if not isinstance(data, dict):
+        return "unknown", "GitHub injoignable"
+    runs = data.get("check_runs") or []
+    if not runs:
+        return "none", "aucune vérification signalée"
+    failed = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") in CI_FAILED]
+    if failed:
+        return "failure", "; ".join(f"{r.get('name')} : {r.get('conclusion')} ({r.get('html_url', '')})" for r in failed)[:900]
+    waiting = [r.get("name") for r in runs if r.get("status") != "completed"]
+    if waiting:
+        return "pending", f"{len(runs) - len(waiting)}/{len(runs)} terminées, en cours : {', '.join(waiting)[:200]}"
+    return "success", f"{len(runs)} vérification(s) réussie(s)"
+
+
+def base_validated(pr):
+    """Une PR empilée n'est prête que si sa base l'est : branche par défaut, ou PR de base verte."""
+    base = (pr.get("base") or {}).get("ref", "")
+    default = ((pr.get("base") or {}).get("repo") or {}).get("default_branch") or "main"
+    if base == default:
+        return True, ""
+    owner = REPO.split("/")[0]
+    bases = gh_json(f"repos/{REPO}/pulls?state=open&head={owner}:{urllib.parse.quote(base)}")
+    if not bases:
+        return False, f"base « {base} » sans PR ouverte validée"
+    verdict, _ = ci_verdict(bases[0]["head"]["sha"])
+    return verdict == "success", "" if verdict == "success" else f"base #{bases[0]['number']} : CI {verdict}"
+
+
+def watch_ci(con):
+    """Suit la CI des PR livrées, à intervalle LQ_CI_POLL par PR (une à deux requêtes GitHub)."""
+    limit = iso(datetime.fromtimestamp(time.time() - CI_POLL_SECONDS, timezone.utc))
+    for t in con.execute("""SELECT * FROM tasks WHERE status='WAITING_OWNER' AND ci_state='pending'
+                            AND (ci_checked_at='' OR ci_checked_at <= ?) ORDER BY priority, issue""", (limit,)).fetchall():
+        n = t["issue"]
+        update_task(con, n, ci_checked_at=iso())
+        num = pr_number(t["pr"])
+        pr = gh_json(f"repos/{REPO}/pulls/{num}") if num else None
+        if not pr:
+            continue  # GitHub injoignable ou PR inconnue : nouvel essai au prochain intervalle
+        if pr.get("merged"):
+            update_task(con, n, ci_state="merged", ci_detail="PR fusionnée par le propriétaire.")
+            event(con, n, "ci", "PR fusionnée : suivi de CI terminé.")
+            continue
+        if pr.get("state") == "closed":
+            update_task(con, n, status="BLOCKED", ci_state="closed", blockers="PR fermée sans fusion.",
+                        next_action="Décision du propriétaire : rouvrir la PR ou retirer le ticket.")
+            set_status_label(con, n, "BLOCKED")
+            continue
+        verdict, detail = ci_verdict(pr["head"]["sha"])
+        waited = time.time() - (ts_of(t["ci_since"]) or time.time())
+        if verdict == "success":
+            ok, why = base_validated(pr)
+            if not ok:
+                update_task(con, n, ci_detail=f"CI verte, mais {why} : pas encore prête.")
+                continue
+            update_task(con, n, ci_state="success", ci_detail=detail, ci_fixes=0,
+                        next_action="Revue et fusion par le propriétaire (CI verte).")
+            event(con, n, "ci", f"CI verte ({detail}) : PR prête pour revue.")
+            set_status_label(con, n, "WAITING_OWNER")
+            after_outcome(con, n, t["last_session"], t["gh_since"] or iso(), {})
+        elif verdict == "failure":
+            fixes = t["ci_fixes"] + 1
+            if fixes <= CI_MAX_FIXES:
+                update_task(con, n, status="RUNNING", attempts=0, not_before="", ci_state="failed", ci_fixes=fixes,
+                            ci_detail=detail,
+                            note=f"CI en échec sur {t['pr']} (commit {pr['head']['sha'][:10]}) : {detail}. "
+                                 f"Correction {fixes}/{CI_MAX_FIXES} : lire `gh run view --log-failed`, corriger sur la "
+                                 "même branche, pousser, puis rendre WAITING_OWNER (même PR).",
+                            next_action=f"Corriger la CI ({fixes}/{CI_MAX_FIXES}).")
+                event(con, n, "ci", f"CI en échec : correction {fixes}/{CI_MAX_FIXES} planifiée — {detail[:200]}")
+            else:
+                update_task(con, n, status="BLOCKED", ci_state="failed", ci_detail=detail,
+                            blockers=f"CI toujours en échec après {CI_MAX_FIXES} corrections : {detail}",
+                            next_action="Diagnostic du propriétaire nécessaire (voir le commentaire du ticket).")
+                set_status_label(con, n, "BLOCKED")
+                body = (f"{BOT_MARKER}\n**CI en échec après {CI_MAX_FIXES} corrections** sur {t['pr']} "
+                        f"(commit `{pr['head']['sha'][:10]}`).\n\n{detail}\n\nTicket mis de côté "
+                        f"(`{STATUS_LABELS['BLOCKED']}`) : répondre ici ou retirer le label pour relancer.")
+                gh_call("-X", "POST", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}")
+                event(con, n, "ci", "CI en échec : corrections épuisées, ticket bloqué.")
+        elif waited > CI_TIMEOUT_SECONDS:
+            update_task(con, n, status="BLOCKED", ci_state="timeout", ci_detail=detail,
+                        blockers=f"CI sans conclusion après {span(waited)} ({detail}).",
+                        next_action="Vérifier les workflows GitHub Actions de la PR.")
+            set_status_label(con, n, "BLOCKED")
+            event(con, n, "ci", f"CI sans conclusion après {span(waited)} : ticket bloqué.")
+        else:
+            update_task(con, n, ci_detail=detail)
+
+
+CI_TEXT = {"pending": "CI en attente", "success": "CI validée", "failed": "CI en échec", "merged": "fusionnée",
+           "closed": "PR fermée", "timeout": "CI sans conclusion"}
+
+
+def run_state(t):
+    """État lisible d'un ticket (#127) : work_in_progress, ci_pending, ci_failed, ready_for_review…"""
+    if t["status"] == "RUNNING":
+        return "ci_failed" if t["ci_state"] == "failed" else "work_in_progress"
+    if t["status"] == "WAITING_OWNER":
+        return {"pending": "ci_pending", "success": "ready_for_review", "merged": "merged"}.get(t["ci_state"], "pr_open")
+    if t["status"] in ("BLOCKED", "FAILED"):
+        return "blocked"
+    if t["status"] == "SUSPENDED":
+        return "needs_human"
+    return t["status"].lower()
+
+
 def scan_replies(con):
     """Un nouveau commentaire du propriétaire (ou d'un collaborateur) sur un ticket bloqué, à tester
     ou en échec relance ce ticket, une seule fois par commentaire. Ignorés : les commentaires de
@@ -991,11 +1201,15 @@ def after_outcome(con, issue, session_id, session_started, report):
     """Statut GitHub et notification selon l'état final de la session."""
     t = task(con, issue)
     status = t["status"]
-    if status in ("BLOCKED", "WAITING_OWNER", "FAILED", "DONE"):
+    if status in ("BLOCKED", "WAITING_OWNER", "FAILED", "DONE") and report:
         update_task(con, issue, gh_since=session_started,
                     questions=json.dumps([str(q) for q in report.get("questions") or []], ensure_ascii=False),
                     test_links=json.dumps([str(x) for x in report.get("test_links") or []], ensure_ascii=False),
                     report_url=str(report.get("report_url") or t["report_url"] or ""))
+    if status == "WAITING_OWNER" and t["ci_state"] == "pending":
+        # PR ouverte, CI en attente : le verrou reste, rien n'est annoncé comme prêt.
+        set_status_label(con, issue, "RUNNING")
+        return
     set_status_label(con, issue, status if status in STATUS_LABELS else "RUNNING")
     if status not in ("WAITING_OWNER", "BLOCKED", "DONE", "FAILED"):
         return
@@ -1213,6 +1427,11 @@ def supervise():
                 except Exception as exc:  # noqa: BLE001 — une synchro ratée ne doit jamais arrêter la file
                     event(con, None, "sync_error", f"{type(exc).__name__}: {exc}"[:500])
                     ctl_set(con, "last_sync_ts", time.time())
+        if CI_WATCH:
+            try:
+                watch_ci(con)
+            except Exception as exc:  # noqa: BLE001 — un suivi de CI raté ne doit jamais arrêter la file
+                event(con, None, "ci_error", f"{type(exc).__name__}: {exc}"[:500])
         if NOTIFY_SMTP_ENV:
             flush_notifications(con)
         blocker = start_blocker(con)
@@ -1638,9 +1857,10 @@ def cmd_pulse(con, _):
         dep = f"  Production {served}" + ("" if pending is None else
                                           (" · develop entièrement déployé" if pending == 0 else f" · develop : {pending} commit(s) non déployé(s)"))
     else:
-        prs = [t for t in con.execute("SELECT issue, pr FROM tasks WHERE status='WAITING_OWNER' ORDER BY issue")]
+        prs = [t for t in con.execute("SELECT issue, pr, ci_state FROM tasks WHERE status='WAITING_OWNER' ORDER BY issue")]
+        mark = {"pending": " CI ⏳", "success": " CI ✓", "failed": " CI ✗"}
         dep = f"  Phase : {ctl_get(con, 'phase') or '—'} · PR en attente de revue : " \
-            + (", ".join(f"#{t['issue']}→{pr_ref(t['pr'])}" for t in prs) or "aucune")
+            + (", ".join(f"#{t['issue']}→{pr_ref(t['pr'])}{mark.get(t['ci_state'], '')}" for t in prs) or "aucune")
     dep += " · bloqués : " + (", ".join(f"#{t['issue']}" for t in o["blocked"]) or "aucun")
     warn = ""
     if h["frozen"]:
@@ -1851,7 +2071,10 @@ def cmd_status_tickets(con, _):
     print(f"En attente de votre validation ({len(testing)}) :")
     for t in testing:
         print(f"  #{t['issue']:<4} {ptitle(t)[:63]:<63} livré {localtime(t['delivered_at'])}, "
-              f"SHA {(t['commit_sha'] or '?')[:10]}, {t['pr'] or 'PR ?'}")
+              f"SHA {(t['commit_sha'] or '?')[:10]}, {t['pr'] or 'PR ?'}"
+              + (f" — {CI_TEXT.get(t['ci_state'], t['ci_state'])}" if t["ci_state"] else ""))
+        if t["ci_state"] in ("pending", "failed") and t["ci_detail"]:
+            print(f"        CI : {t['ci_detail'][:150]}")
         if t["report_url"]:
             print(f"        rapport : {t['report_url']}")
     if not testing:
@@ -1873,6 +2096,12 @@ def cmd_status_tickets(con, _):
     if later:
         print("Ensuite : " + ", ".join(f"#{t['issue']} P{t['priority'] // 10}" for t in later[:12])
               + (f" … (+{len(later) - 12})" if len(later) > 12 else ""))
+    odd = con.execute("""SELECT issue, label_issues FROM tasks WHERE COALESCE(label_issues,'') != ''
+                         AND status NOT IN ('DONE') ORDER BY issue""").fetchall()
+    if odd:
+        print("Labels incohérents (règle appliquée entre parenthèses) :")
+        for r in odd:
+            print(f"  #{r['issue']:<4} {r['label_issues'][:150]}")
     suspended = con.execute("SELECT issue FROM tasks WHERE status='SUSPENDED' ORDER BY issue").fetchall()
     if suspended:
         print("Suspendus (labels GitHub) : " + ", ".join(f"#{r['issue']}" for r in suspended))
@@ -1932,10 +2161,12 @@ def cmd_queue(con, _):
     for t in con.execute("SELECT * FROM tasks ORDER BY CASE status WHEN 'RUNNING' THEN 0 WHEN 'TESTING' THEN 1 "
                          "WHEN 'READY' THEN 2 ELSE 3 END, priority, issue").fetchall():
         extra = f" (après {t['not_before']})" if t["not_before"] and t["not_before"] > iso() else ""
-        print(f"#{t['issue']:<4} {t['status']:<13} p{t['priority']:<3} {t['title'][:60]:<60}{extra}"
+        print(f"#{t['issue']:<4} {run_state(t):<17} p{t['priority']:<3} {t['title'][:60]:<60}{extra}"
               f"{'  deps ' + t['deps'] if t['deps'] else ''}")
         if t["next_action"]:
             print(f"       → {t['next_action'][:150]}")
+        if t["label_issues"]:
+            print(f"       ⚠ labels : {t['label_issues'][:150]}")
 
 
 def cmd_mode(con, args):
@@ -2085,6 +2316,37 @@ def cmd_notify(con, args):
     return 1
 
 
+def cmd_labels(con, args):
+    """Compare les labels du dépôt au référentiel (labels.json). Lecture seule, sauf --apply qui
+    crée les labels manquants et aligne couleur/description (jamais de suppression)."""
+    try:
+        wanted = json.loads(LABELS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"Référentiel illisible ({LABELS_FILE}) : {type(exc).__name__}")
+        return 2
+    current = gh_list(f"repos/{REPO}/labels")
+    if current is None:
+        print("GitHub injoignable.")
+        return 2
+    have = {lbl["name"]: lbl for lbl in current}
+    todo = 0
+    for name, spec in wanted.items():
+        lbl = have.get(name)
+        if lbl and (lbl.get("color", "").lower(), lbl.get("description") or "") == (spec["color"].lower(), spec["description"]):
+            print(f"  ✓ {name}")
+            continue
+        action, ok = ("à mettre à jour" if lbl else "manquant"), False
+        if args.apply:
+            path = f"repos/{REPO}/labels" + (f"/{urllib.parse.quote(name)}" if lbl else "")
+            ok = gh_call("-X", "PATCH" if lbl else "POST", path, *([] if lbl else ["-f", f"name={name}"]),
+                         "-f", f"color={spec['color']}", "-f", f"description={spec['description']}")
+            action = ("mis à jour" if lbl else "créé") if ok else f"ÉCHEC ({action})"
+            event(con, None, "labels", f"{name} : {action}")
+        todo += not ok
+        print(f"  {'✓' if ok else '✗'} {name} — {action}")
+    print("Référentiel complet." if not todo else
+          f"{todo} label(s) à corriger" + ("" if args.apply else f" : {CLI_NAME} labels --apply"))
+    return 1 if todo else 0
 CONSOLE_DIR = Path(os.environ.get("LQ_CONSOLE_DIR", "/srv/moneyprinterturbo"))
 CONSOLE_SETTINGS = CONSOLE_DIR / ".claude" / "settings.local.json"
 CONSOLE_CLAUDE = os.environ.get("LQ_CONSOLE_CLAUDE", "claude --dangerously-skip-permissions")
@@ -2139,7 +2401,8 @@ def cmd_statusline(con, _):
         cur = con.execute("SELECT issue FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
         mode = ctl_get(con, "mode", "RUNNING")
         human = human_state(con)[0]
-        waiting = con.execute("SELECT COUNT(*) c FROM tasks WHERE status='WAITING_OWNER'").fetchone()["c"]
+        waiting = con.execute("SELECT COUNT(*) c FROM tasks WHERE status='WAITING_OWNER' AND ci_state!='pending'").fetchone()["c"]
+        ci = con.execute("SELECT COUNT(*) c FROM tasks WHERE status='WAITING_OWNER' AND ci_state='pending'").fetchone()["c"]
         ready = con.execute("SELECT COUNT(*) c FROM tasks WHERE status IN ('READY','RUNNING')").fetchone()["c"]
         if cur:
             what = f"#{cur['issue']} {ctl_get(con, 'phase')[:40]}"
@@ -2149,7 +2412,7 @@ def cmd_statusline(con, _):
             what = "file en attente (console)"
         else:
             what = "file au repos"
-        print(f"lodyorch · {what} · {ready} à faire · {waiting} PR en revue")
+        print(f"lodyorch · {what} · {ready} à faire · " + (f"{ci} CI en cours · " if ci else "") + f"{waiting} PR en revue")
     except sqlite3.Error:
         print("lodyorch · état indisponible")
     return 0
@@ -2226,6 +2489,8 @@ def main():
     s.add_argument("value", nargs="?")
     sub.add_parser("sync")
     sub.add_parser("check")
+    s = sub.add_parser("labels")
+    s.add_argument("--apply", action="store_true")
     sub.add_parser("console")
     sub.add_parser("statusline")
     s = sub.add_parser("human")
@@ -2254,7 +2519,8 @@ def main():
     code = {"status": cmd_status_tickets if GH_SYNC else cmd_status, "pulse": cmd_pulse, "queue": cmd_queue, "pause": cmd_mode, "resume": cmd_mode, "stop": cmd_mode,
             "skip": cmd_skip, "add": cmd_add, "set": cmd_set, "log": cmd_log, "sessions": cmd_sessions,
             "config": cmd_config, "reload": cmd_reload, "sync": cmd_sync,
-            "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
+            "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "labels": cmd_labels,
+            "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
             "check": cmd_check}[args.cmd](con, args)
     sys.exit(code or 0)
 

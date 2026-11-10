@@ -22,7 +22,8 @@ def test_session_is_launched_with_guard_settings_and_without_mcp(orch):
     assert "--strict-mcp-config" in argv
     t = orch.mod.task(orch.con, 1)
     assert (t["status"], t["pr"]) == ("WAITING_OWNER", "https://github.com/ReC82/lody-video-factory/pull/91")
-    assert "status:needs-test" in orch.labels(1) and "agent:in-progress" not in orch.labels(1)
+    # PR livrée mais CI non encore constatée : le verrou reste, rien n'est annoncé comme prêt (#117).
+    assert "agent:in-progress" in orch.labels(1) and "status:needs-test" not in orch.labels(1)
 
 
 def test_one_session_at_a_time_second_supervisor_exits(orch):

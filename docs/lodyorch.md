@@ -72,6 +72,66 @@ Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgque
 Le propriétaire reprend un ticket bloqué en **répondant dans le ticket** ou en **retirant
 `agent:blocked`**.
 
+## Protocole de traitement (ticket #117)
+
+Référentiel des labels : `deploy/lodyorch/labels.json` (nom, couleur, description).
+`lodyorch labels` compare le dépôt au référentiel (lecture seule) ; `lodyorch labels --apply` crée
+les labels manquants et aligne couleur et description (jamais de suppression).
+
+| Label | Posé par | Effet |
+|---|---|---|
+| `agent:auto` | propriétaire | éligible à la file automatique |
+| `agent:human` | propriétaire | action humaine : hors file |
+| `agent:blocked` | superviseur ou propriétaire | suspendu ; le retirer remet en file |
+| `agent:in-progress` | superviseur | verrou visible ; posé par un tiers, il exclut le ticket |
+| `priority:P0` … `P3` | propriétaire | ordre strict ; P2 si absent ou invalide |
+| `status:needs-test` | superviseur | PR livrée : revue et validation fonctionnelle attendues |
+
+Règles :
+
+1. **Une seule issue active.** Le superviseur ne lance qu'une session (verrou `flock`) ; une issue
+   interrompue est reprise avant toute autre.
+2. **Un seul label de priorité.** Si plusieurs : la plus haute est retenue. Label `priority:*`
+   invalide : P2. `agent:auto` avec `agent:human` : exclu. Label `agent:*` inconnu : signalé. Ces
+   anomalies sont affichées par `lodyorch status` et `lodyorch queue`, et journalisées une fois.
+   Rien n'est corrigé sur GitHub à la place du propriétaire.
+3. **Les PR ne sont pas des tickets** : elles n'entrent jamais dans la file.
+4. **`Depends on #N`** : le ticket attend que `#N` soit fermé (PR fusionnée).
+5. **Prise en charge** : le superviseur publie UN commentaire de prise en charge par ticket
+   (marqueur `<!-- lodyorch:prise-en-charge -->`, vérifié sur GitHub avant publication, donc pas de
+   doublon après un crash). La session publie ensuite le plan et la branche, puis le résultat et la
+   PR. Tout commentaire de l'orchestrateur porte `<!-- lodyorch -->`.
+6. **Ne jamais écraser** une demande ou une tâche déjà démarrée : ticket interrompu repris en
+   premier ; branche ou PR d'un tiers jamais réutilisée (la session rend `BLOCKED` avec la question) ;
+   `agent:in-progress` d'un tiers respecté ; `skip`/`add` du propriétaire non remis en cause par la
+   synchronisation.
+7. **CI suivie par le superviseur, jamais attendue par Claude** (voir ci-dessous) : au plus 2
+   corrections sur la même branche, puis `agent:blocked` avec le diagnostic.
+8. **Idempotence** : une PR par ticket (recherchée avant création) ; une livraison déclarée sans PR
+   n'est pas une livraison (reprise, puis blocage après 3 sessions) ; reprise sur la branche
+   existante, jamais de rebase d'une branche poussée.
+
+## Suivi de la CI sans Claude
+
+Une session pousse sa branche, ouvre la PR et rend la main tout de suite (`WAITING_OWNER`). Le
+superviseur suit ensuite la CI **sans session Claude** : une ou deux requêtes GitHub par PR toutes
+les 5 min (`LQ_CI_POLL`). Pendant ce temps, la file traite un autre ticket **indépendant** (jamais
+un ticket qui dépend de cette PR : une dépendance n'est levée qu'à la fusion), et les nouvelles
+branches partent toujours de `main`.
+
+| État (`lodyorch queue`) | Signification | Label |
+|---|---|---|
+| `work_in_progress` | session de code en cours ou à reprendre | `agent:in-progress` |
+| `ci_pending` | PR ouverte, CI en cours (ou base d'une PR empilée pas encore verte) | `agent:in-progress` |
+| `ci_failed` | CI rouge : correction relancée (1/2, 2/2), avant tout nouveau ticket | `agent:in-progress` |
+| `ready_for_review` | CI verte constatée par le superviseur (et base validée) | `status:needs-test` |
+| `blocked` | CI rouge après 2 corrections, PR fermée, CI sans conclusion après 3 h, question | `agent:blocked` |
+| `needs_human` | `agent:human`, retrait d'`agent:auto`, verrou d'un tiers | — |
+
+Une PR n'est jamais annoncée prête tant que sa CI n'a pas été constatée verte ; une PR empilée ne
+l'est pas tant que la PR de sa base n'est pas verte elle aussi. Fusion ou fermeture de la PR : fin
+du suivi. Les sessions font lint et tests ciblés avant de pousser ; la suite complète tourne en CI.
+
 ## Garde-fous
 
 - **Compte de service `ubuntu`, jamais root.** L'authentification Claude Code existante est
@@ -102,6 +162,7 @@ cd /srv/moneyprinterturbo && git fetch origin && git checkout <branche ou main a
 sudo deploy/lodyorch/install.sh --dry-run   # affiche les actions
 sudo deploy/lodyorch/install.sh             # installe ; ne démarre RIEN
 lodyorch check                              # tout doit être ✓
+lodyorch labels                             # puis lodyorch labels --apply pour créer les labels manquants
 ```
 
 L'installation ajoute les crochets à la console sans rien retirer ni remplacer. Ils sont pris en
@@ -119,6 +180,7 @@ lodyorch status                 service, console, priorité humaine, session, ti
 lodyorch console                rattacher la console tmux lodyorch (créée seulement si absente)
 lodyorch pulse                  point d'activité en 3 lignes (fenêtre « activite »)
 lodyorch check                  contrôles d'installation (lecture seule)
+lodyorch labels [--apply]       labels du dépôt comparés au protocole (#117)
 lodyorch queue | log [N] | sessions
 lodyorch pause | resume         ne plus démarrer de session / reprendre (resume réarme le disjoncteur)
 lodyorch stop [--now]           arrêter après la session en cours, ou tout de suite
@@ -138,7 +200,8 @@ entrées `lodyorch` de `/srv/moneyprinterturbo/.claude/settings.local.json`. L'�
 
 ## Tests
 
-`test/lodyorch/` (lancés par la CI avec le reste de `test/`) : priorités, éligibilité, blocages,
+`test/lodyorch/` (lancés par la CI avec le reste de `test/`) : protocole de labels (référentiel,
+labels invalides, prise en charge unique, livraison sans PR), priorités, éligibilité, blocages,
 dépendances, verrou visible, PR exclues, verrou d'exclusion, reprise après crash sans doublon,
 temporisation et abandon, disjoncteur, refus sans authentification ni garde, masquage des
 journaux, `status`/`pulse`/`phase`/`check`, crochet de garde, unité systemd, console unique

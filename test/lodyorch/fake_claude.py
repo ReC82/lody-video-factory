@@ -34,7 +34,8 @@ def main(argv):
     time.sleep(float(os.environ.get("FAKE_CLAUDE_SLEEP", "0")))
     status = {"deliver": "WAITING_OWNER", "secret": "WAITING_OWNER", "blocked": "BLOCKED"}[mode]
     report = {"status": status, "summary": f"fictif #{issue}", "branch": f"agent/{issue}-fictif",
-              "pr": f"https://github.com/ReC82/lody-video-factory/pull/9{issue}", "commit_sha": "abc1234",
+              "pr": "" if os.environ.get("FAKE_CLAUDE_NO_PR") else f"https://github.com/ReC82/lody-video-factory/pull/9{issue}",
+              "commit_sha": "abc1234",
               "tests": "pytest ok", "questions": ["Q1 ?"] if status == "BLOCKED" else [],
               "blockers": "décision nécessaire" if status == "BLOCKED" else ""}
     with open(os.environ["LQ_STATUS_FILE"], "w", encoding="utf-8") as fh:
