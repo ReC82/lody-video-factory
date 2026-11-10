@@ -59,6 +59,51 @@ def main(argv):
         save(data)
         print(json.dumps([{"name": n} for n in it["labels"]]))
         return 0
+    data["requests"] = data.get("requests", 0) + 1
+    save(data)
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)", base)
+    if m:
+        pr = data.get("pulls", {}).get(m.group(1))
+        if not pr:
+            return 1
+        print(json.dumps(pr))
+        return 0
+    if base.endswith("/pulls"):
+        head = query.get("head", [""])[0].split(":", 1)[-1]
+        print(json.dumps([p for p in data.get("pulls", {}).values() if p["head"].get("ref") == head
+                          and p.get("state") == "open"]))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/commits/([^/]+)/check-runs", base)
+    if m:
+        print(json.dumps({"check_runs": data.get("checks", {}).get(m.group(1), [])}))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/issues/(\d+)/comments", base)
+    if m:
+        if data.get("comments_offline"):
+            return 1
+        mine = [c for c in data.get("comments", []) if c.get("issue") == int(m.group(1))]
+        if method == "POST":
+            body = dict(f.split("=", 1) for f in fields[1::2])["body"]
+            data.setdefault("comments", []).append({"issue": int(m.group(1)), "body": body, "id": len(data["comments"]) + 1,
+                                                    "issue_url": f"x/issues/{m.group(1)}", "author_association": "OWNER",
+                                                    "created_at": "2026-11-10T00:00:00Z"})
+            save(data)
+            return 0
+        page = int(query.get("page", ["1"])[0])
+        print(json.dumps(mine if page == 1 else []))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/labels(?:/(.+))?", base)
+    if m:
+        repo_labels = data.setdefault("repo_labels", {})
+        values = dict(f.split("=", 1) for f in fields[1::2])
+        if method in ("POST", "PATCH"):
+            name = values.get("name") or urllib.parse.unquote(m.group(1))
+            repo_labels[name] = {"name": name, "color": values["color"], "description": values["description"]}
+            save(data)
+            return 0
+        page = int(query.get("page", ["1"])[0])
+        print(json.dumps(list(repo_labels.values()) if page == 1 else []))
+        return 0
     m = re.fullmatch(r"repos/[^/]+/[^/]+/issues/(\d+)", base)
     if m:
         it = data["issues"].get(m.group(1))

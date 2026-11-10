@@ -1,0 +1,11 @@
+{
+  "agent:auto": {"color": "0e8a16", "description": "Éligible au traitement automatique par lodyorch"},
+  "agent:human": {"color": "5319e7", "description": "Action humaine nécessaire : hors file automatique"},
+  "agent:blocked": {"color": "b60205", "description": "Suspendu : exclu de la file (retirer pour reprendre)"},
+  "agent:in-progress": {"color": "fbca04", "description": "Verrou : ticket en cours de traitement"},
+  "priority:P0": {"color": "d93f0b", "description": "Priorité 0 (la plus haute)"},
+  "priority:P1": {"color": "e99695", "description": "Priorité 1"},
+  "priority:P2": {"color": "f9d0c4", "description": "Priorité 2 (défaut)"},
+  "priority:P3": {"color": "fef2c0", "description": "Priorité 3 (la plus basse)"},
+  "status:needs-test": {"color": "1d76db", "description": "Code livré (PR) : revue et validation fonctionnelle attendues"}
+}

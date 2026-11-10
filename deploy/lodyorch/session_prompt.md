@@ -52,8 +52,9 @@ File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis pa
    - Une branche ou une PR ouverte par quelqu'un d'autre traite déjà ce ticket : ne l'écrase pas,
      n'y pousse rien ; rends `BLOCKED` avec la question.
    - Tout est déjà livré (PR fusionnée) : commentaire avec preuves, statut `DONE`.
-4. **Prise en charge** (une seule fois par ticket, vérifie les commentaires existants) : commentaire
-   court avec le plan (3 à 6 points) et le nom de la branche.
+4. **Plan** : le superviseur a déjà publié la prise en charge. Publie UNE fois (vérifie les
+   commentaires existants portant `<!-- lodyorch -->`) le plan (3 à 6 points) et le nom de la
+   branche. Une reprise après crash ne republie pas le plan : elle le complète si besoin.
 5. **Dépendances** : si le ticket a besoin d'un autre ticket ouvert non fusionné, rends `READY`
    avec `"deps": "<n>"` sans rien coder.
 6. **Décisions** : prends les décisions techniques courantes et documente-les. Ne bloque que pour
@@ -69,8 +70,10 @@ File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis pa
    `uv sync --frozen` (environnement partagé `UV_PROJECT_ENVIRONMENT`, déjà fixé), puis
    `uv run --no-sync python -m compileall -q app cli.py main.py webui test`,
    `uv run --no-sync ruff check app cli.py main.py webui test` et
-   `uv run --no-sync python -X utf8 -m pytest -q test` (complet avant la PR ; ciblé pendant le
-   travail). Ajoute des tests pour ce que tu changes. Les tests ne lisent jamais un vrai
+   `uv run --no-sync python -X utf8 -m pytest -q <tests concernés>`. Avant de pousser : lint et
+   tests ciblés toujours ; suite complète seulement si le changement touche du code applicatif
+   partagé (`app/`, `webui/lody/` hors module isolé), une migration ou un contrat — la CI lance de
+   toute façon la suite complète. Ajoute des tests pour ce que tu changes. Les tests ne lisent jamais un vrai
    `config.toml` (utilise `LODY_CONFIG_PATH` vers un fichier temporaire) et n'appellent jamais
    un fournisseur payant (OpenAI, ElevenLabs…) : faux clients de `test/lody/fakes.py`.
 9. **Données** : migrations SQLite rétrocompatibles et idempotentes (ajout de colonnes/tables).
@@ -107,16 +110,19 @@ commande arbitraire.
    Corps écrit dans un fichier puis `--body-file` : résumé, `Closes #{{ISSUE}}`, changements,
    tests lancés et résultats, risques, procédure de vérification pour le propriétaire, et la ligne
    `<!-- lodyorch -->`. Aucun secret, aucune donnée personnelle.
-3. **CI** : `gh pr checks <n> --watch --interval 60` (au plus 30 min). Échec : au plus **2**
-   tentatives de correction poussées sur la même branche ; ensuite statut `BLOCKED` avec le
-   diagnostic (job, erreur, hypothèse) dans le commentaire et dans `blockers`.
-4. Commentaire GitHub sur le ticket : résultat, lien de la PR, tests, limites, « Statut : PR en
-   attente de revue — non fusionnée, non déployée ».
+3. **CI : ne l'attends pas.** Pas de `gh pr checks --watch`, pas de boucle d'attente : après le push
+   et la PR, rends `WAITING_OWNER`. Le superviseur suit la CI sans Claude ; si elle échoue, il te
+   relance sur ce ticket avec le diagnostic dans `note` (au plus 2 corrections, ensuite il bloque
+   le ticket lui-même). En relance CI : `gh run view <id> --log-failed`, correction ciblée sur la
+   même branche, push, `WAITING_OWNER` avec la même PR.
+4. Commentaire GitHub sur le ticket : résultat, lien de la PR, tests locaux, limites, « Statut : PR
+   ouverte — CI en cours, suivie par le superviseur ; non fusionnée, non déployée ». N'écris jamais
+   que la CI est verte si tu ne l'as pas constaté.
 5. Rapport Markdown dans `{{STATE_DIR}}/reports/ticket-{{ISSUE}}.md` (mêmes rubriques que la PR,
    plus les décisions prises seul et ce qui reste à faire ; section datée ajoutée si le fichier
    existe). Il n'est pas commité.
-6. Supprime le worktree du ticket (`git -C {{LAUNCH_DIR}} worktree remove …`) une fois la PR verte
-   et le rapport écrit ; conserve la branche.
+6. Conserve le worktree du ticket (une relance CI le réutilise) ; le superviseur ne le supprime pas
+   non plus. Conserve la branche.
 
 ## Blocage (information indispensable manquante)
 
@@ -154,9 +160,10 @@ fichier, puis `gh issue comment {{ISSUE}} --repo ReC82/lody-video-factory --body
 }
 ```
 
-- `WAITING_OWNER` : PR ouverte, CI verte, en attente de revue et de fusion (cas normal).
-- `BLOCKED` : information ou décision indispensable manquante, ou CI toujours rouge après 2
-  corrections (`questions`/`blockers` renseignés, ticket commenté).
+- `WAITING_OWNER` : PR ouverte et poussée (cas normal) ; le superviseur suit la CI. `pr` est
+  OBLIGATOIRE : sans PR, le superviseur ne compte pas le ticket comme livré.
+- `BLOCKED` : information ou décision indispensable manquante (`questions`/`blockers` renseignés,
+  ticket commenté).
 - `READY` + `deps` : dépend d'un autre ticket à traiter et fusionner d'abord.
 - `DONE` : uniquement si rien n'est à relire (déjà livré, constat sans changement).
 - `RUNNING` : travail en cours à reprendre.

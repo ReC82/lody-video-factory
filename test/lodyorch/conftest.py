@@ -49,6 +49,7 @@ class Harness:
             LQ_WORKDIR=str(tmp_path / "worktrees"),
             LQ_PROMPT=str(ORCH_DIR / "session_prompt.md"),
             LQ_CLAUDE_SETTINGS=str(ORCH_DIR / "claude-settings.json"),
+            LQ_LABELS_FILE=str(ORCH_DIR / "labels.json"),
             LQ_CLAUDE=str(shim(bindir / "claude", HERE / "fake_claude.py")),
             LQ_GH=str(shim(bindir / "gh", HERE / "fake_gh.py")),
             LQ_SHARED_USAGE_DBS="",
