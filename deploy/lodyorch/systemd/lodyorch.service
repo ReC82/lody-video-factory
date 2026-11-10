@@ -1,5 +1,5 @@
 [Unit]
-Description=Lody Video Factory — superviseur des sessions Claude (LODYORCH, instance LQORCH/DIGORCH dédiée)
+Description=Lody Video Factory — superviseur des sessions Claude (LODYORCH, sans fenêtre ; console = tmux lodyorch)
 After=network-online.target
 Wants=network-online.target
 # Pas de boucle de relance : au plus 5 redémarrages par heure, puis systemd abandonne.

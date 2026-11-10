@@ -11,7 +11,6 @@ from pathlib import Path
 from test.lodyorch.conftest import ORCH_DIR, instance_env
 
 SERVICE = (ORCH_DIR / "systemd" / "lodyorch.service").read_text(encoding="utf-8")
-CONSOLE = (ORCH_DIR / "systemd" / "lodyorch-console.service").read_text(encoding="utf-8")
 
 
 def directives(unit):
@@ -30,11 +29,13 @@ def test_supervisor_service_runs_unprivileged_and_isolated():
     assert d["ReadWritePaths"].split()[0] == "/home/ubuntu/.local/state/lodyorch"
 
 
-def test_console_service_delegates_to_the_conflict_safe_script():
-    d = dict(directives(CONSOLE))
-    assert d["ExecStart"] == "/opt/lodyorch/console.sh start"
-    assert d["ExecStop"] == "/opt/lodyorch/console.sh stop"
-    assert "kill-session" not in CONSOLE
+def test_no_second_tmux_console_is_installed():
+    # La console est la session interactive du propriétaire : aucun service ne crée de fenêtre.
+    assert not (ORCH_DIR / "systemd" / "lodyorch-console.service").exists()
+    assert not (ORCH_DIR / "console.sh").exists()
+    assert "tmux" not in SERVICE.split("[Service]")[1].split("ExecStart")[1].splitlines()[0]
+    install = (ORCH_DIR / "install.sh").read_text(encoding="utf-8")
+    assert "new-session" not in install and "rename-session" not in install
 
 
 def test_names_never_collide_with_other_supervisors():
@@ -74,45 +75,6 @@ def test_claude_settings_hook_points_to_the_installed_guard():
     assert "Bash(sudo:*)" in cfg["permissions"]["deny"]
 
 
-def fake_tmux(tmp_path, exists, windows):
-    log = tmp_path / "tmux.log"
-    script = tmp_path / "bin" / "tmux"
-    script.parent.mkdir(exist_ok=True)
-    script.write_text(
-        "#!/bin/sh\n"
-        f'echo "$@" >> "{log}"\n'
-        'case "$1" in\n'
-        f'  has-session) exit {0 if exists else 1} ;;\n'
-        f'  list-windows) printf "{windows}" ; exit {0 if exists else 1} ;;\n'
-        "esac\nexit 0\n", encoding="utf-8")
-    script.chmod(0o755)
-    env = dict(os.environ, PATH=f"{script.parent}:{os.environ['PATH']}")
-    return env, log
-
-
-def test_console_refuses_a_foreign_lodyorch_session_and_never_kills_it(tmp_path):
-    env, log = fake_tmux(tmp_path, exists=True, windows="claude\\n")
-    start = subprocess.run(["sh", str(ORCH_DIR / "console.sh"), "start"], env=env, capture_output=True, text=True)
-    assert start.returncode == 1 and "tmux rename-session" in start.stderr
-    stop = subprocess.run(["sh", str(ORCH_DIR / "console.sh"), "stop"], env=env, capture_output=True, text=True)
-    assert stop.returncode == 0
-    calls = log.read_text(encoding="utf-8")
-    assert "new-session" not in calls and "kill-session" not in calls
-
-
-def test_console_creates_its_windows_when_free_and_stops_only_itself(tmp_path):
-    env, log = fake_tmux(tmp_path, exists=False, windows="")
-    assert subprocess.run(["sh", str(ORCH_DIR / "console.sh"), "start"], env=env).returncode == 0
-    calls = log.read_text(encoding="utf-8")
-    assert "new-session -d -x 200 -y 50 -s lodyorch -n status" in calls
-    for window in ("journal", "events", "activite"):
-        assert f"-n {window}" in calls
-    (tmp_path / "console").mkdir()
-    env2, log2 = fake_tmux(tmp_path / "console", exists=True, windows="status\\njournal\\n")
-    subprocess.run(["sh", str(ORCH_DIR / "console.sh"), "stop"], env=env2, check=True)
-    assert "kill-session -t =lodyorch" in log2.read_text(encoding="utf-8")
-
-
 def test_install_dry_run_changes_nothing_and_starts_nothing(tmp_path):
     env = dict(os.environ, LODYORCH_USER=getpass.getuser())
     out = subprocess.run(["sh", str(ORCH_DIR / "install.sh"), "--dry-run"], env=env, capture_output=True, text=True,
@@ -122,5 +84,6 @@ def test_install_dry_run_changes_nothing_and_starts_nothing(tmp_path):
     assert any("/opt/lodyorch/guard.py" in a for a in actions)
     assert any("/usr/local/bin/lodyorch" in a for a in actions)
     assert not any(re.search(r"systemctl (enable|start|restart)|tmux", a) for a in actions)
+    assert "lodyorch-console" not in out.stdout
     assert "rien n'a été démarré" in out.stdout
     assert Path(ORCH_DIR / "install.sh").stat().st_mode & 0o111

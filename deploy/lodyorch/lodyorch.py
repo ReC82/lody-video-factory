@@ -34,6 +34,9 @@ Commandes :
   lodyorch set N champ valeur                               corriger un champ d'un ticket
   lodyorch sync              synchroniser maintenant les tickets GitHub (si LQ_GH_SYNC=1)
   lodyorch phase TEXTE       phase de travail de la session en cours (appelé par la session)
+  lodyorch console           ouvrir LA console (session tmux interactive, créée seulement si absente)
+  lodyorch human busy|idle   appelé par les crochets de la console : priorité au propriétaire
+  lodyorch statusline        ligne d'état affichée dans la console Claude
   lodyorch notifications [--retry]   emails envoyés / en attente (si LQ_NOTIFY_SMTP_ENV)
   lodyorch log [N]           derniers événements
   lodyorch sessions          dernières sessions
@@ -149,6 +152,15 @@ SETTINGS = {
     "session_max_seconds": ("LQ_SESSION_MAX", 4 * 3600, 600, 12 * 3600, "Durée maximale d'une session."),
     "session_idle_seconds": ("LQ_SESSION_IDLE", 75 * 60, 300, 4 * 3600,
                              "Session coupée après ce délai sans aucune sortie."),
+    "human_quiet_seconds": ("LQ_HUMAN_QUIET", 15 * 60, 0, 24 * 3600,
+                            "Console : aucune session de file avant ce délai après la dernière réponse de Claude "
+                            "au propriétaire (une conversation n'est pas interrompue par la file)."),
+    "human_busy_max_seconds": ("LQ_HUMAN_BUSY_MAX", 2 * 3600, 600, 24 * 3600,
+                               "Console : une demande sans fin signalée (Échap, crash) cesse de bloquer la file "
+                               "après ce délai."),
+    "yield_grace_seconds": ("LQ_YIELD_GRACE", 5 * 60, 30, 3600,
+                            "Demande du propriétaire pendant une session de file : délai laissé à la session pour "
+                            "commiter et rendre son rapport avant d'être arrêtée (ticket repris ensuite)."),
 }
 
 STATUSES = ("READY", "RUNNING", "TESTING", "BLOCKED", "WAITING_OWNER", "DONE", "FAILED")
@@ -462,11 +474,30 @@ def next_utc_day(con=None):
     return datetime.combine(now().astimezone(tz).date() + timedelta(days=1), dtime(0), tzinfo=tz).astimezone(timezone.utc)
 
 
+def human_state(con):
+    """État de la console interactive `lodyorch` (crochets UserPromptSubmit / Stop de la session du
+    propriétaire) : ("busy" | "quiet" | "idle", horodatage, fin de la priorité humaine en epoch)."""
+    state, at = ctl_get(con, "human_state"), ts_of(ctl_get(con, "human_at"))
+    if not state or not at:
+        return "idle", "", 0
+    if state == "busy":
+        end = at + setting(con, "human_busy_max_seconds")[0]
+        return ("busy", ctl_get(con, "human_at"), end) if end > time.time() else ("idle", ctl_get(con, "human_at"), 0)
+    end = at + setting(con, "human_quiet_seconds")[0]
+    return ("quiet", ctl_get(con, "human_at"), end) if end > time.time() else ("idle", ctl_get(con, "human_at"), 0)
+
+
 def start_blocker(con):
     """Pourquoi aucune session ne peut démarrer maintenant : (raison, reprise_iso) ou None.
     Les limites du fournisseur passent avant la politique locale et ne sont jamais contournées."""
     if ctl_get(con, "mode", "RUNNING") == "PAUSED":
         return ctl_get(con, "pause_reason") or "Pause demandée (lodyorch resume pour reprendre).", ""
+    human, _, until = human_state(con)
+    if human == "busy":
+        return "Priorité humaine : le propriétaire travaille dans la console lodyorch.", ""
+    if human == "quiet":
+        return ("Priorité humaine : conversation récente dans la console, la file reprend après un délai de calme.",
+                iso(datetime.fromtimestamp(until, timezone.utc)))
     until = ctl_get(con, "quota_until")
     if until and until > iso():
         return "Limite fournisseur signalée par Claude Code.", until
@@ -528,7 +559,7 @@ def classify(exit_code, result, rate_events, killed):
                 reset = iso(datetime.fromtimestamp(int(ts) + QUOTA_MARGIN_SECONDS, timezone.utc))
             return "RATE_LIMIT", f"Limite fournisseur ({info.get('rateLimitType')}) jusqu'à {reset or '?'}", reset
     if killed:
-        return ("STOPPED" if killed.startswith("Arrêt immédiat") else "TIMEOUT"), killed, ""
+        return ("STOPPED" if killed.startswith(("Arrêt immédiat", "Priorité humaine")) else "TIMEOUT"), killed, ""
     if result is None:
         return "CRASH", f"Processus terminé sans résultat (code {exit_code}).", ""
     text = str(result.get("result") or "")
@@ -547,6 +578,9 @@ def run_session(con, t):
     session_id = str(uuid.uuid4())
     log_path = LOG_DIR / f"{iso().replace(':', '')}-{t['issue']}-{session_id[:8]}.jsonl"
     status_file = LOG_DIR / f"{session_id}.status.json"
+    # Présent = le propriétaire a repris la main : lu par le crochet de garde de la session.
+    yield_file = LOG_DIR / f"{session_id}.yield"
+    yield_at = 0.0
     prompt = build_prompt(con, t, session_id, status_file)
     con.execute("INSERT INTO sessions(id,issue,started_at,log_path) VALUES(?,?,?,?)",
                 (session_id, t["issue"], iso(), str(log_path)))
@@ -556,7 +590,8 @@ def run_session(con, t):
     if GH_SYNC and t["issue"] != TRIAGE:
         set_status_label(con, t["issue"], "RUNNING")
     session_started = iso()
-    env = dict(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]))
+    env = dict(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
+               LQ_YIELD_FILE=str(yield_file))
     cmd = [CLAUDE, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--dangerously-skip-permissions", "--session-id", session_id]
     if CLAUDE_SETTINGS:
@@ -618,7 +653,18 @@ def run_session(con, t):
                 proc.wait()
                 break
             reason = ""
-            if ctl_get(con, "mode") == "STOP_NOW":
+            if human_state(con)[0] == "busy":
+                # Le propriétaire parle dans la console : la session de file range son travail
+                # (le crochet de garde ne lui permet plus que commit, push et rapport), puis s'arrête.
+                if not yield_file.exists():
+                    yield_file.write_text(iso(), encoding="utf-8")
+                    yield_at = time.time()
+                    set_phase(con, t["issue"], "pause demandée : priorité à la console")
+                elif time.time() - yield_at > setting(con, "yield_grace_seconds")[0]:
+                    reason = "Priorité humaine : session de file arrêtée après le délai de rangement."
+            if reason:
+                pass  # priorité humaine : délai de rangement écoulé
+            elif ctl_get(con, "mode") == "STOP_NOW":
                 reason = "Arrêt immédiat demandé (stop --now)."
             elif time.time() - started > max_seconds:
                 reason = f"Durée maximale dépassée ({max_seconds // 60} min)."
@@ -638,6 +684,9 @@ def run_session(con, t):
                 break
     reader.join(timeout=10)
     proc.stdout.close()
+    if yield_file.exists():
+        yield_file.unlink()
+        event(con, t["issue"], "yield", "Session de file rendue à la console (priorité humaine).")
     outcome, detail, reset = classify(proc.returncode, result, rate_events, killed)
     report = {}
     if status_file.exists():
@@ -1491,8 +1540,13 @@ def observe(con):
     elif mode == "PAUSED" and breaker >= breaker_max:
         state, why, cat = "EN ERREUR", (f"disjoncteur déclenché ({breaker} sessions consécutives sans rapport) — "
                                         f"{CLI_NAME} resume après analyse."), "erreur"
+    elif cur and human_state(con)[0] == "busy":
+        state, why, cat = "PAUSE EN COURS", (f"le propriétaire parle dans la console : la session sur #{cur['issue']} "
+                                             "range son travail puis s'arrête (ticket repris ensuite)."), ""
     elif cur:
         state, why, cat = "ACTIF", f"session Claude en cours sur #{cur['issue']}.", ""
+    elif blocker and blocker[0].startswith("Priorité humaine"):
+        state, why, cat = "CONSOLE", blocker[0], "priorité humaine"
     elif blocker and blocker[0].startswith(LIMIT_KINDS):
         state, why, cat = "LIMITÉ", blocker[0], "attente de quota"
     elif mode != "RUNNING":
@@ -1658,15 +1712,12 @@ def cmd_status_tickets(con, _):
               + (f"rechargement demandé {localtime(req)}, appliqué à la fin de la session en cours, sans la couper."
                  if req else f"« {CLI_NAME} reload » l'appliquera entre deux sessions."))
     if TMUX_SESSION:
-        rc, _ = ro_run(["tmux", "has-session", "-t", TMUX_SESSION])
-        if rc is None:
-            print(f"  tmux {TMUX_SESSION} : indisponible (tmux introuvable)")
-        elif rc == 0:
-            _, wins = ro_run(["tmux", "list-windows", "-t", TMUX_SESSION, "-F", "#W"])
-            print(f"  ✓ tmux {TMUX_SESSION} : présente — fenêtres {', '.join(wins.split()) or '?'} "
-                  f"(tmux attach -t {TMUX_SESSION})")
-        else:
-            print(f"  ⚠ tmux {TMUX_SESSION} : absente (ou non visible pour ce compte)")
+        print(f"  {console_state()}")
+    human, human_at, _ = human_state(con)
+    print("  console : " + {"busy": "le propriétaire a la main (demande en cours)",
+                             "quiet": "conversation récente, file en attente du délai de calme",
+                             "idle": "libre, la file peut travailler"}[human]
+          + (f" — dernier échange {localtime(human_at)}" if human_at else " — aucun échange signalé (crochets installés ?)"))
 
     # ── Session Claude en cours et détection de blocage ─────────────────────────────────────
     head("SESSION CLAUDE")
@@ -2034,6 +2085,76 @@ def cmd_notify(con, args):
     return 1
 
 
+CONSOLE_DIR = Path(os.environ.get("LQ_CONSOLE_DIR", "/srv/moneyprinterturbo"))
+CONSOLE_SETTINGS = CONSOLE_DIR / ".claude" / "settings.local.json"
+CONSOLE_CLAUDE = os.environ.get("LQ_CONSOLE_CLAUDE", "claude --dangerously-skip-permissions")
+
+
+def console_state():
+    """La console = la session tmux interactive du propriétaire (jamais créée par le service)."""
+    rc, out = ro_run(["tmux", "list-panes", "-s", "-t", f"={TMUX_SESSION}", "-F", "#{pane_current_command}"])
+    if rc is None:
+        return f"console tmux {TMUX_SESSION} : tmux indisponible"
+    if rc != 0:
+        return f"console tmux {TMUX_SESSION} : absente — {CLI_NAME} console pour l'ouvrir"
+    cmds = out.split()
+    return (f"console tmux {TMUX_SESSION} : présente, Claude interactif "
+            + ("actif" if any(c == "claude" or c.startswith("claude") for c in cmds) else "NON lancé")
+            + f" (tmux attach -t {TMUX_SESSION})")
+
+
+def cmd_console(con, _):
+    """Ouvre LA console : rattache la session tmux existante, ou la crée avec Claude interactif dans
+    le dépôt. Ne renomme, ne remplace et ne tue jamais une session existante."""
+    exists = ro_run(["tmux", "has-session", "-t", f"={TMUX_SESSION}"])[0] == 0
+    if not exists:
+        subprocess.run(["tmux", "new-session", "-d", "-s", TMUX_SESSION, "-c", str(CONSOLE_DIR)], check=True)
+        subprocess.run(["tmux", "send-keys", "-t", f"={TMUX_SESSION}", CONSOLE_CLAUDE, "Enter"], check=True)
+        print(f"Console {TMUX_SESSION} créée ({CONSOLE_DIR}, {CONSOLE_CLAUDE}).")
+    if os.environ.get("TMUX"):
+        print(f"Déjà dans tmux : tmux switch-client -t {TMUX_SESSION}")
+        return 0
+    os.execvp("tmux", ["tmux", "attach", "-t", f"={TMUX_SESSION}"])
+
+
+def cmd_human(con, args):
+    """Appelé par les crochets de la console : `busy` à chaque demande du propriétaire
+    (UserPromptSubmit), `idle` quand Claude a répondu (Stop). Ne bloque jamais la console : toute
+    erreur est ignorée. Sur `busy`, une ligne de contexte signale à Claude la session de file en cours."""
+    try:
+        ctl_set(con, "human_state", "busy" if args.state == "busy" else "quiet")
+        ctl_set(con, "human_at", iso())
+        cur = con.execute("SELECT issue FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+        if args.state == "busy" and cur:
+            print(f"[lodyorch] Une session de file travaille sur #{cur['issue']} : elle range son travail et "
+                  f"s'arrête pour te laisser la main ; elle reprendra après la conversation.")
+    except sqlite3.Error:
+        pass
+    return 0
+
+
+def cmd_statusline(con, _):
+    """Ligne d'état de la console Claude (réglage statusLine) : file, ticket, phase, PR."""
+    try:
+        cur = con.execute("SELECT issue FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+        mode = ctl_get(con, "mode", "RUNNING")
+        human = human_state(con)[0]
+        waiting = con.execute("SELECT COUNT(*) c FROM tasks WHERE status='WAITING_OWNER'").fetchone()["c"]
+        ready = con.execute("SELECT COUNT(*) c FROM tasks WHERE status IN ('READY','RUNNING')").fetchone()["c"]
+        if cur:
+            what = f"#{cur['issue']} {ctl_get(con, 'phase')[:40]}"
+        elif mode != "RUNNING":
+            what = f"file {mode.lower()}"
+        elif human != "idle":
+            what = "file en attente (console)"
+        else:
+            what = "file au repos"
+        print(f"lodyorch · {what} · {ready} à faire · {waiting} PR en revue")
+    except sqlite3.Error:
+        print("lodyorch · état indisponible")
+    return 0
+
+
 def cmd_phase(con, args):
     """Appelé par la session : déclare sa phase (analyse, implémentation, tests, PR, rapport…)."""
     raw = os.environ.get("LQ_ISSUE") or ctl_get(con, "phase_issue")
@@ -2072,16 +2193,10 @@ def cmd_check(con, _):
     line(WORKDIR.is_dir(), "dossier des worktrees", str(WORKDIR))
     line(STATE_DIR.is_dir() and (STATE_DIR.stat().st_mode & 0o077) == 0, "dossier d'état privé (0700)", str(STATE_DIR))
     if TMUX_SESSION:
-        rc, _ = ro_run(["tmux", "has-session", "-t", f"={TMUX_SESSION}"])
-        if rc == 0:
-            _, wins = ro_run(["tmux", "list-windows", "-t", f"={TMUX_SESSION}", "-F", "#W"])
-            console = "status" in wins.split()
-            line(console, f"session tmux {TMUX_SESSION}",
-                 "console de l'orchestrateur" if console else
-                 f"OCCUPÉE par une autre session (fenêtres : {', '.join(wins.split())}) : "
-                 f"tmux rename-session -t {TMUX_SESSION} <autre nom>")
-        else:
-            print(f"  · session tmux {TMUX_SESSION} absente (créée par le service console)")
+        print(f"  · {console_state()}")
+    hooks = CONSOLE_SETTINGS.read_text(encoding="utf-8") if CONSOLE_SETTINGS.is_file() else ""
+    line(f"{CLI_NAME} human busy" in hooks and f"{CLI_NAME} human idle" in hooks,
+         "crochets de la console (priorité humaine)", str(CONSOLE_SETTINGS))
     print("Aucune session ne sera refusée." if not bad else f"{bad} point(s) à corriger avant de démarrer.")
     return 1 if bad else 0
 
@@ -2111,6 +2226,10 @@ def main():
     s.add_argument("value", nargs="?")
     sub.add_parser("sync")
     sub.add_parser("check")
+    sub.add_parser("console")
+    sub.add_parser("statusline")
+    s = sub.add_parser("human")
+    s.add_argument("state", choices=("busy", "idle"))
     s = sub.add_parser("phase")
     s.add_argument("text", nargs="+")
     s = sub.add_parser("notifications")
@@ -2127,7 +2246,7 @@ def main():
     s.add_argument("issue", type=int, nargs="?")
     args = p.parse_args()
     # `status` et `pulse` : connexion en lecture seule (aucune création, migration ni écriture).
-    con = status_db() if args.cmd in ("status", "pulse") and DB_PATH.exists() else db()
+    con = status_db() if args.cmd in ("status", "pulse", "statusline") and DB_PATH.exists() else db()
     if args.cmd == "run":
         sys.exit(supervise())
     if args.cmd == "config" and args.action != "show" and (not args.name or (args.action == "set") != bool(args.value)):
@@ -2135,7 +2254,7 @@ def main():
     code = {"status": cmd_status_tickets if GH_SYNC else cmd_status, "pulse": cmd_pulse, "queue": cmd_queue, "pause": cmd_mode, "resume": cmd_mode, "stop": cmd_mode,
             "skip": cmd_skip, "add": cmd_add, "set": cmd_set, "log": cmd_log, "sessions": cmd_sessions,
             "config": cmd_config, "reload": cmd_reload, "sync": cmd_sync,
-            "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase,
+            "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
             "check": cmd_check}[args.cmd](con, args)
     sys.exit(code or 0)
 

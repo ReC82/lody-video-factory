@@ -5,6 +5,31 @@ session Claude Code non interactive qui développe, teste, pousse une branche, o
 et rend compte ; puis il passe au suivant. **Il ne fusionne et ne déploie jamais rien** : chaque PR
 attend la revue du propriétaire.
 
+## Une seule console
+
+Comme pour Dig et RPG Quest, **la console est la session tmux `lodyorch` dans laquelle le
+propriétaire parle à Claude** (Claude interactif dans `/srv/moneyprinterturbo`). Aucune deuxième
+console, aucun renommage. La file de tickets tourne **sans fenêtre** dans `lodyorch.service` et ne
+lance jamais deux sessions Claude de code en même temps.
+
+Coordination (ce que Dig et RPG Quest n'ont pas : chez eux, les deux peuvent travailler en même
+temps) :
+
+- chaque message du propriétaire déclenche le crochet `UserPromptSubmit` → `lodyorch human busy` ;
+  chaque réponse terminée de Claude, le crochet `Stop` → `lodyorch human idle` ;
+- tant que le propriétaire a la main, **aucune session de file ne démarre** ; elle reprend après
+  15 min de calme (`human_quiet_seconds`) ;
+- si une session de file travaille quand le propriétaire écrit, elle **range son travail** : le
+  crochet de garde ne lui permet plus que commit, push et rapport ; après 5 min
+  (`yield_grace_seconds`) elle est arrêtée. Le ticket reste en cours, sans pénalité, et il est
+  **repris en premier** ensuite. Claude, dans la console, en est informé par une ligne de contexte ;
+- la ligne d'état de la console (`lodyorch statusline`) affiche la file : ticket, phase, PR en revue.
+
+Compromis assumé : la console et la file sont deux processus Claude distincts (l'un interactif,
+l'autre non). Une même session Claude ne peut pas à la fois recevoir les messages du propriétaire
+et être pilotée par un superviseur sans synchronisation ; ici, la synchronisation est explicite
+(crochets + verrou), et le propriétaire n'a qu'une console à utiliser.
+
 C'est une instance dédiée du superviseur déjà éprouvé sur l'hôte (LQORCH → JCORCH → DIGORCH,
 `/opt/dig-orch/lqorch.py`), avec ses propres service, session tmux, état, verrou et worktrees.
 Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgquest`.
@@ -16,7 +41,8 @@ Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgque
 | Sources versionnées | `deploy/lodyorch/` (ce dépôt) |
 | Code installé, prompt, configuration | `/opt/lodyorch/` (root, lecture seule pour les sessions) |
 | Commande | `/usr/local/bin/lodyorch` |
-| Services | `lodyorch.service` (superviseur), `lodyorch-console.service` (tmux `lodyorch`) |
+| Service | `lodyorch.service` (file, sans fenêtre) |
+| Console | session tmux `lodyorch` du propriétaire ; crochets dans `/srv/moneyprinterturbo/.claude/settings.local.json` (exclu de Git) |
 | État, verrou, journaux, rapports | `~/.local/state/lodyorch/` (0700 : `state.db`, `supervisor.lock`, `sessions/*.jsonl`, `reports/`) |
 | Clone dédié | `~/lody-orch/repo` (jamais `/srv/moneyprinterturbo`) |
 | Worktrees | `~/lody-orch/worktrees/ticket-<n>`, environnement Python partagé `~/lody-orch/venv` |
@@ -78,20 +104,19 @@ sudo deploy/lodyorch/install.sh             # installe ; ne démarre RIEN
 lodyorch check                              # tout doit être ✓
 ```
 
-Avant le premier démarrage de la console : **aucune autre session tmux ne doit s'appeler
-`lodyorch`** (la console refuse de démarrer et ne tue jamais une session existante) :
-`tmux rename-session -t lodyorch lody-dev`.
+L'installation ajoute les crochets à la console sans rien retirer ni remplacer. Ils sont pris en
+compte au prochain démarrage de Claude dans la console (ou après validation dans `/hooks`).
 
 ```sh
-sudo systemctl enable --now lodyorch.service
-sudo systemctl enable --now lodyorch-console.service
-tmux attach -t lodyorch      # fenêtres activite / status / journal / events ; Ctrl-b d pour quitter
+sudo systemctl enable --now lodyorch.service   # la file démarre, sans fenêtre
+lodyorch console                               # rattache LA console ; la crée seulement si absente
 ```
 
 ## Exploitation
 
 ```
-lodyorch status                 services, tmux, session, ticket, phase, PR, quotas, dernière erreur
+lodyorch status                 service, console, priorité humaine, session, ticket, phase, PR, erreurs
+lodyorch console                rattacher la console tmux lodyorch (créée seulement si absente)
 lodyorch pulse                  point d'activité en 3 lignes (fenêtre « activite »)
 lodyorch check                  contrôles d'installation (lecture seule)
 lodyorch queue | log [N] | sessions
@@ -107,14 +132,15 @@ Mise à jour : `sudo deploy/lodyorch/install.sh` (sauvegarde dans `~/backups/lod
 `lodyorch reload`. Retour arrière : réinstaller les fichiers de la sauvegarde dans `/opt/lodyorch/`,
 `sudo systemctl daemon-reload`, `lodyorch reload`.
 
-Désinstallation : `lodyorch stop`, `sudo systemctl disable --now lodyorch.service
-lodyorch-console.service`, puis supprimer `/etc/systemd/system/lodyorch*.service`, `/opt/lodyorch`
-et `/usr/local/bin/lodyorch`. L'état (`~/.local/state/lodyorch`) et le clone peuvent être conservés.
+Désinstallation : `lodyorch stop`, `sudo systemctl disable --now lodyorch.service`, puis
+supprimer `/etc/systemd/system/lodyorch.service`, `/opt/lodyorch`, `/usr/local/bin/lodyorch` et les
+entrées `lodyorch` de `/srv/moneyprinterturbo/.claude/settings.local.json`. L'état (`~/.local/state/lodyorch`) et le clone peuvent être conservés.
 
 ## Tests
 
 `test/lodyorch/` (lancés par la CI avec le reste de `test/`) : priorités, éligibilité, blocages,
 dépendances, verrou visible, PR exclues, verrou d'exclusion, reprise après crash sans doublon,
 temporisation et abandon, disjoncteur, refus sans authentification ni garde, masquage des
-journaux, `status`/`pulse`/`phase`/`check`, crochet de garde, unités systemd, console tmux et
-installation à blanc. Faux `gh` et faux `claude` : aucun réseau, aucun appel au modèle.
+journaux, `status`/`pulse`/`phase`/`check`, crochet de garde, unité systemd, console unique
+(crochets fusionnés sans écrasement, `lodyorch console` sans renommage, priorité humaine, rangement
+puis reprise de la session de file) et installation à blanc. Faux `gh` et faux `claude` : aucun réseau, aucun appel au modèle.

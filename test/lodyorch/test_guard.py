@@ -108,3 +108,22 @@ def test_secret_content_and_external_connectors_are_denied(guard_env):
 def test_unreadable_input_is_denied():
     out = subprocess.run([sys.executable, str(GUARD)], input="pas du json", capture_output=True, text=True, timeout=30)
     assert out.returncode == 2
+
+
+def test_owner_takeover_restricts_the_session_to_wrapping_up(guard_env, tmp_path):
+    flag = tmp_path / "s.yield"
+    flag.write_text("x", encoding="utf-8")
+    env = dict(guard_env, LQ_YIELD_FILE=str(flag))
+    for command in ("git add -A && git commit -m 'wip (#1)'", "git push -u origin agent/1-x",
+                    'lodyorch phase "rangement"', "gh pr create --base main --body-file /tmp/pr.md"):
+        assert run_guard("Bash", {"command": command}, env)[0] == 0, command
+    status = guard_env["LQ_STATUS_FILE"]
+    assert run_guard("Write", {"file_path": status, "content": "{}"}, env)[0] == 0
+    code, err = run_guard("Bash", {"command": "uv run pytest -q test"}, env)
+    assert code == 2 and "repris la main" in err and "RUNNING" in err
+    assert run_guard("Edit", {"file_path": str(BASE / "wt" / "ticket-1" / "a.py"), "new_string": "x"}, env)[0] == 2
+    assert run_guard("Agent", {"prompt": "x"}, env)[0] == 2
+    # Les interdits ordinaires restent en vigueur pendant le rangement.
+    assert run_guard("Bash", {"command": "git push --force origin agent/1-x"}, env)[0] == 2
+    flag.unlink()
+    assert run_guard("Bash", {"command": "uv run pytest -q test"}, env)[0] == 0

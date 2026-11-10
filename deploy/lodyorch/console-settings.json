@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "/usr/local/bin/lodyorch human busy 2>/dev/null || true"}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "/usr/local/bin/lodyorch human idle >/dev/null 2>&1 || true"}]}
+    ]
+  },
+  "statusLine": {"type": "command", "command": "/usr/local/bin/lodyorch statusline 2>/dev/null"}
+}

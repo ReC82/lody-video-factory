@@ -85,7 +85,11 @@ File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis pa
     du ticket, et rends `RUNNING` avec une `next_action` précise.
 12. Si `lodyorch status` indique un mode STOP ou PAUSED, termine l'unité en cours sans en commencer
     d'autre.
-13. **Nouveau commentaire du propriétaire** (voir `note`) : s'il répond à une question ou demande
+13. **Priorité au propriétaire** : il peut écrire à tout moment dans la console `lodyorch`. Le crochet
+    de garde te le signale alors en refusant tes actions (« le propriétaire a repris la main ») :
+    commit + push du travail utile, rapport `RUNNING` avec une `next_action` précise, puis arrête-toi
+    sans discuter. Tu seras relancé sur le même ticket après la conversation.
+14. **Nouveau commentaire du propriétaire** (voir `note`) : s'il répond à une question ou demande
     une correction, reprends le travail sur la même branche et la même PR. S'il ne demande rien :
     ne change rien, ne commente pas, rends immédiatement le statut précédent.
 

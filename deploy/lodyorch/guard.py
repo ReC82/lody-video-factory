@@ -81,6 +81,16 @@ STRONG_SECRETS = re.compile(
 FORBIDDEN_TOOLS = re.compile(r"^(mcp__.*|RemoteTrigger|CronCreate|CronDelete|PushNotification|Artifact\w*|SendFeedback)$")
 
 
+# Priorité humaine : fichier posé par le superviseur quand le propriétaire écrit dans la console.
+# La session ne peut plus que ranger son travail : lire, commiter, pousser, écrire son rapport.
+YIELD_FILE = os.environ.get("LQ_YIELD_FILE", "")
+YIELD_BASH = re.compile(r"^\s*(cd\s+\S+\s*&&\s*)?(git\s|lodyorch\s+(phase|status)\b|gh\s+pr\s+(view|list|create)\b"
+                        r"|gh\s+issue\s+comment\b|cat\s|ls\b|pwd\b)")
+YIELD_MESSAGE = ("le propriétaire a repris la main dans la console lodyorch. Range ton travail MAINTENANT : "
+                 "commit et push de ce qui est utile sur la branche du ticket, puis écris le rapport de fin "
+                 "avec status RUNNING et une next_action précise, puis arrête-toi. Le ticket sera repris ensuite")
+
+
 def deny(reason):
     print(f"LODYORCH — action refusée par le crochet de garde : {reason}. "
           "Reste dans le worktree du ticket et dans les règles de la session.", file=sys.stderr)
@@ -112,6 +122,16 @@ def main():
         deny("appel illisible")
     if FORBIDDEN_TOOLS.match(tool):
         deny(f"outil {tool} hors périmètre")
+    if YIELD_FILE and os.path.exists(YIELD_FILE):
+        if tool == "Bash" and not YIELD_BASH.match(str(inp.get("command") or "")):
+            deny(YIELD_MESSAGE)
+        if tool not in ("Bash", "Read", "Grep", "Glob", "Write", "Edit"):
+            deny(YIELD_MESSAGE)
+        if tool in ("Write", "Edit"):
+            target = os.path.realpath(os.path.expanduser(str(inp.get("file_path") or "")))
+            if target != os.environ.get("LQ_STATUS_FILE") and not target.startswith(f"{STATE_DIR}/reports/") \
+                    and not target.startswith("/tmp/"):
+                deny(YIELD_MESSAGE)
     if tool == "Bash":
         cmd = str(inp.get("command") or "")
         if STRONG_SECRETS.search(cmd):
