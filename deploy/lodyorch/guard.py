@@ -84,11 +84,21 @@ FORBIDDEN_TOOLS = re.compile(r"^(mcp__.*|RemoteTrigger|CronCreate|CronDelete|Pus
 # Priorité humaine : fichier posé par le superviseur quand le propriétaire écrit dans la console.
 # La session ne peut plus que ranger son travail : lire, commiter, pousser, écrire son rapport.
 YIELD_FILE = os.environ.get("LQ_YIELD_FILE", "")
-YIELD_BASH = re.compile(r"^\s*(cd\s+\S+\s*&&\s*)?(git\s|lodyorch\s+(phase|status)\b|gh\s+pr\s+(view|list|create)\b"
-                        r"|gh\s+issue\s+comment\b|cat\s|ls\b|pwd\b)")
+# Chaque segment d'une commande chaînée (&&, ||, ;, |, retour à la ligne) doit être une commande de
+# rangement : se placer, copier le livrable, commiter, pousser, ouvrir la PR, commenter, consulter.
+YIELD_BASH = re.compile(r"^\s*(cd|git|ls|pwd|cat|head|tail|wc|echo|cp|mv|mkdir|sha256sum|true"
+                        r"|lodyorch\s+(phase|status)|gh\s+pr\s+(view|list|create)|gh\s+issue\s+comment)(\s|$)")
+YIELD_TOOLS = ("Bash", "Read", "Grep", "Glob", "Write", "Edit", "ToolSearch", "TaskStop")
+
+
+def yield_allows(cmd):
+    """Commande permise pendant le rangement : tous ses segments (hors texte cité) sont permis."""
+    segments = re.split(r"&&|\|\||;|\||\n", strip_quoted(cmd))
+    return all(YIELD_BASH.match(seg) for seg in segments if seg.strip())
 YIELD_MESSAGE = ("le propriétaire a repris la main dans la console lodyorch. Range ton travail MAINTENANT : "
                  "commit et push de ce qui est utile sur la branche du ticket, puis écris le rapport de fin "
-                 "avec status RUNNING et une next_action précise, puis arrête-toi. Le ticket sera repris ensuite")
+                 "avec status RUNNING et une next_action précise, puis arrête-toi. Le ticket sera repris ensuite. "
+                 "Si la console redevient calme avant, les restrictions sont levées : reprends alors normalement")
 
 
 def deny(reason):
@@ -123,9 +133,9 @@ def main():
     if FORBIDDEN_TOOLS.match(tool):
         deny(f"outil {tool} hors périmètre")
     if YIELD_FILE and os.path.exists(YIELD_FILE):
-        if tool == "Bash" and not YIELD_BASH.match(str(inp.get("command") or "")):
+        if tool == "Bash" and not yield_allows(str(inp.get("command") or "")):
             deny(YIELD_MESSAGE)
-        if tool not in ("Bash", "Read", "Grep", "Glob", "Write", "Edit"):
+        if tool not in YIELD_TOOLS:
             deny(YIELD_MESSAGE)
         if tool in ("Write", "Edit"):
             target = os.path.realpath(os.path.expanduser(str(inp.get("file_path") or "")))

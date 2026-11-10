@@ -54,6 +54,7 @@ import json
 import os
 import queue
 import re
+import shlex
 import smtplib
 import ssl
 import urllib.parse
@@ -704,6 +705,13 @@ def run_session(con, t):
                     set_phase(con, t["issue"], "pause demandée : priorité à la console")
                 elif time.time() - yield_at > setting(con, "yield_grace_seconds")[0]:
                     reason = "Priorité humaine : session de file arrêtée après le délai de rangement."
+            elif yield_file.exists():
+                # La console est redevenue calme avant la fin du délai : restrictions levées, la session
+                # reprend avec toutes ses permissions (pas d'arrêt, pas de nouvelle session consommée).
+                # Un nouvel échange reposera le fichier avec un délai de rangement complet.
+                yield_file.unlink()
+                event(con, t["issue"], "yield", "Console redevenue calme : restrictions levées, la session continue.")
+                set_phase(con, t["issue"], "reprise : la console est redevenue calme")
             if reason:
                 pass  # priorité humaine : délai de rangement écoulé
             elif ctl_get(con, "mode") == "STOP_NOW":
@@ -1651,10 +1659,30 @@ def code_version():
     return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 
 
+def read_env_file(path):
+    """Variables d'un fichier `NOM=valeur` (format EnvironmentFile / sh, guillemets shell)."""
+    env = {}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, raw = line.split("=", 1)
+            words = shlex.split(raw) if raw else [""]
+            env[key.strip()] = words[0] if words else ""
+    return env
+
+
 def reexec(con):
     """Recharge le code installé dans le même processus (même PID pour systemd). Appelé seulement
-    entre deux sessions ; le verrou est libéré par l'exec (descripteur non hérité) puis repris."""
+    entre deux sessions ; le verrou est libéré par l'exec (descripteur non hérité) puis repris.
+    La configuration (LQ_ENV_FILE) est relue aussi : sans cela, une variable ajoutée ou modifiée
+    dans lodyorch.env n'était prise en compte qu'au redémarrage du service."""
     ctl_set(con, "reload_requested", "")
+    env_file = os.environ.get("LQ_ENV_FILE", "")
+    if env_file:
+        try:
+            os.environ.update(read_env_file(env_file))
+        except (OSError, ValueError) as exc:
+            event(con, None, "supervisor", f"Configuration non relue ({type(exc).__name__}) : valeurs actuelles conservées.")
     event(con, None, "supervisor", "Rechargement du code demandé : ré-exécution entre deux sessions.")
     con.close()
     os.execv(sys.executable, [sys.executable, str(Path(__file__).resolve()), "run"])

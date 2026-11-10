@@ -127,3 +127,21 @@ def test_owner_takeover_restricts_the_session_to_wrapping_up(guard_env, tmp_path
     assert run_guard("Bash", {"command": "git push --force origin agent/1-x"}, env)[0] == 2
     flag.unlink()
     assert run_guard("Bash", {"command": "uv run pytest -q test"}, env)[0] == 0
+
+
+def test_wrap_up_allows_chained_packaging_commands(guard_env, tmp_path):
+    """Incident du 10/11/2026 (#118) : `cd … && cp … && git add … && git commit … && git push … | tail`
+    était refusé, et le travail n'a pas pu être poussé pendant le rangement."""
+    flag = tmp_path / "s.yield"
+    flag.write_text("x", encoding="utf-8")
+    env = dict(guard_env, LQ_YIELD_FILE=str(flag))
+    wt = BASE / "wt" / "ticket-118"
+    incident = (f"cd {wt} && cp prototypes/remotion-118/out/prototype-118.mp4 docs/prototypes/118/ && "
+                "git add prototypes/remotion-118 docs/prototypes/118 && git commit -q -m \"feat(animation): "
+                "prototype (#118)\n\nCorps ; avec | et && dans le message\" && "
+                "git push -q -u origin agent/118-prototype-remotion 2>&1 | tail -2; git rev-parse HEAD")
+    assert run_guard("Bash", {"command": incident}, env)[0] == 0
+    assert run_guard("ToolSearch", {"query": "select:TaskStop"}, env)[0] == 0
+    for command in (f"cd {wt} && npx remotion render src/index.ts", f"cd {wt} && python3 - <<'EOF'\nprint(1)\nEOF",
+                    "git status; uv run pytest -q", "ls | xargs rm -rf"):
+        assert run_guard("Bash", {"command": command}, env)[0] == 2, command

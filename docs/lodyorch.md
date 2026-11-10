@@ -183,6 +183,8 @@ lodyorch notifications [--retry] emails envoyés / en attente ; --retry : nouvel
   aucun connecteur MCP (`--strict-mcp-config`).
 - **Journaux** : motifs de secrets (jetons Anthropic, OpenAI, GitHub, AWS, Slack, clés privées,
   `api_key=…`, `Bearer …`) masqués avant écriture des journaux de session et des événements.
+- **Ressources** : l'hôte est partagé avec la production. Les sessions sont freinées au-delà de 1,4 Go de RAM
+  et ne dépassent jamais 1,8 Go ni 1,5 CPU, avec des poids CPU et disque réduits (`lodyorch.service`).
 - **Budget** : 8 sessions/jour au démarrage, pause à 80 % de la fenêtre Claude de 5 h et à 70 % de
   celle de 7 jours (quota **partagé** avec les autres superviseurs, dont les bases sont lues en
   lecture seule), session ≤ 2 h, coupure après 1 h sans sortie, 3 tentatives par ticket,
@@ -225,12 +227,14 @@ lodyorch pause | resume         ne plus démarrer de session / reprendre (resume
 lodyorch stop [--now]           arrêter après la session en cours, ou tout de suite
 lodyorch skip N [raison] | add N [--prio 10] | set N champ valeur
 lodyorch config [set NOM VALEUR | unset NOM]
-lodyorch reload                 appliquer un code mis à jour entre deux sessions
+lodyorch reload                 appliquer le code et lodyorch.env mis à jour, entre deux sessions
 journalctl -u lodyorch -f
 ```
 
 Mise à jour : `sudo deploy/lodyorch/install.sh` (sauvegarde dans `~/backups/lodyorch/`), puis
-`lodyorch reload`. Retour arrière : réinstaller les fichiers de la sauvegarde dans `/opt/lodyorch/`,
+`lodyorch reload` (relit aussi `lodyorch.env` ; une variable retirée garde sa valeur jusqu'au
+prochain redémarrage). Une unité systemd modifiée demande `sudo systemctl daemon-reload` puis
+`sudo systemctl restart lodyorch`, entre deux sessions. Retour arrière : réinstaller les fichiers de la sauvegarde dans `/opt/lodyorch/`,
 `sudo systemctl daemon-reload`, `lodyorch reload`.
 
 Désinstallation : `lodyorch stop`, `sudo systemctl disable --now lodyorch.service lodyorch-notify.timer`, puis

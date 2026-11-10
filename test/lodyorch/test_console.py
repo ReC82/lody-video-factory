@@ -149,3 +149,82 @@ def test_statusline_summarises_queue_for_the_console(orch):
     out = subprocess.run([sys.executable, str(ORCH_DIR / "lodyorch.py"), "statusline"], capture_output=True,
                          text=True, timeout=30).stdout
     assert out.startswith("lodyorch · ") and "1 à faire" in out and "1 CI en cours" in out and "0 PR en revue" in out
+
+
+def test_quiet_console_lifts_the_wrap_up_restrictions_and_the_session_finishes_normally(orch, monkeypatch):
+    """Incident du 10/11/2026 (#118) : la console était redevenue calme, mais le fichier de rangement
+    restait posé ; la session ne pouvait plus travailler, puis a été coupée au message suivant."""
+    import threading
+    orch.issue(1, [AUTO, "priority:P0"])
+    orch.mod.ctl_set(orch.con, "cfg.yield_grace_seconds", 30)
+    monkeypatch.setenv("FAKE_CLAUDE_SLEEP", "14")
+    orch.sync()
+    seen = []
+    busy = threading.Timer(3, lambda: human(orch, "busy"))
+    probe = threading.Timer(6, lambda: seen.append(bool(list(orch.mod.LOG_DIR.glob("*.yield")))))
+    idle = threading.Timer(7, lambda: human(orch, "idle"))
+    for timer in (busy, probe, idle):
+        timer.start()
+    assert orch.cycle() == 1
+    for timer in (busy, probe, idle):
+        timer.join()
+    assert seen == [True]  # restrictions bien posées pendant l'échange
+    (s,) = orch.con.execute("SELECT outcome FROM sessions").fetchall()
+    assert s["outcome"] == "COMPLETED"  # pas d'arrêt, pas de seconde session
+    assert orch.mod.task(orch.con, 1)["status"] == "WAITING_OWNER"
+    assert len(orch.claude_calls()) == 1
+    assert not list(orch.mod.LOG_DIR.glob("*.yield"))
+    messages = [e["message"] for e in orch.con.execute("SELECT message FROM events WHERE kind='yield'")]
+    assert any("restrictions levées" in m for m in messages)
+
+
+def test_a_new_exchange_after_the_lift_gets_a_full_wrap_up_delay(orch, monkeypatch):
+    import threading
+    orch.issue(1, [AUTO, "priority:P0"])
+    orch.mod.ctl_set(orch.con, "cfg.yield_grace_seconds", 30)
+    monkeypatch.setenv("FAKE_CLAUDE_SLEEP", "90")
+    orch.sync()
+    timers = [threading.Timer(2, lambda: human(orch, "busy")), threading.Timer(5, lambda: human(orch, "idle")),
+              threading.Timer(12, lambda: human(orch, "busy"))]
+    for timer in timers:
+        timer.start()
+    started = time.time()
+    assert orch.cycle() == 1
+    for timer in timers:
+        timer.join()
+    elapsed = time.time() - started
+    # Arrêt compté depuis le second échange (12 s + 30 s), jamais depuis le premier (2 s + 30 s).
+    assert 40 <= elapsed < 75, elapsed
+    (s,) = orch.con.execute("SELECT outcome, detail FROM sessions").fetchall()
+    assert s["outcome"] == "STOPPED" and "Priorité humaine" in s["detail"]
+
+
+def test_status_is_strictly_read_only_and_never_interrupts_a_session(orch):
+    """`lodyorch status` lancé depuis un terminal SSH : connexion en lecture seule, aucun état modifié,
+    aucune priorité humaine déclarée, aucun fichier de rangement (seuls les crochets de la console le font)."""
+    import sqlite3
+    orch.issue(1, [AUTO, "priority:P0"])
+    orch.sync()
+    orch.con.execute("INSERT INTO sessions(id, issue, started_at, pid) VALUES('s-1', 1, '2026-11-10T00:00:00Z', ?)",
+                     (os.getpid(),))
+    orch.con.commit()
+
+    def snapshot():
+        con = sqlite3.connect(f"file:{orch.mod.DB_PATH}?mode=ro", uri=True)
+        return [list(con.execute(f"SELECT * FROM {t} ORDER BY 1")) for t in
+                ("tasks", "sessions", "events", "control", "notifications", "run_reports")]
+    before = snapshot()
+    env = dict(os.environ)
+    for cmd in ("status", "pulse", "statusline", "queue", "sessions"):
+        out = subprocess.run([sys.executable, str(ORCH_DIR / "lodyorch.py"), cmd], env=env,
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, (cmd, out.stderr[-500:])
+    assert snapshot() == before
+    assert orch.mod.human_state(orch.con)[0] == "idle"
+    assert not list(orch.mod.LOG_DIR.glob("*.yield"))
+    ro = orch.mod.status_db()
+    try:
+        ro.execute("UPDATE control SET value='x'")
+        raise AssertionError("écriture acceptée par la connexion de status")
+    except sqlite3.OperationalError as exc:
+        assert "readonly" in str(exc)
