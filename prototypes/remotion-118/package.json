@@ -1,0 +1,23 @@
+{
+  "name": "lody-remotion-prototype-118",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Prototype d'animation 2D Remotion pour Lody (#118) — isolé du moteur Python",
+  "type": "module",
+  "scripts": {
+    "audio": "node scripts/make-audio.mjs",
+    "test": "node --test test/*.test.mjs",
+    "prerender": "node scripts/make-audio.mjs",
+    "render": "remotion render src/index.ts LodyProto118 out/prototype-118.mp4 --concurrency=1 --codec=h264 --crf=26"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.542",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.542"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.0",
+    "typescript": "5.6.3"
+  }
+}

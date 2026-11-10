@@ -1,0 +1,5 @@
+node_modules/
+out/
+# générés de façon déterministe par `npm run audio` (lancé avant chaque rendu)
+public/voice.wav
+src/envelope.json
