@@ -30,7 +30,8 @@ if [ "$DRY" = 0 ] && [ "$(id -u)" != 0 ]; then
 fi
 [ -n "$SVC_HOME" ] || { echo "Compte $SVC_USER introuvable." >&2; exit 1; }
 for f in lodyorch.py guard.py session_prompt.md lodyorch.env claude-settings.json labels.json lodyorch \
-         console-settings.json console_settings.py systemd/lodyorch.service; do
+         console-settings.json console_settings.py systemd/lodyorch.service \
+         systemd/lodyorch-notify.service systemd/lodyorch-notify.timer; do
     [ -f "$SRC/$f" ] || { echo "Fichier manquant : $SRC/$f" >&2; exit 1; }
 done
 
@@ -39,7 +40,7 @@ if [ -d "$DEST" ]; then
     BK="$SVC_HOME/backups/lodyorch/config-$(date +%Y%m%d-%H%M%S)"
     as_user mkdir -p "$BK"
     run cp -a "$DEST/." "$BK/"
-    for u in lodyorch.service; do
+    for u in lodyorch.service lodyorch-notify.service lodyorch-notify.timer; do
         [ -f "/etc/systemd/system/$u" ] && run cp -a "/etc/systemd/system/$u" "$BK/"
     done
     run chown -R "$SVC_USER:$SVC_USER" "$BK"
@@ -65,8 +66,10 @@ else
     as_user git -C "$BASE/repo" fetch --quiet --prune origin
 fi
 
-echo "4. Unité systemd du superviseur (installée, NI activée NI démarrée ; aucune fenêtre tmux)"
-run install -o root -g root -m 0644 "$SRC/systemd/lodyorch.service" /etc/systemd/system/lodyorch.service
+echo "4. Unités systemd : superviseur et envoi des emails (installées, NI activées NI démarrées ; aucune fenêtre tmux)"
+for u in lodyorch.service lodyorch-notify.service lodyorch-notify.timer; do
+    run install -o root -g root -m 0644 "$SRC/systemd/$u" "/etc/systemd/system/$u"
+done
 run systemctl daemon-reload
 
 echo "5. Console tmux « lodyorch » = la session Claude interactive existante : crochets de priorité humaine"
@@ -93,6 +96,7 @@ Installation terminée — rien n'a été démarré. Pour lancer l'orchestrateur
   Dans la console Claude « lodyorch » : /hooks (valider les nouveaux crochets) ou relancer Claude
   lodyorch labels                                  # labels du protocole (#117) ; --apply pour les créer
   sudo systemctl enable --now lodyorch.service      # file automatique, sans fenêtre
+  sudo systemctl enable --now lodyorch-notify.timer # emails des rapports (seule unité qui lit le SMTP)
   lodyorch console                                  # rattache LA console (la crée seulement si absente)
 Après une mise à jour du code : lodyorch reload (sans couper la session en cours).
 TXT

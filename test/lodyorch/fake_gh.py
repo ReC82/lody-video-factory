@@ -41,6 +41,9 @@ def main(argv):
     if args[0] == "-X":
         method, args = args[1], args[2:]
     path, fields = args[0], args[1:]
+    payload = None
+    if fields[:2] == ["--input", "-"]:
+        payload, fields = json.load(sys.stdin), fields[2:]
     if data.get("offline"):
         return 1
     base = path.split("?")[0]
@@ -61,6 +64,12 @@ def main(argv):
         return 0
     data["requests"] = data.get("requests", 0) + 1
     save(data)
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)/(files|commits)", base)
+    if m:
+        pr = data.get("pulls", {}).get(m.group(1)) or {}
+        page = int(query.get("page", ["1"])[0])
+        print(json.dumps(pr.get(m.group(2), []) if page == 1 else []))
+        return 0
     m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)", base)
     if m:
         pr = data.get("pulls", {}).get(m.group(1))
@@ -83,11 +92,16 @@ def main(argv):
             return 1
         mine = [c for c in data.get("comments", []) if c.get("issue") == int(m.group(1))]
         if method == "POST":
-            body = dict(f.split("=", 1) for f in fields[1::2])["body"]
-            data.setdefault("comments", []).append({"issue": int(m.group(1)), "body": body, "id": len(data["comments"]) + 1,
-                                                    "issue_url": f"x/issues/{m.group(1)}", "author_association": "OWNER",
-                                                    "created_at": "2026-11-10T00:00:00Z"})
+            if data.get("comments_post_offline"):
+                return 1
+            body = payload["body"] if payload else dict(f.split("=", 1) for f in fields[1::2])["body"]
+            cid = len(data["comments"]) + 1
+            comment = {"issue": int(m.group(1)), "body": body, "id": cid, "issue_url": f"x/issues/{m.group(1)}",
+                       "html_url": f"https://github.com/x/issues/{m.group(1)}#issuecomment-{cid}",
+                       "author_association": "OWNER", "created_at": "2026-11-10T00:00:00Z"}
+            data.setdefault("comments", []).append(comment)
             save(data)
+            print(json.dumps(comment))
             return 0
         page = int(query.get("page", ["1"])[0])
         print(json.dumps(mine if page == 1 else []))

@@ -141,6 +141,15 @@ DEPS_RE = re.compile(r"(?:d[ée]pend(?:ance)?s?\s+(?:de|du|des|d'|on)|bloqu[ée]
 NOTIFY_SMTP_ENV = os.environ.get("LQ_NOTIFY_SMTP_ENV", "")
 NOTIFY_PREFIX = os.environ.get("LQ_NOTIFY_PREFIX", "[Lody]")
 SITE_URL = os.environ.get("LQ_SITE_URL", "")
+# Rapport permanent par tentative (#123) : rédigé par le superviseur après chaque session (succès,
+# échec, blocage, interruption récupérée), archivé localement, publié en commentaire du ticket
+# (lien permanent) et envoyé par email. Une session arrêtée volontairement ou par une limite
+# fournisseur n'est pas une tentative : pas de rapport.
+RUN_REPORTS = os.environ.get("LQ_RUN_REPORTS", "0") == "1"
+REPORT_PROJECT = os.environ.get("LQ_REPORT_PROJECT", "Lody Video Factory")
+REPORT_MARKER = "<!-- lodyorch:rapport run={run} -->"
+REPORT_COMMENT_MAX = 60000  # limite GitHub d'un commentaire : 65 536 caractères
+REPORT_SKIP_OUTCOMES = ("RATE_LIMIT", "STOPPED")
 CLI_NAME = os.environ.get("LQ_CLI", "lodyorch")
 INSTANCE = os.environ.get("LQ_INSTANCE", "LODYORCH")
 
@@ -253,6 +262,11 @@ def db():
         key TEXT PRIMARY KEY, issue INTEGER, kind TEXT, subject TEXT, body TEXT,
         attachment_name TEXT DEFAULT '', attachment TEXT DEFAULT '', created_at TEXT, sent_at TEXT,
         attempts INTEGER NOT NULL DEFAULT 0, next_try TEXT DEFAULT '', last_error TEXT DEFAULT '');
+    CREATE TABLE IF NOT EXISTS run_reports(
+        run_id TEXT PRIMARY KEY, issue INTEGER, session_id TEXT, outcome TEXT, detail TEXT,
+        report TEXT DEFAULT '{}', state TEXT, file TEXT DEFAULT '', created_at TEXT, finalized_at TEXT DEFAULT '',
+        comment_url TEXT DEFAULT '', comment_attempts INTEGER NOT NULL DEFAULT 0, comment_next TEXT DEFAULT '',
+        comment_error TEXT DEFAULT '');
     """)
     for col, decl in (("gh_labels", "TEXT DEFAULT '[]'"), ("gh_since", "TEXT DEFAULT ''"),
                       ("gh_cursor", "INTEGER NOT NULL DEFAULT 0"), ("questions", "TEXT DEFAULT '[]'"),
@@ -729,6 +743,8 @@ def run_session(con, t):
     apply_outcome(con, t["issue"], outcome, detail, reset, report)
     if GH_SYNC and t["issue"] != TRIAGE:
         after_outcome(con, t["issue"], session_id, session_started, report)
+    if t["issue"] != TRIAGE:
+        record_run(con, t["issue"], session_id, outcome, detail, report)
     set_phase(con, t["issue"], f"session terminée : {outcome}")
     if outcome != "COMPLETED" or not report:
         ctl_set(con, "last_error", redact(f"{iso()} #{t['issue']} {outcome} — {detail}")[:500])
@@ -1103,11 +1119,13 @@ def watch_ci(con):
         if pr.get("merged"):
             update_task(con, n, ci_state="merged", ci_detail="PR fusionnée par le propriétaire.")
             event(con, n, "ci", "PR fusionnée : suivi de CI terminé.")
+            finalize_pending_runs(con, n)
             continue
         if pr.get("state") == "closed":
             update_task(con, n, status="BLOCKED", ci_state="closed", blockers="PR fermée sans fusion.",
                         next_action="Décision du propriétaire : rouvrir la PR ou retirer le ticket.")
             set_status_label(con, n, "BLOCKED")
+            finalize_pending_runs(con, n)
             continue
         verdict, detail = ci_verdict(pr["head"]["sha"])
         waited = time.time() - (ts_of(t["ci_since"]) or time.time())
@@ -1121,6 +1139,7 @@ def watch_ci(con):
             event(con, n, "ci", f"CI verte ({detail}) : PR prête pour revue.")
             set_status_label(con, n, "WAITING_OWNER")
             after_outcome(con, n, t["last_session"], t["gh_since"] or iso(), {})
+            finalize_pending_runs(con, n)
         elif verdict == "failure":
             fixes = t["ci_fixes"] + 1
             if fixes <= CI_MAX_FIXES:
@@ -1131,6 +1150,7 @@ def watch_ci(con):
                                  "même branche, pousser, puis rendre WAITING_OWNER (même PR).",
                             next_action=f"Corriger la CI ({fixes}/{CI_MAX_FIXES}).")
                 event(con, n, "ci", f"CI en échec : correction {fixes}/{CI_MAX_FIXES} planifiée — {detail[:200]}")
+                finalize_pending_runs(con, n)
             else:
                 update_task(con, n, status="BLOCKED", ci_state="failed", ci_detail=detail,
                             blockers=f"CI toujours en échec après {CI_MAX_FIXES} corrections : {detail}",
@@ -1141,12 +1161,14 @@ def watch_ci(con):
                         f"(`{STATUS_LABELS['BLOCKED']}`) : répondre ici ou retirer le label pour relancer.")
                 gh_call("-X", "POST", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}")
                 event(con, n, "ci", "CI en échec : corrections épuisées, ticket bloqué.")
+                finalize_pending_runs(con, n)
         elif waited > CI_TIMEOUT_SECONDS:
             update_task(con, n, status="BLOCKED", ci_state="timeout", ci_detail=detail,
                         blockers=f"CI sans conclusion après {span(waited)} ({detail}).",
                         next_action="Vérifier les workflows GitHub Actions de la PR.")
             set_status_label(con, n, "BLOCKED")
             event(con, n, "ci", f"CI sans conclusion après {span(waited)} : ticket bloqué.")
+            finalize_pending_runs(con, n)
         else:
             update_task(con, n, ci_detail=detail)
 
@@ -1211,8 +1233,8 @@ def after_outcome(con, issue, session_id, session_started, report):
         set_status_label(con, issue, "RUNNING")
         return
     set_status_label(con, issue, status if status in STATUS_LABELS else "RUNNING")
-    if status not in ("WAITING_OWNER", "BLOCKED", "DONE", "FAILED"):
-        return
+    if status not in ("WAITING_OWNER", "BLOCKED", "DONE", "FAILED") or RUN_REPORTS:
+        return  # avec les rapports de tentative (#123), l'email part avec le rapport, une fois par run
     questions = [str(q) for q in (report.get("questions") or []) if str(q).strip()]
     if status == "BLOCKED" and not questions and t["blockers"]:
         questions = [t["blockers"]]
@@ -1293,7 +1315,8 @@ def send_mail(subject, body, attachment_name="", attachment=""):
     msg["Message-ID"] = make_msgid(domain=cfg["FROM"].split("@", 1)[-1])
     msg.set_content(body)
     if attachment_name:
-        msg.add_attachment(attachment.encode("utf-8"), maintype="text", subtype="markdown", filename=attachment_name)
+        # Texte UTF-8 déclaré (charset) : sans lui, les accents du rapport arrivent corrompus.
+        msg.add_attachment(attachment, subtype="markdown", charset="utf-8", filename=attachment_name)
     with smtplib.SMTP_SSL(cfg["HOST"], int(cfg["PORT"]), context=ssl.create_default_context(), timeout=30) as smtp:
         smtp.login(cfg["USERNAME"], cfg["PASSWORD"])
         refused = smtp.send_message(msg)
@@ -1303,7 +1326,11 @@ def send_mail(subject, body, attachment_name="", attachment=""):
 
 def flush_notifications(con):
     """Envoie ce qui est en attente ; un échec n'arrête jamais la file : nouvel essai plus tard
-    (délai croissant, 30 essais au plus). Le message d'erreur ne contient jamais d'identifiant."""
+    (délai croissant, 30 essais au plus). Le message d'erreur ne contient jamais d'identifiant.
+    Fichier SMTP illisible (superviseur isolé par systemd) : rien n'est tenté ni compté, l'envoi
+    revient à l'unité dédiée lodyorch-notify qui, elle seule, lit ce fichier."""
+    if not os.access(NOTIFY_SMTP_ENV, os.R_OK):
+        return
     for nf in con.execute("""SELECT * FROM notifications WHERE sent_at IS NULL AND attempts < 30
                              AND (next_try = '' OR next_try <= ?) ORDER BY created_at""", (iso(),)).fetchall():
         # Réservation atomique : le superviseur et la commande `notify` peuvent vider la file en même
@@ -1330,6 +1357,249 @@ def flush_notifications(con):
         event(con, nf["issue"], "notify", f"Email envoyé : {nf['subject']}")
 
 
+# ---------------------------------------------------------------- rapports de tentative (#123)
+
+def record_run(con, issue, session_id, outcome, detail, report):
+    """Enregistre la tentative (une seule fois par session) puis rédige son rapport, sauf si la CI
+    de la PR livrée est encore en cours : le rapport attend alors son verdict (watch_ci)."""
+    if not RUN_REPORTS or outcome in REPORT_SKIP_OUTCOMES or not session_id:
+        return
+    t = task(con, issue)
+    if not t:
+        return
+    run_id = session_id[:8]
+    waiting = t["status"] == "WAITING_OWNER" and t["ci_state"] == "pending"
+    cur = con.execute("""INSERT OR IGNORE INTO run_reports(run_id,issue,session_id,outcome,detail,report,state,created_at)
+                         VALUES(?,?,?,?,?,?,?,?)""",
+                      (run_id, issue, session_id, outcome, detail or "", json.dumps(report or {}, ensure_ascii=False),
+                       "awaiting_ci" if waiting else "new", iso()))
+    con.commit()
+    if not cur.rowcount:
+        return
+    if waiting:
+        event(con, issue, "report", f"Rapport du run {run_id} : rédigé au verdict de la CI.")
+    else:
+        finalize_run(con, run_id)
+
+
+def finalize_pending_runs(con, issue):
+    for r in con.execute("SELECT run_id FROM run_reports WHERE issue=? AND state='awaiting_ci'", (issue,)).fetchall():
+        finalize_run(con, r["run_id"])
+
+
+def report_state(t, outcome):
+    """État final lisible : terminé / à tester / bloqué / échec (+ précision)."""
+    st, ci = t["status"], t["ci_state"]
+    if st == "DONE":
+        return "terminé"
+    if st == "WAITING_OWNER":
+        return {"success": "à tester — CI verte", "merged": "à tester — PR fusionnée par le propriétaire",
+                "pending": "à tester — CI en cours"}.get(ci, "à tester")
+    if st == "BLOCKED":
+        return "bloqué"
+    if st == "FAILED":
+        return "échec"
+    if ci == "failed":
+        return "échec — CI rouge, correction relancée automatiquement"
+    if outcome == "INTERRUPTED":
+        return "échec — tentative interrompue, ticket repris automatiquement"
+    return "échec — tentative sans livraison, nouvelle tentative automatique"
+
+
+def session_report_text(report):
+    """Rapport détaillé écrit par la session : accepté seulement sous STATE_DIR/reports (une session
+    ne peut pas faire joindre un autre fichier du compte, par exemple des identifiants)."""
+    raw = str((report or {}).get("report_file") or "")
+    if not raw:
+        return ""
+    try:
+        path = Path(raw).resolve()
+        if not path.is_relative_to((STATE_DIR / "reports").resolve()) or not path.is_file():
+            return ""
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def as_list(value):
+    if not value:
+        return []
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return [value] if value.strip() else []
+    return [str(x) for x in value if str(x).strip()] if isinstance(value, list) else [str(value)]
+
+
+def render_run_report(con, r, t):
+    """Rapport standard (rubriques 1 à 7 du ticket #123), en Markdown, secrets masqués."""
+    n, run_id = r["issue"], r["run_id"]
+    report = json.loads(r["report"] or "{}")
+    s = con.execute("SELECT * FROM sessions WHERE id=?", (r["session_id"],)).fetchone()
+    rank = con.execute("SELECT COUNT(*) FROM sessions WHERE issue=? AND started_at <= ?",
+                       (n, s["started_at"] if s else iso())).fetchone()[0]
+    state = report_state(t, r["outcome"])
+    url = f"https://github.com/{REPO}/issues/{n}"
+    num = pr_number(t["pr"])
+    files = gh_list(f"repos/{REPO}/pulls/{num}/files") if num else None
+    commits = gh_list(f"repos/{REPO}/pulls/{num}/commits") if num else None
+    deployed = ("PR fusionnée par le propriétaire ; aucun déploiement fait par lodyorch."
+                if t["ci_state"] == "merged" else
+                "Rien n'est fusionné ni déployé : lodyorch ne fusionne et ne déploie jamais.")
+    out = [REPORT_MARKER.format(run=run_id), "",
+           f"# Rapport lodyorch — {REPORT_PROJECT} — #{n}", "",
+           "| | |", "|---|---|",
+           f"| Projet | {REPORT_PROJECT} |",
+           f"| Date (UTC) | {r['created_at']} |",
+           f"| Ticket | [#{n} — {t['title']}]({url}) |",
+           f"| Session lodyorch | `{r['session_id']}` (tentative n° {rank}) |",
+           f"| Run | `{run_id}` |",
+           f"| Fin de session | {r['outcome']} — {(r['detail'] or '').splitlines()[0][:200] if r['detail'] else '-'} |",
+           f"| **État final** | **{state}** |", "",
+           "## 1. Résumé", "",
+           t["summary"] or str(report.get("summary") or "") or "(aucun résumé : la session n'a pas rendu de rapport)", ""]
+    remaining = str(report.get("remaining") or "").strip()
+    out += [f"**Reste à faire :** {remaining or 'rien de signalé.'}", "", f"**Déploiement :** {deployed}", "",
+            "## 2. Branche, commits, PR, CI et tests", "",
+            f"- Branche : `{t['branch']}`" if t["branch"] else "- Branche : aucune",
+            f"- Dernier commit : [`{t['commit_sha'][:10]}`](https://github.com/{REPO}/commit/{t['commit_sha']})"
+            if t["commit_sha"] else "- Dernier commit : aucun",
+            f"- PR : {t['pr']}" if t["pr"] else "- PR : aucune",
+            f"- CI : {CI_TEXT.get(t['ci_state'], 'non suivie')}" + (f" — {t['ci_detail']}" if t["ci_detail"] else ""),
+            f"- Tests exécutés (déclarés par la session) : {t['tests'] or report.get('tests') or 'non renseignés'}"]
+    if commits:
+        out += ["", "Commits de la PR :"]
+        out += [f"- [`{c['sha'][:10]}`]({c.get('html_url') or ''}) {str(c.get('commit', {}).get('message', '')).splitlines()[0][:120]}"
+                for c in commits[:30]]
+    out += ["", "## 3. Fichiers modifiés", ""]
+    if files:
+        out += [f"- `{f['filename']}` ({f.get('status', '')}, +{f.get('additions', 0)} −{f.get('deletions', 0)})"
+                for f in files[:100]]
+    else:
+        out.append("Non disponible (pas de PR, ou GitHub injoignable au moment du rapport).")
+    cost = s["cost_usd"] if s else None
+    out += ["", "## 4. Risques, coûts et décisions", "",
+            f"- Risques : {report.get('risks') or 'voir la PR (rubrique « Risques »).'}",
+            f"- Coût de la session : {f'{cost:.2f} USD (prix catalogue estimé par Claude Code, pas une facture)' if cost else 'non disponible'}"]
+    questions = as_list(report.get("questions")) or as_list(t["questions"])
+    out += [f"- Question {i} : {q}" for i, q in enumerate(questions, 1)] or ["- Aucune décision du propriétaire demandée."]
+    out += ["", "## 5. Test humain", ""]
+    steps = as_list(report.get("human_tests"))
+    links = as_list(report.get("test_links")) or as_list(t["test_links"])
+    out += [f"{i}. {x}" for i, x in enumerate(steps, 1)] or ["Aucune instruction de test fournie par la session."]
+    out += [f"- Lien : {x}" for x in links]
+    out += ["", "## 6. État final", "", f"**{state}**", ""]
+    if t["blockers"]:
+        out.append(f"- Blocage : {t['blockers']}")
+    if t["deps"]:
+        out.append(f"- Dépendances : {', '.join('#' + d for d in t['deps'].split(',') if d)}")
+    out.append(f"- Prochaine action : {t['next_action'] or '-'}")
+    detail = session_report_text(report).strip()
+    out += ["", "## 7. Identification", "",
+            f"- Run `{run_id}`, session `{r['session_id']}`, ticket #{n}.",
+            f"- Fichier : `{report_file_name(r)}` (archive locale du superviseur, aussi jointe à l'email).",
+            "- Un nouveau run du même ticket produit un nouveau rapport ; celui-ci n'est jamais réécrit."]
+    if detail:
+        out += ["", "## Annexe — rapport détaillé de la session", "", detail]
+    return redact("\n".join(out)) + "\n"
+
+
+def report_file_name(r):
+    when = r["created_at"].replace("T", " ")
+    return f"{when[:10]}_{when[11:13]}{when[14:16]}_lody_issue-{r['issue']}_run-{r['run_id']}.md"
+
+
+def comment_body(md):
+    """Commentaire GitHub = rapport complet ; au-delà de la limite, l'annexe est tronquée (signalé)."""
+    body = f"{BOT_MARKER}\n{md}"
+    if len(body) <= REPORT_COMMENT_MAX:
+        return body
+    note = "\n\n_(Rapport tronqué ici pour GitHub ; version intégrale jointe à l'email et archivée par le superviseur.)_\n"
+    return body[:REPORT_COMMENT_MAX - len(note)] + note
+
+
+def finalize_run(con, run_id):
+    r = con.execute("SELECT * FROM run_reports WHERE run_id=?", (run_id,)).fetchone()
+    t = task(con, r["issue"]) if r else None
+    if not r or not t or r["state"] not in ("new", "awaiting_ci"):
+        return
+    md = render_run_report(con, r, t)
+    folder = STATE_DIR / "reports" / "runs"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / report_file_name(r)
+    path.write_text(md, encoding="utf-8")
+    con.execute("UPDATE run_reports SET state='ready', file=?, finalized_at=? WHERE run_id=?", (str(path), iso(), run_id))
+    con.commit()
+    event(con, r["issue"], "report", f"Rapport du run {run_id} rédigé : {path.name}")
+    link = publish_report(con, run_id)
+    state = report_state(t, r["outcome"])
+    summary = t["summary"] or str(json.loads(r["report"] or "{}").get("summary") or "(aucun résumé)")
+    body = "\n".join([f"Projet : {REPORT_PROJECT}", f"Ticket #{r['issue']} — {t['title']}", f"État : {state}",
+                      f"Run : {run_id} (session {r['session_id']})", "", "Résumé :", summary, "",
+                      f"Rapport complet : {link or 'publication GitHub en attente, il apparaîtra dans le ticket'}",
+                      f"Ticket : https://github.com/{REPO}/issues/{r['issue']}"]
+                     + ([f"PR : {t['pr']}"] if t["pr"] else [])
+                     + ["", "Le rapport complet est joint (Markdown).",
+                        "Répondre dans le ticket GitHub : la réponse est détectée et le travail reprend automatiquement."])
+    queue_notification(con, f"run:{run_id}", r["issue"], state,
+                       f"[{REPORT_PROJECT}] #{r['issue']} — {state.split(' — ')[0]} — {t['title']}",
+                       redact(body), path.name, md)
+
+
+def gh_post_json(path, payload):
+    try:
+        out = subprocess.run([GH, "api", "-X", "POST", path, "--input", "-"], input=json.dumps(payload),
+                             capture_output=True, text=True, timeout=60)
+        return json.loads(out.stdout or "{}") if out.returncode == 0 else None
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError):
+        return None
+
+
+def publish_report(con, run_id):
+    """Commentaire du rapport sur le ticket, une seule fois par run : marqueur cherché sur GitHub
+    avant publication (pas de doublon après un crash). Échec → nouvel essai, délai croissant."""
+    r = con.execute("SELECT * FROM run_reports WHERE run_id=?", (run_id,)).fetchone()
+    if not r or r["state"] != "ready" or r["comment_url"]:
+        return r["comment_url"] if r else ""
+    n, marker, url, error = r["issue"], REPORT_MARKER.format(run=run_id), "", ""
+    comments = gh_list(f"repos/{REPO}/issues/{n}/comments")
+    if comments is None:
+        error = "commentaires du ticket illisibles"
+    else:
+        found = [c for c in comments if marker in (c.get("body") or "")]
+        if found:
+            url = found[0].get("html_url") or f"https://github.com/{REPO}/issues/{n}"
+        else:
+            try:
+                md = Path(r["file"]).read_text(encoding="utf-8")
+            except OSError:
+                md = ""
+            res = gh_post_json(f"repos/{REPO}/issues/{n}/comments", {"body": comment_body(md)}) if md else None
+            if res is not None:
+                url = res.get("html_url") or f"https://github.com/{REPO}/issues/{n}"
+            else:
+                error = "publication refusée ou GitHub injoignable" if md else "fichier du rapport introuvable"
+    if url:
+        con.execute("UPDATE run_reports SET comment_url=?, comment_error='' WHERE run_id=?", (url, run_id))
+        con.commit()
+        event(con, n, "report", f"Rapport du run {run_id} publié : {url}")
+        return url
+    attempts = r["comment_attempts"] + 1
+    delay = min(6 * 3600, 120 * 2 ** attempts)
+    con.execute("UPDATE run_reports SET comment_attempts=?, comment_next=?, comment_error=? WHERE run_id=?",
+                (attempts, iso(datetime.fromtimestamp(time.time() + delay, timezone.utc)), error, run_id))
+    con.commit()
+    event(con, n, "report_error", f"Rapport du run {run_id} non publié ({error}), essai {attempts} : conservé localement.")
+    return ""
+
+
+def flush_reports(con):
+    for r in con.execute("""SELECT run_id FROM run_reports WHERE state='ready' AND comment_url='' AND comment_attempts < 30
+                            AND (comment_next='' OR comment_next <= ?) ORDER BY created_at""", (iso(),)).fetchall():
+        publish_report(con, r["run_id"])
+
+
 # ---------------------------------------------------------------- boucle
 
 def recover_interrupted(con):
@@ -1349,6 +1619,9 @@ def recover_interrupted(con):
                     (iso(), "Superviseur redémarré pendant la session.", s["id"]))
         con.commit()
         event(con, s["issue"], "recovered", f"Session {s['id']} interrompue par un redémarrage du superviseur.")
+        if s["issue"] != TRIAGE:
+            record_run(con, s["issue"], s["id"], "INTERRUPTED",
+                       "Superviseur redémarré pendant la session : ticket repris en premier.", {})
         ctl_set(con, "last_error", f"{iso()} #{s['issue']} INTERRUPTED — superviseur redémarré pendant la session "
                                    "(reprise du ticket en premier).")
 
@@ -1432,6 +1705,8 @@ def supervise():
                 watch_ci(con)
             except Exception as exc:  # noqa: BLE001 — un suivi de CI raté ne doit jamais arrêter la file
                 event(con, None, "ci_error", f"{type(exc).__name__}: {exc}"[:500])
+        if RUN_REPORTS:
+            flush_reports(con)
         if NOTIFY_SMTP_ENV:
             flush_notifications(con)
         blocker = start_blocker(con)
@@ -2272,6 +2547,15 @@ def cmd_sync(con, _):
 
 
 def cmd_notifications(con, args):
+    if args.send:
+        # Unité lodyorch-notify : seule à lire le fichier SMTP ; n'affiche que des compteurs.
+        if not NOTIFY_SMTP_ENV or not os.access(NOTIFY_SMTP_ENV, os.R_OK):
+            print("Fichier SMTP illisible ou non configuré (LQ_NOTIFY_SMTP_ENV) : rien envoyé.")
+            return 2
+        flush_notifications(con)
+        left = con.execute("SELECT COUNT(*) FROM notifications WHERE sent_at IS NULL AND attempts < 30").fetchone()[0]
+        print(f"Emails en attente après envoi : {left}.")
+        return 0
     if args.retry:
         con.execute("UPDATE notifications SET next_try='' WHERE sent_at IS NULL")
         con.commit()
@@ -2280,6 +2564,53 @@ def cmd_notifications(con, args):
         state = f"envoyé {nf['sent_at']}" if nf["sent_at"] else f"EN ATTENTE ({nf['attempts']} essai(s), {nf['last_error'] or '-'})"
         print(f"{nf['created_at']} {nf['subject'][:60]:<60} {state}"
               + (f"  + {nf['attachment_name']}" if nf["attachment_name"] else ""))
+    return 0
+
+
+def cmd_report(con, args):
+    """Rapport de la dernière session du ticket : rédigé s'il manque (session antérieure à #123,
+    rapport perdu), publié s'il attend GitHub ; jamais réécrit."""
+    s = con.execute("SELECT * FROM sessions WHERE issue=? AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT 1",
+                    (args.issue,)).fetchone()
+    if not s:
+        print(f"#{args.issue} : aucune session terminée.")
+        return 2
+    if not RUN_REPORTS:
+        print("Rapports désactivés (LQ_RUN_REPORTS=1 pour les activer).")
+        return 2
+    report = {}
+    status_file = LOG_DIR / f"{s['id']}.status.json"
+    if status_file.is_file():
+        try:
+            report = json.loads(status_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            report = {}
+    record_run(con, args.issue, s["id"], s["outcome"] or "COMPLETED", s["detail"] or "", report)
+    r = con.execute("SELECT * FROM run_reports WHERE run_id=?", (s["id"][:8],)).fetchone()
+    if not r:
+        print(f"#{args.issue} : la session {s['id'][:8]} ({s['outcome']}) n'est pas une tentative, pas de rapport.")
+        return 0
+    if r["state"] == "awaiting_ci":
+        print(f"#{args.issue} run {r['run_id']} : rapport rédigé au verdict de la CI (suivie par le superviseur).")
+        return 0
+    url = publish_report(con, r["run_id"])
+    r = con.execute("SELECT * FROM run_reports WHERE run_id=?", (r["run_id"],)).fetchone()
+    print(f"#{args.issue} run {r['run_id']} : {Path(r['file']).name if r['file'] else '?'} — "
+          + (url or f"publication GitHub en attente ({r['comment_error'] or 'nouvel essai automatique'})"))
+    return 0
+
+
+def cmd_reports(con, _):
+    rows = con.execute("SELECT * FROM run_reports ORDER BY created_at DESC LIMIT 20").fetchall()
+    if not rows:
+        print("Aucun rapport de tentative.")
+    for r in rows:
+        nf = con.execute("SELECT sent_at, attempts FROM notifications WHERE key=?", (f"run:{r['run_id']}",)).fetchone()
+        mail = ("email envoyé" if nf and nf["sent_at"] else f"email en attente ({nf['attempts']} essai(s))" if nf
+                else "email non configuré" if not NOTIFY_SMTP_ENV else "email pas encore en file")
+        where = r["comment_url"] or ("en attente de la CI" if r["state"] == "awaiting_ci"
+                                     else f"GitHub en attente : {r['comment_error'] or '-'}")
+        print(f"{r['created_at']} #{r['issue']:<5} run {r['run_id']} {r['outcome']:<12} {where} · {mail}")
     return 0
 
 
@@ -2457,6 +2788,20 @@ def cmd_check(con, _):
     line(STATE_DIR.is_dir() and (STATE_DIR.stat().st_mode & 0o077) == 0, "dossier d'état privé (0700)", str(STATE_DIR))
     if TMUX_SESSION:
         print(f"  · {console_state()}")
+    if RUN_REPORTS:
+        print(f"  · rapports de tentative : actifs ({STATE_DIR / 'reports' / 'runs'})")
+    if NOTIFY_SMTP_ENV:
+        if os.access(NOTIFY_SMTP_ENV, os.R_OK):
+            try:
+                smtp_settings()
+                line(True, "configuration SMTP réutilisée (valeurs jamais affichées)", NOTIFY_SMTP_ENV)
+            except (OSError, ValueError) as exc:
+                line(False, "configuration SMTP", str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
+        else:
+            line(False, "configuration SMTP lisible par le compte de service", NOTIFY_SMTP_ENV)
+        _, state = ro_run(["systemctl", "is-active", f"{SERVICE}-notify.timer"])
+        print(f"  · envoi des emails : {SERVICE}-notify.timer {state or 'absent'}"
+              + ("" if state == "active" else f" (sudo systemctl enable --now {SERVICE}-notify.timer)"))
     hooks = CONSOLE_SETTINGS.read_text(encoding="utf-8") if CONSOLE_SETTINGS.is_file() else ""
     line(f"{CLI_NAME} human busy" in hooks and f"{CLI_NAME} human idle" in hooks,
          "crochets de la console (priorité humaine)", str(CONSOLE_SETTINGS))
@@ -2499,6 +2844,10 @@ def main():
     s.add_argument("text", nargs="+")
     s = sub.add_parser("notifications")
     s.add_argument("--retry", action="store_true")
+    s.add_argument("--send", action="store_true")
+    s = sub.add_parser("report")
+    s.add_argument("issue", type=int)
+    sub.add_parser("reports")
     s = sub.add_parser("notify")
     s.add_argument("issue", type=int)
     s.add_argument("report")
@@ -2520,6 +2869,7 @@ def main():
             "skip": cmd_skip, "add": cmd_add, "set": cmd_set, "log": cmd_log, "sessions": cmd_sessions,
             "config": cmd_config, "reload": cmd_reload, "sync": cmd_sync,
             "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "labels": cmd_labels,
+            "report": cmd_report, "reports": cmd_reports,
             "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
             "check": cmd_check}[args.cmd](con, args)
     sys.exit(code or 0)

@@ -1,0 +1,21 @@
+[Unit]
+Description=Lody Video Factory — envoi des emails de rapport LODYORCH (aucune session Claude)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Environment=HOME=/home/ubuntu
+EnvironmentFile=/opt/lodyorch/lodyorch.env
+# Vide la file des emails préparés par le superviseur (base d'état), rien d'autre : ni Claude, ni
+# GitHub, ni dépôt. C'est la seule unité qui lit le fichier SMTP, invisible pour le superviseur.
+ExecStart=/usr/bin/python3 /opt/lodyorch/lodyorch.py notifications --send
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/home/ubuntu/.local/state/lodyorch
+InaccessiblePaths=-/srv/moneyprinterturbo -/home/ubuntu/.claude -/home/ubuntu/.config/gh -/home/ubuntu/.ssh -/home/ubuntu/lody-orch

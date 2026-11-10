@@ -107,10 +107,11 @@ def test_ci_failure_relaunches_a_bounded_fix_then_blocks_with_a_diagnostic(orch)
     t = orch.mod.task(orch.con, 1)
     assert t["status"] == "BLOCKED" and "après 2 corrections" in t["blockers"]
     assert "agent:blocked" in orch.labels(1)
-    comments = [c for c in orch.gh()["comments"] if c["issue"] == 1 and "CI en échec" in c["body"]]
+    comments = [c for c in orch.gh()["comments"] if c["issue"] == 1 and "CI en échec" in c["body"]
+                and "lodyorch:rapport" not in c["body"]]  # hors rapports de tentative (#123)
     assert len(comments) == 1
     poll(orch)  # plus suivi : pas de boucle de correction ni de commentaire en double
-    assert len([c for c in orch.gh()["comments"] if "CI en échec" in c["body"]]) == 1
+    assert len([c for c in orch.gh()["comments"] if "CI en échec" in c["body"] and "lodyorch:rapport" not in c["body"]]) == 1
     assert len(orch.claude_calls()) == 3
 
 

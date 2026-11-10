@@ -29,6 +29,25 @@ def test_supervisor_service_runs_unprivileged_and_isolated():
     assert d["ReadWritePaths"].split()[0] == "/home/ubuntu/.local/state/lodyorch"
 
 
+def test_smtp_file_is_read_only_by_the_isolated_notify_unit():
+    """#123 : le superviseur et ses sessions ne voient pas le fichier SMTP ; seule l'unité d'envoi le
+    lit, sans accès à Claude, à GitHub ni au dépôt."""
+    env = instance_env()
+    smtp = env["LQ_NOTIFY_SMTP_ENV"]
+    assert smtp == "/home/ubuntu/.config/plugadmin/smtp.env" and env["LQ_RUN_REPORTS"] == "1"
+    assert "-/home/ubuntu/.config/plugadmin" in dict(directives(SERVICE))["InaccessiblePaths"].split()
+    notify = dict(directives((ORCH_DIR / "systemd" / "lodyorch-notify.service").read_text(encoding="utf-8")))
+    assert notify["Type"] == "oneshot" and notify["User"] == "ubuntu" and notify["NoNewPrivileges"] == "yes"
+    assert notify["ExecStart"] == "/usr/bin/python3 /opt/lodyorch/lodyorch.py notifications --send"
+    assert notify["ProtectSystem"] == "strict" and notify["ProtectHome"] == "read-only"
+    assert notify["ReadWritePaths"] == "/home/ubuntu/.local/state/lodyorch"
+    hidden = notify["InaccessiblePaths"].split()
+    for path in ("-/home/ubuntu/.claude", "-/home/ubuntu/.config/gh", "-/srv/moneyprinterturbo", "-/home/ubuntu/lody-orch"):
+        assert path in hidden
+    timer = (ORCH_DIR / "systemd" / "lodyorch-notify.timer").read_text(encoding="utf-8")
+    assert "OnUnitInactiveSec=2min" in timer and "WantedBy=timers.target" in timer
+
+
 def test_no_second_tmux_console_is_installed():
     # La console est la session interactive du propriétaire : aucun service ne crée de fenêtre.
     assert not (ORCH_DIR / "systemd" / "lodyorch-console.service").exists()
