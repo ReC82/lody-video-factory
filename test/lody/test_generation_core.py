@@ -31,7 +31,7 @@ def test_migrations_create_tables_and_are_idempotent(tmp_path):
     ProductionRepository(path)
     ProductionRepository(path)  # rejeu : sans effet
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 8
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 9
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
     columns = {row[1] for row in connection.execute("PRAGMA table_info(productions)")}

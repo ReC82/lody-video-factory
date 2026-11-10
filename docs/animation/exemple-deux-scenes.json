@@ -1,0 +1,395 @@
+{
+  "schema": "lody.animation/1",
+  "canvas": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920
+  },
+  "scenes": [
+    {
+      "id": "accueil",
+      "duration_frames": 150,
+      "intent": {
+        "narration": "Bonjour ! Je suis Mimo.",
+        "purpose": "Accrocher : présenter le personnage en 5 secondes.",
+        "mood": "enjoué",
+        "notes": "Le salut doit tomber sur « Bonjour »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "colline",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_00000000a002",
+                  "version": 1
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "mimo",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_00000000a001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": -300,
+                    "y": 1500
+                  },
+                  {
+                    "frame": 24,
+                    "x": 540,
+                    "y": 1500
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.9
+                  },
+                  {
+                    "frame": 24,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  },
+                  {
+                    "frame": 30,
+                    "name": "joie"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 30,
+                    "end": 90,
+                    "name": "salut"
+                  },
+                  {
+                    "start": 100,
+                    "end": 140,
+                    "name": "hochement"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          },
+          {
+            "id": "textes",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Bonjour, je suis Mimo",
+                  "style": "title"
+                },
+                "start": 6,
+                "end": 150,
+                "position": [
+                  {
+                    "frame": 6,
+                    "x": 540,
+                    "y": 360
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 20,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "camera": {
+          "keyframes": [
+            {
+              "frame": 0,
+              "x": 540,
+              "y": 960,
+              "zoom": 1.0,
+              "rotation": 0
+            },
+            {
+              "frame": 150,
+              "x": 540,
+              "y": 1100,
+              "zoom": 1.15,
+              "rotation": 0
+            }
+          ],
+          "easing": "ease_in_out"
+        },
+        "speech": {
+          "speaker": "mimo",
+          "cues": [
+            {
+              "text": "Bonjour",
+              "start": 30,
+              "end": 44
+            },
+            {
+              "text": "!",
+              "start": 44,
+              "end": 47
+            },
+            {
+              "text": "Je",
+              "start": 47,
+              "end": 54
+            },
+            {
+              "text": "suis",
+              "start": 57,
+              "end": 64
+            },
+            {
+              "text": "Mimo.",
+              "start": 67,
+              "end": 81
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "fade",
+          "frames": 10
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 60
+        }
+      }
+    },
+    {
+      "id": "graphique",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Regarde : chaque barre pousse, image par image.",
+        "purpose": "Montrer une donnée simple avec un geste de désignation.",
+        "mood": "didactique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "colline",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_00000000a002",
+                  "version": 1
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "scene",
+            "objects": [
+              {
+                "id": "graphique",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_00000000a003",
+                  "version": 1
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 1500,
+                    "y": 800
+                  },
+                  {
+                    "frame": 20,
+                    "x": 720,
+                    "y": 800
+                  }
+                ],
+                "easing": "ease_out",
+                "gestures": [
+                  {
+                    "start": 20,
+                    "end": 80,
+                    "name": "pousser-barres"
+                  }
+                ]
+              },
+              {
+                "id": "mimo",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_00000000a001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1500
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 20,
+                    "value": -6
+                  },
+                  {
+                    "frame": 160,
+                    "value": -6
+                  },
+                  {
+                    "frame": 179,
+                    "value": 0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentre"
+                  },
+                  {
+                    "frame": 150,
+                    "name": "clin-oeil"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 10,
+                    "end": 120,
+                    "name": "designer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          },
+          {
+            "id": "textes",
+            "objects": [
+              {
+                "id": "legende",
+                "type": "text",
+                "text": {
+                  "content": "+40 % en 4 semaines",
+                  "style": "caption"
+                },
+                "start": 80,
+                "end": 180,
+                "position": [
+                  {
+                    "frame": 80,
+                    "x": 720,
+                    "y": 1120
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "mimo",
+          "cues": [
+            {
+              "text": "Regarde",
+              "start": 12,
+              "end": 30
+            },
+            {
+              "text": ":",
+              "start": 30,
+              "end": 33
+            },
+            {
+              "text": "chaque",
+              "start": 36,
+              "end": 50
+            },
+            {
+              "text": "barre",
+              "start": 53,
+              "end": 64
+            },
+            {
+              "text": "pousse,",
+              "start": 67,
+              "end": 80
+            },
+            {
+              "text": "image",
+              "start": 90,
+              "end": 104
+            },
+            {
+              "text": "par",
+              "start": 107,
+              "end": 114
+            },
+            {
+              "text": "image.",
+              "start": 117,
+              "end": 131
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "slide_left",
+          "frames": 12
+        },
+        "transition_out": {
+          "type": "fade",
+          "frames": 15
+        },
+        "fallback": {
+          "type": "asset",
+          "asset": {
+            "id": "ast_00000000a002",
+            "version": 1
+          }
+        }
+      }
+    }
+  ]
+}

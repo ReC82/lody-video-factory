@@ -338,7 +338,7 @@ class ProductionService:
             project_id=parent.project_id, subject=parent.subject, provider=parent.provider,
             status=ProductionStatus.BROUILLON, parent_production_id=parent.id, brief=parent.brief,
             script=parent.script, script_source="previous", params=parent.params, storyboard=parent.storyboard,
-            visual_prompts=parent.visual_prompts, snapshot=inherited, cost_currency=parent.cost_currency, cost_low=parent.cost_low,
+            visual_prompts=parent.visual_prompts, snapshot=inherited, animation=parent.animation, cost_currency=parent.cost_currency, cost_low=parent.cost_low,
             cost_high=parent.cost_high, cost_partial=parent.cost_partial, cost_detail=parent.cost_detail,
             current_step="Brouillon de V2",
         )
