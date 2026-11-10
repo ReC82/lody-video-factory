@@ -34,6 +34,14 @@ InaccessiblePaths=-/srv/moneyprinterturbo -/home/ubuntu/.config/plugadmin -/home
 ReadOnlyPaths=-/srv -/opt -/home/ubuntu/Dig -/home/ubuntu/LodyLand -/home/ubuntu/.local/state
 ReadWritePaths=/home/ubuntu/.local/state/lodyorch -/home/ubuntu/.local/state/claude
 PrivateTmp=yes
+# Ressources : l'hôte (2 CPU, ~4 Go) est partagé avec la production Lody. Les sessions (Claude, tests,
+# rendus Remotion/Chrome) sont freinées au-delà de 1,4 Go et ne dépassent jamais 1,8 Go ni 1,5 CPU ;
+# poids CPU/disque réduits pour laisser la priorité aux conteneurs de production.
+MemoryHigh=1400M
+MemoryMax=1800M
+CPUQuota=150%
+CPUWeight=50
+IOWeight=50
 
 [Install]
 WantedBy=multi-user.target

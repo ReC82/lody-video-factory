@@ -48,6 +48,12 @@ def test_smtp_file_is_read_only_by_the_isolated_notify_unit():
     assert "OnUnitInactiveSec=2min" in timer and "WantedBy=timers.target" in timer
 
 
+def test_sessions_are_resource_capped_to_protect_production():
+    d = dict(directives(SERVICE))
+    assert (d["MemoryHigh"], d["MemoryMax"], d["CPUQuota"]) == ("1400M", "1800M", "150%")
+    assert d["CPUWeight"] == "50" and d["IOWeight"] == "50"
+
+
 def test_no_second_tmux_console_is_installed():
     # La console est la session interactive du propriétaire : aucun service ne crée de fenêtre.
     assert not (ORCH_DIR / "systemd" / "lodyorch-console.service").exists()
