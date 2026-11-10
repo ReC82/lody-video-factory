@@ -1,0 +1,6 @@
+#!/bin/sh
+# Commande LODYORCH : superviseur Claude de Lody Video Factory (voir docs/lodyorch.md).
+set -a
+. /opt/lodyorch/lodyorch.env
+set +a
+exec /usr/bin/python3 /opt/lodyorch/lodyorch.py "$@"

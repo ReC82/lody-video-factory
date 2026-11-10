@@ -43,6 +43,7 @@ test_*.py
 !test/services/test_*.py
 !test/test_*.py
 !test/lody/test_*.py
+!test/lodyorch/test_*.py
 streamlit.log
 .coverage
 coverage.xml
