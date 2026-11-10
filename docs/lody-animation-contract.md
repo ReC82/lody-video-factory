@@ -1,8 +1,8 @@
 # Contrat de storyboard animé 2D et catalogue d'assets (`lody.animation/1`)
 
 > Ticket #119. Couche de **données** uniquement : aucun rendu, aucune interface, aucun appel payant.
-> Le moteur de rendu (worker Remotion prototypé en #118) et le mode de projet « Animation 2D / Hybride »
-> arrivent avec #120 ; la réédition ciblée par scène avec #121.
+> Le moteur de rendu et le mode de projet « Animation 2D / Hybride » : voir
+> [lody-animation-provider.md](lody-animation-provider.md) (#120) ; la réédition ciblée par scène avec #121.
 
 Un projet ou une production **sans animation fonctionne exactement comme avant** : rien du pipeline
 MoneyPrinterTurbo ne lit ces données, et `productions.animation` vaut `{}` pour toute production classique.

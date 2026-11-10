@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from lody import catalog, db
+from lody.animation import modes as render_modes
 from lody.brief import BRIEF_KEY, validate_brief, with_legacy_voice
 from lody.seeds import ADDITIVE_BRIEF_KEYS
 from lody.secrets_guard import SECRET_MESSAGE, find_secret_path
@@ -196,6 +197,9 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
                 clean["settings"] = {**raw_settings, BRIEF_KEY: clean_brief}
             else:
                 errors["settings"] = "Les paramètres de production sont invalides."
+        # #120 : mode de rendu (Classique / Animation 2D / Hybride) ; absent = Classique, inconnu = refusé.
+        if render_modes.SETTINGS_KEY in raw_settings and raw_settings[render_modes.SETTINGS_KEY] not in render_modes.RENDER_MODES:
+            errors["render_mode"] = "Mode de rendu inconnu : " + ", ".join(render_modes.RENDER_MODES.values()) + "."
 
     # Garde-fou secrets : tout champ texte, plateformes et réglages.
     for key in ("name", "description", "tone", "visual_style", "voice_name", "platforms", "settings"):

@@ -10,6 +10,7 @@ import json
 
 import streamlit as st
 
+from lody.animation import modes as render_modes
 from lody import brief as brief_lib
 from lody import catalog, nav, project_transfer, voice_picker
 from lody.characters import CharacterRepository
@@ -70,7 +71,8 @@ def _submit(repo: ProjectRepository, project_id: str) -> None:
             voice_provider=ss.get(f"{p}_voice_provider"),
             voice_name=ss.get(f"{p}_voice_name"),
             music_provider=ss.get(f"{p}_music_provider"),
-            settings={**project.settings, brief_lib.BRIEF_KEY: new_brief},
+            settings={**project.settings, brief_lib.BRIEF_KEY: new_brief,
+                      render_modes.SETTINGS_KEY: ss.get(f"{p}_render_mode") or render_modes.project_render_mode(project.settings)},
         )
     except ProjectValidationError as error:
         ss[ERRORS_KEY] = error.errors
@@ -338,6 +340,14 @@ def render(repo: ProjectRepository, project: Project, states: States, character_
                     )
                 error_under("language")
                 error_under("format")
+                modes_list = list(render_modes.RENDER_MODES)
+                current_mode = render_modes.project_render_mode(project.settings)
+                st.radio(
+                    "Mode de rendu des vidéos", modes_list, index=modes_list.index(current_mode),
+                    format_func=lambda value: render_modes.RENDER_MODES[value], horizontal=True, key=f"{p}_render_mode",
+                    help=" ".join(f"{render_modes.RENDER_MODES[m]} : {render_modes.DESCRIPTIONS[m]}" for m in modes_list),
+                )
+                error_under("render_mode")
                 low, high = brief_lib.DURATION_LIMITS
                 st.slider(
                     "Durée cible (secondes)", min_value=min(low, current["duration_min"]),
