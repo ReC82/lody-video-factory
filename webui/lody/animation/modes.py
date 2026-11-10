@@ -1,6 +1,6 @@
 """Mode de rendu d'un projet (#120) : Classique, Animation 2D ou Hybride.
 
-- **Classique** (défaut) : le pipeline historique MoneyPrinterTurbo, strictement inchangé. Un projet qui
+- **Classique** (défaut) : le pipeline du moteur historique, strictement inchangé. Un projet qui
   n'a jamais choisi de mode est classique ; sa demande, son instantané et leur empreinte ne changent pas.
 - **Animation 2D** : le storyboard animé figé (#119) est rendu scène par scène par le worker 2D ; une scène
   en échec fait échouer la production (rien n'est présenté comme animé s'il ne l'est pas).
@@ -26,8 +26,8 @@ DESCRIPTIONS = {
     HYBRID: "Storyboard animé 2D ; une scène en échec est remplacée par son image de repli, signalée.",
 }
 
-# Identifiants des fournisseurs (chaînes, pour éviter tout import circulaire avec ``lody.generation``).
-CLASSIC_PROVIDER = "moneyprinterturbo"
+# Identifiant du fournisseur 2D (chaîne, pour éviter tout import circulaire avec ``lody.generation``). Le
+# fournisseur Classique n'est nommé que par son connecteur (``runtime.DEFAULT_PROVIDER``).
 ANIMATION_PROVIDER = "animation_2d"
 
 
@@ -41,9 +41,9 @@ def is_animated(mode: str) -> bool:
     return mode in (ANIMATION, HYBRID)
 
 
-def provider_for_mode(mode: str) -> str:
-    """Fournisseur d'un mode : le moteur historique pour Classique, le worker 2D sinon."""
-    return ANIMATION_PROVIDER if is_animated(mode) else CLASSIC_PROVIDER
+def provider_for_mode(mode: str, classic_provider: str) -> str:
+    """Fournisseur d'un mode : ``classic_provider`` (moteur historique) pour Classique, le worker 2D sinon."""
+    return ANIMATION_PROVIDER if is_animated(mode) else classic_provider
 
 
 def validate_mode(value: Any) -> str:

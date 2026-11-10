@@ -151,8 +151,8 @@ def _submit(world: World, project, storyboard, mode=None, key="prd_000000000001-
 def test_render_mode_defaults_to_classic_and_maps_providers():
     assert modes.project_render_mode({}) == modes.CLASSIC
     assert modes.project_render_mode({"render_mode": "inconnu"}) == modes.CLASSIC
-    assert modes.provider_for_mode(modes.CLASSIC) == "moneyprinterturbo"
-    assert modes.provider_for_mode(modes.ANIMATION) == modes.provider_for_mode(modes.HYBRID) == "animation_2d"
+    assert modes.provider_for_mode(modes.CLASSIC, "historique") == "historique"
+    assert modes.provider_for_mode(modes.ANIMATION, "historique") == modes.provider_for_mode(modes.HYBRID, "x") == "animation_2d"
 
 
 def test_project_render_mode_is_validated_and_stored(tmp_path):

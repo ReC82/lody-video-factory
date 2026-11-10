@@ -142,8 +142,7 @@ def _provider_id(project: Project) -> str:
     """Démonstration si demandée ; sinon le fournisseur du mode de rendu du projet (#120)."""
     if st.session_state.get(_keys(project)["demo"]):
         return DEMO_PROVIDER
-    animated = render_modes.is_animated(render_modes.project_render_mode(project.settings))
-    return ANIMATION_PROVIDER if animated else DEFAULT_PROVIDER
+    return render_modes.provider_for_mode(render_modes.project_render_mode(project.settings), DEFAULT_PROVIDER)
 
 
 def _uploaded_storyboard(project: Project) -> object | None:
