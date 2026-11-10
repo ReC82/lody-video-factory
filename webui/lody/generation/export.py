@@ -44,6 +44,7 @@ _IDENTIFIER_KEYS = {
     "id", "ref", "production_id", "projet_id", "project_id", "tache_moteur_id", "task_id",
     "production_parente_id", "parent_production_id", "production_racine_id", "root_production_id",
     "character_id", "location_id", "voice_id", "external_voice_id", "reference_image", "video_ref",
+    "sha256",  # #119 : empreintes du storyboard animé figé, jamais un secret
 }
 
 
@@ -159,6 +160,8 @@ def build_config_export(production: Production, images: list[dict[str, str]] | N
              "prompt_image_final": scene.get("prompt"), "duree_estimee_s": scene.get("seconds")}
             for scene in (production.storyboard or [])
         ] or UNAVAILABLE,
+        # #119 : storyboard animé FIGÉ (versions d'assets + empreinte), tel qu'enregistré pour CETTE production.
+        "storyboard_anime": production.animation or "aucun : production classique (sans animation 2D)",
         "scenes_prompts_envoyes_au_moteur": trace.get("scenes") or UNAVAILABLE,
         "correspondance_scene_image": _scene_image_correspondence(production, images),
         "modele_images": trace.get("image_model") or UNAVAILABLE,

@@ -222,6 +222,51 @@ def _voice_direction(connection: sqlite3.Connection) -> None:
     _add_columns(connection, "characters", {"voice_direction": "TEXT NOT NULL DEFAULT '{}'"})
 
 
+# Animation 2D (#119) : catalogue d'assets réutilisables d'un projet, à versions immuables. Les liens vers un
+# personnage ou un lieu sont des TEXT nus vérifiés par ``lody.animation.assets`` (même raison que
+# ``productions.template_id``) ; ``characters``/``locations`` ne sont pas modifiés. Le déclencheur garantit
+# qu'une version publiée n'est jamais réécrite, même par un accès SQL direct.
+ANIMATION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS animation_assets (
+    id            TEXT PRIMARY KEY,
+    project_id    TEXT NOT NULL REFERENCES projects (id),
+    name          TEXT NOT NULL,
+    kind          TEXT NOT NULL CHECK (kind IN ('character', 'background', 'prop', 'overlay')),
+    description   TEXT NOT NULL DEFAULT '',
+    character_id  TEXT CHECK (character_id IS NULL OR kind = 'character'),
+    location_id   TEXT CHECK (location_id IS NULL OR kind = 'background'),
+    is_active     INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_animation_assets_project
+    ON animation_assets (project_id, is_active DESC, name COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS animation_asset_versions (
+    asset_id    TEXT NOT NULL REFERENCES animation_assets (id),
+    version     INTEGER NOT NULL CHECK (version >= 1),
+    manifest    TEXT NOT NULL,
+    sha256      TEXT NOT NULL,
+    notes       TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (asset_id, version)
+);
+CREATE TRIGGER IF NOT EXISTS trg_animation_asset_versions_immutable
+    BEFORE UPDATE ON animation_asset_versions
+BEGIN
+    SELECT RAISE(ABORT, 'version d''asset immuable : publier une nouvelle version');
+END;
+"""
+
+
+def _animation(connection: sqlite3.Connection) -> None:
+    """v9 (#119) : catalogue d'assets d'animation 2D et storyboard animé FIGÉ d'une production.
+
+    ``productions.animation`` vaut '{}' pour toute production existante et pour toute production classique :
+    le pipeline historique ne la lit jamais, son comportement est strictement inchangé."""
+    connection.executescript(ANIMATION_SCHEMA)
+    _add_columns(connection, "productions", {"animation": "TEXT NOT NULL DEFAULT '{}'"})
+
+
 MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
@@ -231,6 +276,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (6, _reference_images),
     (7, _voice_direction),
     (8, _production_templates),
+    (9, _animation),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 

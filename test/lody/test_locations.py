@@ -42,7 +42,7 @@ def test_fresh_database_has_zero_locations_and_reaches_the_latest_schema(tmp_pat
     assert repo.list_for_project(project.id) == []
     assert repo.count_for_project(project.id) == 0
     connection = sqlite3.connect(path)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 8
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 9
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"projects", "productions", "publication_kits", "characters", "locations"} <= tables
 

@@ -1,0 +1,189 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_00000000a001",
+      "name": "Mimo — marionnette",
+      "kind": "character",
+      "description": "Personnage fictif du POC #118 (pas Eli).",
+      "is_active": true,
+      "character": "Mimo",
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 900,
+            "anchor": {
+              "x": 0.5,
+              "y": 1.0
+            },
+            "parts": [
+              "body",
+              "head",
+              "eyes",
+              "eyelids",
+              "mouth",
+              "arm-left",
+              "arm-right",
+              "ears"
+            ],
+            "expressions": [
+              "neutre",
+              "joie",
+              "surprise",
+              "concentre"
+            ],
+            "gestures": [
+              "salut",
+              "designer",
+              "au-revoir",
+              "hochement"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/mimo/v1/mimo.svg",
+                "sha256": "3907037571ff5ef6f3a72510bbb015fbd799f3217df61384085a3f65559ddc65"
+              }
+            ]
+          },
+          "sha256": "122bd674318ced76fa1321036c0363b68ef21779dfb107e71af21cc87a9e7e00",
+          "notes": "Première marionnette."
+        },
+        {
+          "version": 2,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 900,
+            "anchor": {
+              "x": 0.5,
+              "y": 1.0
+            },
+            "parts": [
+              "body",
+              "head",
+              "eyes",
+              "eyelids",
+              "mouth",
+              "arm-left",
+              "arm-right",
+              "ears"
+            ],
+            "expressions": [
+              "neutre",
+              "joie",
+              "surprise",
+              "concentre",
+              "clin-oeil"
+            ],
+            "gestures": [
+              "salut",
+              "designer",
+              "au-revoir",
+              "hochement"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/mimo/v2/mimo.svg",
+                "sha256": "8e7e9d36503f904a71b405fb0888178de29555b38d2ad8fd1ec0caf99edb4994"
+              }
+            ]
+          },
+          "sha256": "16fc57dbfccd7c377375b6fa79de961faab1b9d718fede3a43be106d477cbc64",
+          "notes": "Ajout de l'expression clin-oeil."
+        }
+      ]
+    },
+    {
+      "id": "ast_00000000a002",
+      "name": "Colline au lever du soleil",
+      "kind": "background",
+      "description": "Décor vertical 9:16.",
+      "is_active": true,
+      "character": null,
+      "location": "Colline",
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1080,
+            "height": 1920,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "ciel",
+              "soleil",
+              "nuages",
+              "collines",
+              "herbe"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/colline/v1/colline.svg",
+                "sha256": "495d1fbabb80d3453734a6f91f5c69024a4998df0a188dc3ae423fdd2e3b3632"
+              },
+              {
+                "role": "still",
+                "path": "animation-assets/colline/v1/colline.png",
+                "sha256": "7e4b6b9d28ae702fcc6bc804e1b8e44fac37783c09c51f0c0d597bf87f6ebdb7"
+              }
+            ]
+          },
+          "sha256": "0bc22e7a59bc244e34300e701be1338f6e2acbe5ec164f9c79e3bace83c24923",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "ast_00000000a003",
+      "name": "Graphique à barres",
+      "kind": "prop",
+      "description": "Carte avec 4 barres animables.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 640,
+            "height": 520,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "carte",
+              "barre-1",
+              "barre-2",
+              "barre-3",
+              "barre-4"
+            ],
+            "gestures": [
+              "pousser-barres"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/graphique/v1/graphique.svg",
+                "sha256": "eef93e1d14482804277fca0172464032d1a4fdbcc338524059fa1e861454ad4d"
+              }
+            ]
+          },
+          "sha256": "70edb918a3b19c3367b30ea8d3a8505dc2ffe7db485026ab9bd322528584ff84",
+          "notes": ""
+        }
+      ]
+    }
+  ]
+}

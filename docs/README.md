@@ -20,6 +20,8 @@ ainsi que l'existence des fichiers liés.
   vidéo, architecture du module de génération, coûts, stockage et limitations connues.
 - [Contrat du moteur historique](lody-engine-contract.md) — contrat de l'API MoneyPrinterTurbo
   utilisée comme connecteur hérité, relevé dans le code et connu du seul `mpt_connector.py`.
+- [Contrat de storyboard animé 2D](lody-animation-contract.md) — format `lody.animation/1` d'une
+  scène animée, catalogue d'assets réutilisables versionnés et gel des versions par production.
 
 ## Voix
 

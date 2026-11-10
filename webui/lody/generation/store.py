@@ -19,23 +19,26 @@ from pathlib import Path
 from typing import Any
 
 from lody import db
+from lody.animation.contract import validate_document
 from lody.generation.models import ACTIVE_STATUSES, ProductionStatus
 from lody.secrets_guard import find_secret_path
 
 JSON_COLUMNS = ("brief", "storyboard", "visual_prompts", "params", "cost_detail", "assets", "warnings", "snapshot",
-                "trace", "template_snapshot")
+                "trace", "template_snapshot", "animation")
 _JSON_DEFAULTS: dict[str, Any] = {
     "brief": {}, "storyboard": [], "visual_prompts": [], "params": {}, "cost_detail": {}, "assets": [], "warnings": [],
-    "snapshot": {}, "trace": {}, "template_snapshot": {},
+    "snapshot": {}, "trace": {}, "template_snapshot": {}, "animation": {},
 }
 UPDATABLE = frozenset({
     "subject", "brief", "script", "script_source", "storyboard", "visual_prompts", "params",
     "cost_currency", "cost_low", "cost_high", "cost_partial", "cost_detail", "confirmed_at", "provider",
     "external_task_id", "status", "progress", "current_step", "error_code", "error_message",
     "started_at", "finished_at", "last_polled_at", "video_ref", "video_duration", "assets", "warnings",
-    "snapshot", "trace",
+    "snapshot", "trace", "animation",
 })
 # L'instantané des paramètres du projet n'est écrit qu'à la préparation (brouillon) : jamais après lancement.
+# Même règle pour le storyboard animé figé (#119) : il fige les versions d'assets utilisées par CETTE production.
+FROZEN_COLUMNS = frozenset({"snapshot", "animation"})
 SNAPSHOT_WRITABLE_FROM = frozenset({ProductionStatus.BROUILLON, ProductionStatus.EN_ATTENTE_CONFIRMATION})
 # Colonnes de contenu saisi ou dérivé du brief : jamais de clé. (Les identifiants de tâche et les
 # chemins de fichiers ressemblent à des jetons opaques : ils sont validés ailleurs, pas ici.)
@@ -91,6 +94,13 @@ class Production:
     # Valeurs neutres par défaut : une production sans template reste le cas normal.
     template_id: str | None = None
     template_snapshot: dict[str, Any] = field(default_factory=dict)
+    # #119 : storyboard animé FIGÉ (contrat ``lody.animation/1``, versions d'assets explicites + empreinte).
+    # ``{}`` = production classique : le pipeline historique ne lit jamais ce champ.
+    animation: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_animated(self) -> bool:
+        return bool(self.animation)
 
     @property
     def label(self) -> str:
@@ -143,6 +153,9 @@ class ProductionRepository:
     def _encode(column: str, value: Any) -> Any:
         if column in GUARDED and find_secret_path({column: value} if not isinstance(value, (dict, list)) else value):
             raise ValueError("Une clé secrète ne peut pas être enregistrée dans une production.")
+        if column == "animation" and value:
+            # Seul un storyboard FIGÉ et intact entre en base (versions explicites, empreinte vérifiée).
+            value = validate_document(value, require_pinned=True)
         if column in JSON_COLUMNS:
             return json.dumps(value, ensure_ascii=False)
         if column in ("cost_low", "cost_high"):
@@ -225,7 +238,7 @@ class ProductionRepository:
         return self.get(production_id)
 
     def update(self, production_id: str, **fields: Any) -> Production:
-        if "snapshot" in fields:
+        if FROZEN_COLUMNS & set(fields):
             raise ValueError("L'instantané des paramètres est immuable : il ne s'écrit qu'à la préparation.")
         if not fields:
             return self.get(production_id)
@@ -247,7 +260,7 @@ class ProductionRepository:
         lancement (deux clics, deux onglets).
         """
         sources = [ProductionStatus(status).value for status in allowed_from]
-        if "snapshot" in fields and not {ProductionStatus(status) for status in allowed_from} <= SNAPSHOT_WRITABLE_FROM:
+        if FROZEN_COLUMNS & set(fields) and not {ProductionStatus(status) for status in allowed_from} <= SNAPSHOT_WRITABLE_FROM:
             raise ValueError("L'instantané des paramètres est immuable une fois la production confirmée.")
         values = self._prepare(fields)
         assignments = ", ".join(f"{name} = :{name}" for name in values)
