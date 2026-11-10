@@ -705,6 +705,13 @@ def run_session(con, t):
                     set_phase(con, t["issue"], "pause demandée : priorité à la console")
                 elif time.time() - yield_at > setting(con, "yield_grace_seconds")[0]:
                     reason = "Priorité humaine : session de file arrêtée après le délai de rangement."
+            elif yield_file.exists():
+                # La console est redevenue calme avant la fin du délai : restrictions levées, la session
+                # reprend avec toutes ses permissions (pas d'arrêt, pas de nouvelle session consommée).
+                # Un nouvel échange reposera le fichier avec un délai de rangement complet.
+                yield_file.unlink()
+                event(con, t["issue"], "yield", "Console redevenue calme : restrictions levées, la session continue.")
+                set_phase(con, t["issue"], "reprise : la console est redevenue calme")
             if reason:
                 pass  # priorité humaine : délai de rangement écoulé
             elif ctl_get(con, "mode") == "STOP_NOW":
