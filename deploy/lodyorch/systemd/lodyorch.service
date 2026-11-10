@@ -1,0 +1,39 @@
+[Unit]
+Description=Lody Video Factory — superviseur des sessions Claude (LODYORCH, instance LQORCH/DIGORCH dédiée)
+After=network-online.target
+Wants=network-online.target
+# Pas de boucle de relance : au plus 5 redémarrages par heure, puis systemd abandonne.
+StartLimitIntervalSec=3600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Compte de service des autres superviseurs : jamais root.
+User=ubuntu
+Environment=HOME=/home/ubuntu
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/opt/lodyorch/lodyorch.env
+WorkingDirectory=/home/ubuntu/lody-orch
+ExecStart=/usr/bin/python3 /opt/lodyorch/lodyorch.py run
+# Relancé seulement après un plantage. Après « lodyorch stop », refuse de retravailler avant « lodyorch resume ».
+Restart=on-failure
+RestartSec=120
+# « systemctl stop » arrête aussi la session Claude en cours (préférer « lodyorch stop »).
+KillMode=control-group
+TimeoutStopSec=90
+# Isolation imposée par le noyau au superviseur ET à ses sessions Claude (héritée) :
+# - NoNewPrivileges : sudo et tout binaire setuid deviennent inopérants (donc ni docker, ni
+#   systemctl, ni changement de compte) ;
+# - l'arbre de production Lody (config.toml et ses sauvegardes, secrets/, storage/, data/) et les
+#   fichiers SMTP/clés des autres projets sont invisibles ;
+# - les autres projets et superviseurs sont en lecture seule (leurs bases d'état restent lisibles
+#   pour le quota partagé), le système (/usr, /etc, /boot) aussi.
+NoNewPrivileges=yes
+ProtectSystem=full
+InaccessiblePaths=-/srv/moneyprinterturbo -/home/ubuntu/.config/plugadmin -/home/ubuntu/.config/dig -/home/ubuntu/.ssh -/etc/dig
+ReadOnlyPaths=-/srv -/opt -/home/ubuntu/Dig -/home/ubuntu/LodyLand -/home/ubuntu/.local/state
+ReadWritePaths=/home/ubuntu/.local/state/lodyorch -/home/ubuntu/.local/state/claude
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

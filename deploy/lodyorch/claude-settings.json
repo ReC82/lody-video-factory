@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "/usr/bin/python3 /opt/lodyorch/guard.py" }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Bash(sudo:*)",
+      "Bash(docker:*)",
+      "Bash(systemctl:*)",
+      "Bash(tmux:*)",
+      "Bash(gh pr merge:*)",
+      "Read(/srv/**)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.config/gh/**)",
+      "Edit(/srv/**)",
+      "Edit(/opt/**)"
+    ]
+  }
+}
