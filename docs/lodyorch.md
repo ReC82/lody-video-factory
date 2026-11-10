@@ -41,9 +41,9 @@ Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgque
 | Sources versionnées | `deploy/lodyorch/` (ce dépôt) |
 | Code installé, prompt, configuration | `/opt/lodyorch/` (root, lecture seule pour les sessions) |
 | Commande | `/usr/local/bin/lodyorch` |
-| Service | `lodyorch.service` (file, sans fenêtre) |
+| Service | `lodyorch.service` (file, sans fenêtre) ; `lodyorch-notify.timer` (emails des rapports) |
 | Console | session tmux `lodyorch` du propriétaire ; crochets dans `/srv/moneyprinterturbo/.claude/settings.local.json` (exclu de Git) |
-| État, verrou, journaux, rapports | `~/.local/state/lodyorch/` (0700 : `state.db`, `supervisor.lock`, `sessions/*.jsonl`, `reports/`) |
+| État, verrou, journaux, rapports | `~/.local/state/lodyorch/` (0700 : `state.db`, `supervisor.lock`, `sessions/*.jsonl`, `reports/`, `reports/runs/`) |
 | Clone dédié | `~/lody-orch/repo` (jamais `/srv/moneyprinterturbo`) |
 | Worktrees | `~/lody-orch/worktrees/ticket-<n>`, environnement Python partagé `~/lody-orch/venv` |
 
@@ -132,6 +132,43 @@ Une PR n'est jamais annoncée prête tant que sa CI n'a pas été constatée ver
 l'est pas tant que la PR de sa base n'est pas verte elle aussi. Fusion ou fermeture de la PR : fin
 du suivi. Les sessions font lint et tests ciblés avant de pousser ; la suite complète tourne en CI.
 
+## Rapport permanent par tentative (ticket #123)
+
+Après chaque tentative (livraison, blocage, échec, crash, interruption récupérée au redémarrage du
+superviseur), **le superviseur** rédige un rapport standard. Ce n'est pas Claude qui le rédige : il existe donc même quand la
+session a planté. Une session arrêtée pour laisser la main à la console ou par une limite du fournisseur
+n'est pas une tentative et ne produit pas de rapport.
+
+- **Contenu** : projet, date UTC, ticket et lien, session et run ; résumé en français ; reste à faire ;
+  ce qui est déployé (jamais rien par lodyorch) ; branche, commits et PR (lus sur GitHub), état de la
+  CI, tests déclarés ; fichiers modifiés ; risques, coût estimé, questions ; test humain numéroté
+  (`human_tests` du JSON de fin) ; état final (terminé / à tester / bloqué / échec + cause, blocage,
+  dépendances, prochaine action) ; identifiant du run. Le rapport détaillé écrit par la session est
+  joint en annexe, seulement s'il se trouve sous `reports/` (aucun autre fichier du compte ne peut
+  être joint). Les motifs de secrets sont masqués.
+- **Livraison avec PR** : le rapport attend le verdict de la CI (suivie par le superviseur) pour
+  l'inclure ; CI rouge → rapport « échec — correction relancée », puis un nouveau rapport pour la
+  tentative de correction.
+- **Archive** : `~/.local/state/lodyorch/reports/runs/YYYY-MM-DD_HHMM_lody_issue-N_run-ID.md`, écrit
+  une fois et jamais réécrit. Un nouveau run du même ticket produit un nouveau fichier.
+- **Lien permanent** : le rapport complet est publié en **commentaire du ticket**, marqué
+  `<!-- lodyorch:rapport run=ID -->`. Le marqueur est cherché avant publication : jamais de doublon,
+  même après un crash. Si GitHub est indisponible, le rapport reste archivé et la publication est
+  retentée (délai croissant). Pour « lis le rapport #N » : dernier commentaire « Rapport lodyorch » du ticket.
+- **Email** : sujet `[Lody Video Factory] #N — état — intitulé`, résumé et lien du commentaire dans
+  le corps, Markdown en pièce jointe, une fois par run. Transport et destinataire : le fichier SMTP
+  existant de PlugAdmin (comme digorch et jury-central). **Le superviseur et ses sessions ne le voient
+  pas** (systemd) : les emails sont préparés dans la base d'état puis envoyés par
+  `lodyorch-notify.service`. Cette unité, déclenchée par un timer toutes les 2 min, lit le fichier sans jamais le copier ni l'afficher. Elle n'a
+  accès ni à Claude, ni à GitHub, ni au dépôt. En cas d'échec SMTP, de nouveaux essais sont faits, sans refaire le travail
+  (30 au plus, délai croissant). Le message d'erreur ne contient jamais d'identifiant.
+
+```
+lodyorch reports                 derniers rapports : lien du commentaire, email envoyé ou en attente
+lodyorch report N                rapport de la dernière session de N (rédigé s'il manque, publié s'il attend)
+lodyorch notifications [--retry] emails envoyés / en attente ; --retry : nouvel essai immédiat
+```
+
 ## Garde-fous
 
 - **Compte de service `ubuntu`, jamais root.** L'authentification Claude Code existante est
@@ -170,6 +207,7 @@ compte au prochain démarrage de Claude dans la console (ou après validation da
 
 ```sh
 sudo systemctl enable --now lodyorch.service   # la file démarre, sans fenêtre
+sudo systemctl enable --now lodyorch-notify.timer  # emails des rapports
 lodyorch console                               # rattache LA console ; la crée seulement si absente
 ```
 
@@ -181,6 +219,7 @@ lodyorch console                rattacher la console tmux lodyorch (créée seul
 lodyorch pulse                  point d'activité en 3 lignes (fenêtre « activite »)
 lodyorch check                  contrôles d'installation (lecture seule)
 lodyorch labels [--apply]       labels du dépôt comparés au protocole (#117)
+lodyorch reports | report N     rapports de tentative (#123)
 lodyorch queue | log [N] | sessions
 lodyorch pause | resume         ne plus démarrer de session / reprendre (resume réarme le disjoncteur)
 lodyorch stop [--now]           arrêter après la session en cours, ou tout de suite
@@ -194,8 +233,8 @@ Mise à jour : `sudo deploy/lodyorch/install.sh` (sauvegarde dans `~/backups/lod
 `lodyorch reload`. Retour arrière : réinstaller les fichiers de la sauvegarde dans `/opt/lodyorch/`,
 `sudo systemctl daemon-reload`, `lodyorch reload`.
 
-Désinstallation : `lodyorch stop`, `sudo systemctl disable --now lodyorch.service`, puis
-supprimer `/etc/systemd/system/lodyorch.service`, `/opt/lodyorch`, `/usr/local/bin/lodyorch` et les
+Désinstallation : `lodyorch stop`, `sudo systemctl disable --now lodyorch.service lodyorch-notify.timer`, puis
+supprimer `/etc/systemd/system/lodyorch*.service`, `/etc/systemd/system/lodyorch-notify.timer`, `/opt/lodyorch`, `/usr/local/bin/lodyorch` et les
 entrées `lodyorch` de `/srv/moneyprinterturbo/.claude/settings.local.json`. L'état (`~/.local/state/lodyorch`) et le clone peuvent être conservés.
 
 ## Tests
@@ -206,4 +245,5 @@ dépendances, verrou visible, PR exclues, verrou d'exclusion, reprise après cra
 temporisation et abandon, disjoncteur, refus sans authentification ni garde, masquage des
 journaux, `status`/`pulse`/`phase`/`check`, crochet de garde, unité systemd, console unique
 (crochets fusionnés sans écrasement, `lodyorch console` sans renommage, priorité humaine, rangement
-puis reprise de la session de file) et installation à blanc. Faux `gh` et faux `claude` : aucun réseau, aucun appel au modèle.
+puis reprise de la session de file), rapports de tentative (faux SMTP, panne SMTP, panne GitHub,
+idempotence, masquage) et installation à blanc. Faux `gh` et faux `claude` : aucun réseau, aucun appel au modèle.

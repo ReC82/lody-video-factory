@@ -1,0 +1,10 @@
+[Unit]
+Description=Lody Video Factory — envoi périodique des emails de rapport LODYORCH
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

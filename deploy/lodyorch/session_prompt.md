@@ -120,7 +120,9 @@ commande arbitraire.
    que la CI est verte si tu ne l'as pas constaté.
 5. Rapport Markdown dans `{{STATE_DIR}}/reports/ticket-{{ISSUE}}.md` (mêmes rubriques que la PR,
    plus les décisions prises seul et ce qui reste à faire ; section datée ajoutée si le fichier
-   existe). Il n'est pas commité.
+   existe). Il n'est pas commité. Le superviseur en tire le **rapport standard de la tentative**
+   (publié dans le ticket et envoyé par email) : ne publie pas toi-même de second rapport, mais
+   renseigne `risks` et `human_tests` dans le JSON de fin.
 6. Conserve le worktree du ticket (une relance CI le réutilise) ; le superviseur ne le supprime pas
    non plus. Conserve la branche.
 
@@ -153,6 +155,8 @@ fichier, puis `gh issue comment {{ISSUE}} --repo ReC82/lody-video-factory --body
   "remaining": "ce qui reste à réaliser, ou vide",
   "report_url": "lien de la PR ou du commentaire de livraison",
   "report_file": "{{STATE_DIR}}/reports/ticket-{{ISSUE}}.md",
+  "risks": "risques et régressions possibles, ou « aucun identifié »",
+  "human_tests": ["étape 1 concrète (page, action, résultat attendu)", "…"],
   "blockers": "ce qui bloque, ce qui a été tenté",
   "deps": "",
   "next_action": "prochaine action précise",

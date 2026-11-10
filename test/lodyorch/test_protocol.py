@@ -68,7 +68,7 @@ def test_claim_comment_is_published_once_even_across_crashes(orch):
     orch.cycle(mode="crash")
     orch.mod.update_task(orch.con, 1, not_before="")
     orch.cycle(mode="deliver")
-    comments = [c for c in orch.gh()["comments"] if c["issue"] == 1]
+    comments = [c for c in orch.gh()["comments"] if c["issue"] == 1 and orch.mod.CLAIM_MARKER in c["body"]]
     assert len(comments) == 1
     assert orch.mod.CLAIM_MARKER in comments[0]["body"] and orch.mod.BOT_MARKER in comments[0]["body"]
     assert "Aucune fusion ni aucun déploiement automatique" in comments[0]["body"]
@@ -81,7 +81,7 @@ def test_claim_already_on_github_is_not_duplicated(orch):
                          "issue_url": "x/issues/1", "author_association": "OWNER", "created_at": "2026-11-10T00:00:00Z"}]
     orch.set_gh(data)
     orch.cycle()
-    assert len([c for c in orch.gh()["comments"] if c["issue"] == 1]) == 1
+    assert len([c for c in orch.gh()["comments"] if c["issue"] == 1 and orch.mod.CLAIM_MARKER in c["body"]]) == 1
     assert orch.mod.task(orch.con, 1)["claimed"] == 1
 
 

@@ -5,7 +5,8 @@
   puis le rapport de fin dans LQ_STATUS_FILE selon FAKE_CLAUDE_MODE :
   `deliver` (WAITING_OWNER + PR), `blocked`, `crash` (aucun résultat, code 1), `secret` (fuite simulée
   d'un jeton dans la sortie, qui doit être masquée dans le journal). FAKE_CLAUDE_SLEEP : durée
-  simulée de la session avant son rapport (essais de reprise)."""
+  simulée de la session avant son rapport (essais de reprise). FAKE_CLAUDE_EXTRA : JSON fusionné
+  dans le rapport de fin."""
 
 import json
 import os
@@ -38,6 +39,7 @@ def main(argv):
               "commit_sha": "abc1234",
               "tests": "pytest ok", "questions": ["Q1 ?"] if status == "BLOCKED" else [],
               "blockers": "décision nécessaire" if status == "BLOCKED" else ""}
+    report.update(json.loads(os.environ.get("FAKE_CLAUDE_EXTRA") or "{}"))
     with open(os.environ["LQ_STATUS_FILE"], "w", encoding="utf-8") as fh:
         json.dump(report, fh)
     print(json.dumps({"type": "result", "result": "fini", "is_error": False, "total_cost_usd": 0.01}), flush=True)

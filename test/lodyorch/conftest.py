@@ -27,6 +27,10 @@ def instance_env():
     return env
 
 
+def _no_real_smtp(*_args, **_kwargs):
+    raise AssertionError("connexion SMTP réelle interdite dans les tests")
+
+
 def shim(path, script):
     path.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
     path.chmod(0o755)
@@ -61,6 +65,8 @@ class Harness:
             monkeypatch.setenv(key, value)
         self.monkeypatch = monkeypatch
         self.mod = self.load()
+        # Filet : aucun test ne peut ouvrir de connexion SMTP réelle (un test SMTP pose son faux serveur).
+        monkeypatch.setattr(self.mod.smtplib, "SMTP_SSL", _no_real_smtp)
         self.con = self.mod.db()
 
     def load(self):
