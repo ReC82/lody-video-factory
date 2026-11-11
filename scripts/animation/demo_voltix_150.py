@@ -156,16 +156,18 @@ def scene_coaxial(s: dict, coax_id: str) -> dict:
     d, (c3, c4) = s["duration"], s["cues"]
     step = max(6, (c3["end"] - c3["start"]) // 5)
     t = [c3["start"] + i * step for i in range(4)]
-    labels = [("l-ame", "Âme en cuivre", 870, 400, t[0]), ("l-isolant", "Isolant", 770, 720, t[1]),
-              ("l-tresse", "Tresse (blindage)", 520, 400, t[2]), ("l-gaine", "Gaine", 260, 720, t[3])]
+    # Étiquettes alternées au-dessus / au-dessous du câble, centrées sur leur couche et sans chevauchement
+    # (coupe à l'échelle 1,05 centrée en x = 540 : gaine ≈ 277, tresse ≈ 575, isolant ≈ 773, âme ≈ 935).
+    labels = [("l-ame", "Âme en cuivre", 860, 430, t[0]), ("l-isolant", "Isolant", 860, 800, t[1]),
+              ("l-tresse", "Tresse (blindage)", 480, 800, t[2]), ("l-gaine", "Gaine", 277, 430, t[3])]
     texts = [text(i, c, "label", [k(0, x=x, y=y)], start=f,
                   scale=[k(f, value=0.5), k(f + 8, value=1.0)], easing="spring") for i, c, x, y, f in labels]
-    texts.append(text("ohms", "75 Ω", "title", [k(0, x=540, y=900)], start=c4["start"] + 6,
+    texts.append(text("ohms", "75 Ω", "title", [k(0, x=300, y=1040)], start=c4["start"] + 6,
                       scale=[k(c4["start"] + 6, value=0.3), k(c4["start"] + 20, value=1.15)], easing="spring"))
-    coax = asset("coax", coax_id, [k(0, x=-520, y=560), k(16, x=540, y=560)], scale=[k(0, value=1.05)],
+    coax = asset("coax", coax_id, [k(0, x=-520, y=610), k(16, x=540, y=610)], scale=[k(0, value=1.05)],
                  easing="ease_out")
-    voltix = asset("voltix", VOLTIX, [k(0, x=800, y=1490)], scale=[k(0, value=0.95)],
-                   expressions=[k(0, name="concentration"), k(c4["start"], name="sourire")],
+    voltix = asset("voltix", VOLTIX, [k(0, x=800, y=1490)], scale=[k(0, value=0.8)],
+                   expressions=[k(0, name="neutre"), k(c4["start"], name="sourire")],
                    gestures=[{"start": c3["start"], "end": c4["start"] - 2, "name": "montrer"},
                              {"start": c4["start"], "end": min(d, c4["start"] + 28), "name": "rebond"}],
                    lipsync=True)
@@ -173,8 +175,8 @@ def scene_coaxial(s: dict, coax_id: str) -> dict:
             "intent": {"narration": " ".join(t for t, _ in LINES["coaxial"]), "purpose": "Expliquer le câble"},
             "render": {"layers": [{"id": "schema", "objects": [coax]}, {"id": "etiquettes", "objects": texts},
                                   {"id": "personnages", "objects": [voltix]}],
-                       "camera": {"keyframes": [cam(0, 540, 960, 1.0), cam(c3["end"], 560, 820, 1.08),
-                                                cam(d, 540, 900, 1.02)]},
+                       "camera": {"keyframes": [cam(0, 540, 960, 1.0), cam(c3["end"], 540, 960, 1.03),
+                                                cam(d, 540, 960, 1.0)]},
                        "speech": {"speaker": "voltix", "cues": s["cues"]},
                        "transition_in": {"type": "slide_left", "frames": 12},
                        "fallback": {"type": "still", "frame": c4["start"] + 20}}}
@@ -183,20 +185,20 @@ def scene_coaxial(s: dict, coax_id: str) -> dict:
 def scene_bnc(s: dict, coax_id: str) -> dict:
     d, (c5, c6, c7) = s["duration"], s["cues"]
     push, turn = c6["start"] + 4, c6["start"] + (c6["end"] - c6["start"]) // 2
-    male = asset("bnc-male", BNC_M, [k(0, x=-420, y=640), k(c5["start"] + 18, x=270, y=640),
-                                     k(push, x=270, y=640), k(push + 10, x=460, y=640)],
-                 scale=[k(0, value=1.5)], easing="ease_out")
-    femelle = asset("bnc-femelle", BNC_F, [k(0, x=1500, y=640), k(c5["start"] + 12, x=720, y=640)],
-                    scale=[k(0, value=1.5)], easing="ease_out")
-    labels = [text("l-male", "BNC mâle", "label", [k(0, x=300, y=830)], start=c5["start"] + 18),
-              text("l-femelle", "BNC femelle · 75 Ω", "label", [k(0, x=760, y=450)], start=c5["start"] + 12),
-              text("quart", "↻ ¼ de tour", "subtitle", [k(0, x=540, y=960)], start=turn, end=c7["start"] + 4,
+    male = asset("bnc-male", BNC_M, [k(0, x=-420, y=600), k(c5["start"] + 18, x=250, y=600),
+                                     k(push, x=250, y=600), k(push + 10, x=420, y=600)],
+                 scale=[k(0, value=1.3)], easing="ease_out")
+    femelle = asset("bnc-femelle", BNC_F, [k(0, x=1500, y=600), k(c5["start"] + 12, x=680, y=600)],
+                    scale=[k(0, value=1.3)], easing="ease_out")
+    labels = [text("l-male", "BNC mâle", "label", [k(0, x=250, y=790)], start=c5["start"] + 18),
+              text("l-femelle", "BNC femelle · 75 Ω", "label", [k(0, x=760, y=790)], start=c5["start"] + 12),
+              text("quart", "↻ ¼ de tour", "subtitle", [k(0, x=300, y=1000)], start=turn, end=c7["start"] + 4,
                    rotation=[k(turn, value=-20), k(turn + 14, value=0)], easing="spring"),
-              text("clic", "Clic !", "title", [k(0, x=640, y=560)], start=c7["start"],
+              text("clic", "Clic !", "title", [k(0, x=560, y=400)], start=c7["start"],
                    scale=[k(c7["start"], value=0.3), k(c7["start"] + 12, value=1.3)],
                    rotation=[k(c7["start"], value=-8)], easing="spring")]
-    voltix = asset("voltix", VOLTIX, [k(0, x=540, y=1490)], scale=[k(0, value=1.0)],
-                   expressions=[k(0, name="concentration"), k(c7["start"], name="surprise"),
+    voltix = asset("voltix", VOLTIX, [k(0, x=810, y=1490)], scale=[k(0, value=0.8)],
+                   expressions=[k(0, name="neutre"), k(c6["start"], name="concentration"), k(c7["start"], name="surprise"),
                                 k(c7["start"] + 14, name="sourire")],
                    gestures=[{"start": c5["start"], "end": c6["end"], "name": "montrer"},
                              {"start": c7["start"], "end": c7["start"] + 28, "name": "rebond"},
@@ -207,8 +209,8 @@ def scene_bnc(s: dict, coax_id: str) -> dict:
             "render": {"layers": [{"id": "connecteurs", "objects": [femelle, male]},
                                   {"id": "etiquettes", "objects": labels},
                                   {"id": "personnages", "objects": [voltix]}],
-                       "camera": {"keyframes": [cam(0, 540, 960, 1.0), cam(push + 10, 470, 760, 1.12),
-                                                cam(c7["end"], 540, 900, 1.0)]},
+                       "camera": {"keyframes": [cam(0, 540, 960, 1.0), cam(push + 10, 540, 960, 1.04),
+                                                cam(c7["end"], 540, 960, 1.0)]},
                        "speech": {"speaker": "voltix", "cues": s["cues"]},
                        "transition_in": {"type": "slide_left", "frames": 12},
                        "transition_out": {"type": "fade", "frames": 12},

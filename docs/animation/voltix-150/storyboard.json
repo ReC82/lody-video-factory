@@ -1,0 +1,785 @@
+{
+ "schema": "lody.animation/1",
+ "canvas": {
+  "fps": 30,
+  "width": 1080,
+  "height": 1920
+ },
+ "scenes": [
+  {
+   "id": "accueil",
+   "duration_frames": 167,
+   "intent": {
+    "narration": "Salut, moi c'est Voltix ! Aujourd'hui : le câble SDI.",
+    "purpose": "Accroche",
+    "mood": "enjoué"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "Le câble SDI",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 250
+         }
+        ],
+        "start": 76,
+        "scale": [
+         {
+          "frame": 76,
+          "value": 0.4
+         },
+         {
+          "frame": 90,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "sous-titre",
+        "type": "text",
+        "text": {
+         "content": "BNC · coaxial 75 Ω",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 380
+         }
+        ],
+        "start": 88,
+        "opacity": [
+         {
+          "frame": 88,
+          "value": 0
+         },
+         {
+          "frame": 100,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_666bab603c91",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1480
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.22
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 0,
+          "end": 28,
+          "name": "rebond"
+         },
+         {
+          "start": 30,
+          "end": 60,
+          "name": "saluer"
+         },
+         {
+          "start": 80,
+          "end": 155,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 167,
+       "x": 540,
+       "y": 930,
+       "zoom": 1.06,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Salut, moi c'est Voltix !",
+       "start": 14,
+       "end": 72
+      },
+      {
+       "text": "Aujourd'hui : le câble SDI.",
+       "start": 80,
+       "end": 151
+      }
+     ]
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 10
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 24
+    }
+   }
+  },
+  {
+   "id": "coaxial",
+   "duration_frames": 167,
+   "intent": {
+    "narration": "Le signal vidéo voyage dans un câble coaxial… … d'une impédance de 75 ohms.",
+    "purpose": "Expliquer le câble"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "schema",
+      "objects": [
+       {
+        "id": "coax",
+        "type": "asset",
+        "asset": {
+         "id": "ast_84b6f18dae26",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": -520,
+          "y": 610
+         },
+         {
+          "frame": 16,
+          "x": 540,
+          "y": 610
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.05
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "etiquettes",
+      "objects": [
+       {
+        "id": "l-ame",
+        "type": "text",
+        "text": {
+         "content": "Âme en cuivre",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 860,
+          "y": 430
+         }
+        ],
+        "start": 14,
+        "scale": [
+         {
+          "frame": 14,
+          "value": 0.5
+         },
+         {
+          "frame": 22,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "l-isolant",
+        "type": "text",
+        "text": {
+         "content": "Isolant",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 860,
+          "y": 800
+         }
+        ],
+        "start": 29,
+        "scale": [
+         {
+          "frame": 29,
+          "value": 0.5
+         },
+         {
+          "frame": 37,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "l-tresse",
+        "type": "text",
+        "text": {
+         "content": "Tresse (blindage)",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 480,
+          "y": 800
+         }
+        ],
+        "start": 44,
+        "scale": [
+         {
+          "frame": 44,
+          "value": 0.5
+         },
+         {
+          "frame": 52,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "l-gaine",
+        "type": "text",
+        "text": {
+         "content": "Gaine",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 277,
+          "y": 430
+         }
+        ],
+        "start": 59,
+        "scale": [
+         {
+          "frame": 59,
+          "value": 0.5
+         },
+         {
+          "frame": 67,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ohms",
+        "type": "text",
+        "text": {
+         "content": "75 Ω",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 300,
+          "y": 1040
+         }
+        ],
+        "start": 106,
+        "scale": [
+         {
+          "frame": 106,
+          "value": 0.3
+         },
+         {
+          "frame": 120,
+          "value": 1.15
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_666bab603c91",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 800,
+          "y": 1490
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.8
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "neutre"
+         },
+         {
+          "frame": 100,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 14,
+          "end": 98,
+          "name": "montrer"
+         },
+         {
+          "start": 100,
+          "end": 128,
+          "name": "rebond"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 92,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.03,
+       "rotation": 0
+      },
+      {
+       "frame": 167,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Le signal vidéo voyage dans un câble coaxial…",
+       "start": 14,
+       "end": 92
+      },
+      {
+       "text": "… d'une impédance de 75 ohms.",
+       "start": 100,
+       "end": 153
+      }
+     ]
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 12
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 120
+    }
+   }
+  },
+  {
+   "id": "bnc",
+   "duration_frames": 252,
+   "intent": {
+    "narration": "Au bout : une fiche BNC. On pousse, on tourne d'un quart de tour… Clic ! C'est verrouillé.",
+    "purpose": "Montrer le verrouillage BNC"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "connecteurs",
+      "objects": [
+       {
+        "id": "bnc-femelle",
+        "type": "asset",
+        "asset": {
+         "id": "ast_23f447be304e",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 1500,
+          "y": 600
+         },
+         {
+          "frame": 26,
+          "x": 680,
+          "y": 600
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.3
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "bnc-male",
+        "type": "asset",
+        "asset": {
+         "id": "ast_fd71e6d20dca",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": -420,
+          "y": 600
+         },
+         {
+          "frame": 32,
+          "x": 250,
+          "y": 600
+         },
+         {
+          "frame": 93,
+          "x": 250,
+          "y": 600
+         },
+         {
+          "frame": 103,
+          "x": 420,
+          "y": 600
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.3
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "etiquettes",
+      "objects": [
+       {
+        "id": "l-male",
+        "type": "text",
+        "text": {
+         "content": "BNC mâle",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 790
+         }
+        ],
+        "start": 32
+       },
+       {
+        "id": "l-femelle",
+        "type": "text",
+        "text": {
+         "content": "BNC femelle · 75 Ω",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 760,
+          "y": 790
+         }
+        ],
+        "start": 26
+       },
+       {
+        "id": "quart",
+        "type": "text",
+        "text": {
+         "content": "↻ ¼ de tour",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 300,
+          "y": 1000
+         }
+        ],
+        "start": 124,
+        "end": 172,
+        "rotation": [
+         {
+          "frame": 124,
+          "value": -20
+         },
+         {
+          "frame": 138,
+          "value": 0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "clic",
+        "type": "text",
+        "text": {
+         "content": "Clic !",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 560,
+          "y": 400
+         }
+        ],
+        "start": 168,
+        "scale": [
+         {
+          "frame": 168,
+          "value": 0.3
+         },
+         {
+          "frame": 180,
+          "value": 1.3
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 168,
+          "value": -8
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_666bab603c91",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 810,
+          "y": 1490
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.8
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "neutre"
+         },
+         {
+          "frame": 89,
+          "name": "concentration"
+         },
+         {
+          "frame": 168,
+          "name": "surprise"
+         },
+         {
+          "frame": 182,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 14,
+          "end": 160,
+          "name": "montrer"
+         },
+         {
+          "start": 168,
+          "end": 196,
+          "name": "rebond"
+         },
+         {
+          "start": 198,
+          "end": 228,
+          "name": "saluer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 103,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.04,
+       "rotation": 0
+      },
+      {
+       "frame": 212,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Au bout : une fiche BNC.",
+       "start": 14,
+       "end": 81
+      },
+      {
+       "text": "On pousse, on tourne d'un quart de tour…",
+       "start": 89,
+       "end": 160
+      },
+      {
+       "text": "Clic ! C'est verrouillé.",
+       "start": 168,
+       "end": 212
+      }
+     ]
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 12
+    },
+    "transition_out": {
+     "type": "fade",
+     "frames": 12
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 178
+    }
+   }
+  }
+ ],
+ "frozen": {
+  "at": "2026-11-11T10:04:50+00:00",
+  "assets": [
+   {
+    "id": "ast_23f447be304e",
+    "version": 1,
+    "sha256": "b9ee29528da4a07dde80647ee6e1c76ce160b800acab616abf0e0614b2d69d09",
+    "kind": "prop",
+    "name": "Embase BNC femelle"
+   },
+   {
+    "id": "ast_666bab603c91",
+    "version": 1,
+    "sha256": "ddf8a04d0177474ab09335994ced9f825e05ade1630a8157760e1afee31dce97",
+    "kind": "character",
+    "name": "Voltix — marionnette"
+   },
+   {
+    "id": "ast_84b6f18dae26",
+    "version": 1,
+    "sha256": "a399c30b950d29a20b22a18c0fd30771ea0408c158a384aaf1261ecb3337997d",
+    "kind": "prop",
+    "name": "Câble coaxial 75 Ω — coupe"
+   },
+   {
+    "id": "ast_fd71e6d20dca",
+    "version": 1,
+    "sha256": "8352fed3fa3570cfb6cc5f4d8e556a50f871d66b3ecd10fed45f6bf2fc96948c",
+    "kind": "prop",
+    "name": "Fiche BNC mâle"
+   }
+  ],
+  "sha256": "0fb9a6ca3387d106adca9e2e9187a33d1a7de39efb518d325ffaf39b88e66720"
+ }
+}

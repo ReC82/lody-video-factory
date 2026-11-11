@@ -95,12 +95,10 @@ moteur pour un repli `still` ; à défaut, un carton neutre. La source utilisée
 
 ## Limites connues (suites proposées)
 
-- **Adaptateur Remotion du contrat** : le prototype #118 rend une scène codée en dur. Le composant qui
-  interprète `lody.animation-scene/1` (calques, images-clés, easing, caméra, gestes) reste à écrire,
-  ainsi que l'image Docker du worker (Node 22, Chrome headless, polices figées). La licence Remotion
-  doit être tranchée avant (voir #118).
-- **Voix off et musique** : pas encore de TTS dans le rendu 2D, la vidéo est muette et le préflight
-  l'annonce. Le worker sait déjà mixer un `audio.wav` placé dans le dossier de tâche.
+- **Moteur de scène** : livré par #150 (`renderers/remotion`, voir [lody-animation-remotion.md](lody-animation-remotion.md)).
+  Restent l'image Docker du worker (Node 22, Chrome headless, polices figées) et la licence Remotion (#118).
+- **Voix off et musique** : le worker mixe `voice.wav` + `music.wav` (#150), mais la synthèse vocale n'est pas
+  encore appelée par le fournisseur : sans fichier déposé, la vidéo reste muette et le préflight l'annonce.
 - **Import des fichiers d'assets** : le catalogue (#119) référence des chemins du dossier de données, mais
   aucun écran ne téléverse encore ces fichiers.
 - Réédition ciblée par scène et contrôle qualité : #121.

@@ -26,6 +26,8 @@ ainsi que l'existence des fichiers liés.
   projet (Classique, Animation 2D, Hybride), fournisseur `animation_2d`, worker isolé et reprise.
 - [Voltix — fiche personnage et rig SVG](lody-voltix.md) — mascotte jaune aux jambes à ressort :
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
+- [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
+  rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
 
 ## Voix
 
