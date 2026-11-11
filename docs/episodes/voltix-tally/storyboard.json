@@ -1,0 +1,2257 @@
+{
+  "schema": "lody.animation/1",
+  "canvas": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920
+  },
+  "scenes": [
+    {
+      "id": "accroche",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Cette petite lumière rouge sur une caméra ? Elle peut vous éviter une énorme bourde en direct !",
+        "purpose": "Accrocher : la bourde en direct que le Tally évite.",
+        "mood": "énergique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "camera-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "plaque-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "plaque-3",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 3",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "presentateur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1500
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  },
+                  {
+                    "frame": 90,
+                    "name": "surprise"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voyants",
+            "objects": [
+              {
+                "id": "v1-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v2-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v2-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1040
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 2300
+                  },
+                  {
+                    "frame": 18,
+                    "x": 820,
+                    "y": 1750
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 60,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 20,
+                    "end": 60,
+                    "name": "rebond"
+                  },
+                  {
+                    "start": 70,
+                    "end": 150,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              },
+              {
+                "id": "panneau-oups",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14000000000a",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 1100
+                  }
+                ],
+                "start": 30,
+                "scale": [
+                  {
+                    "frame": 30,
+                    "value": 0.2
+                  },
+                  {
+                    "frame": 45,
+                    "value": 1.0
+                  }
+                ],
+                "easing": "spring"
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "regie",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Dans une émission à plusieurs caméras, le réalisateur choisit l'image qui part à l'antenne.",
+        "purpose": "Poser le contexte : plusieurs caméras, un réalisateur qui choisit.",
+        "mood": "explicatif"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Régie",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 260
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 1750
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 60,
+                    "name": "saluer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "asset",
+          "asset": {
+            "id": "ast_140000000002",
+            "version": "latest"
+          }
+        }
+      }
+    },
+    {
+      "id": "flux",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Toutes les caméras arrivent au mélangeur, et une seule image sort vers le programme.",
+        "purpose": "Montrer le trajet de l'image : caméras, mélangeur, programme.",
+        "mood": "schématique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "schema-flux",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000009",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 900
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 15,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Caméras → Mélangeur → Programme",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 260
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 1750
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 20,
+                    "end": 120,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "question",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Mais comment le présentateur sait-il quelle caméra le filme en direct ? Grâce au Tally !",
+        "purpose": "Poser la question et nommer le Tally.",
+        "mood": "intrigué"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "presentateur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1350
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "surprise"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 90,
+                    "name": "tourner-tete"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "interrogation",
+                "type": "text",
+                "text": {
+                  "content": "?",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 700
+                  }
+                ],
+                "start": 0,
+                "end": 120
+              },
+              {
+                "id": "tally",
+                "type": "text",
+                "text": {
+                  "content": "Tally",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "start": 120
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 1750
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "confusion"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 120,
+                    "end": 170,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "voyant-rouge",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Le mélangeur renvoie un signal à la caméra choisie, et son voyant s'allume, généralement en rouge.",
+        "purpose": "Expliquer le signal retour et le voyant situé sur la caméra.",
+        "mood": "explicatif"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1100
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.6
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1500
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voyants",
+            "objects": [
+              {
+                "id": "v1-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 820
+                  }
+                ]
+              },
+              {
+                "id": "v1-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 820
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 110,
+                    "value": 0
+                  },
+                  {
+                    "frame": 120,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "antenne",
+                "type": "text",
+                "text": {
+                  "content": "À l'antenne",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "start": 120
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 1780
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 110,
+                    "end": 200,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "commutation",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Regardez : caméra un, rouge. On change de plan… caméra deux, rouge !",
+        "purpose": "Démontrer la commutation : le rouge suit la caméra à l'antenne.",
+        "mood": "dynamique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "camera-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "plaque-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "plaque-3",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 3",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1410
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voyants",
+            "objects": [
+              {
+                "id": "v1-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v1-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1040
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  },
+                  {
+                    "frame": 95,
+                    "value": 1
+                  },
+                  {
+                    "frame": 100,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "v2-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v2-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1040
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 155,
+                    "value": 0
+                  },
+                  {
+                    "frame": 160,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "v3-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1040
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1780
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  },
+                  {
+                    "frame": 160,
+                    "name": "surprise"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 160,
+                    "end": 200,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 180
+        }
+      }
+    },
+    {
+      "id": "bon-regard",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Le présentateur regarde la bonne caméra, et l'opérateur sait qu'il doit garder son cadrage.",
+        "purpose": "Bénéfice : présentateur et opérateur savent quoi faire.",
+        "mood": "rassurant"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 760,
+                    "y": 1150
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.9
+                  }
+                ]
+              },
+              {
+                "id": "operateur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 900,
+                    "y": 1150
+                  }
+                ]
+              },
+              {
+                "id": "presentateur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 280,
+                    "y": 1450
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  },
+                  {
+                    "frame": 40,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 40,
+                    "name": "tourner-tete"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voyants",
+            "objects": [
+              {
+                "id": "v2-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 760,
+                    "y": 990
+                  }
+                ]
+              },
+              {
+                "id": "v2-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 760,
+                    "y": 990
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1800
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 60,
+                    "end": 120,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "previsualisation",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Sur certains systèmes, une autre couleur, souvent verte, signale la caméra prête en prévisualisation.",
+        "purpose": "Nuance : couleur de prévisualisation selon équipement.",
+        "mood": "précis"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "camera-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.7
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "plaque-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1410
+                  }
+                ]
+              },
+              {
+                "id": "plaque-3",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 3",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1410
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voyants",
+            "objects": [
+              {
+                "id": "v1-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v1-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 240,
+                    "y": 1040
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "v2-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v3-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1040
+                  }
+                ]
+              },
+              {
+                "id": "v3-vert",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000006",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 840,
+                    "y": 1040
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 60,
+                    "value": 0
+                  },
+                  {
+                    "frame": 70,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "preview",
+                "type": "text",
+                "text": {
+                  "content": "Prévisualisation",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 280
+                  }
+                ],
+                "start": 70
+              },
+              {
+                "id": "selon",
+                "type": "text",
+                "text": {
+                  "content": "Selon équipement",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 400
+                  }
+                ],
+                "start": 90
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1780
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 70,
+                    "end": 180,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "attention",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Attention : ce n'est pas le voyant d'enregistrement, et les couleurs dépendent du matériel.",
+        "purpose": "Lever la confusion avec le voyant d'enregistrement.",
+        "mood": "prudent"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "objets",
+            "objects": [
+              {
+                "id": "camescope",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14000000000b",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 280,
+                    "y": 900
+                  }
+                ]
+              },
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 900
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voyants",
+            "objects": [
+              {
+                "id": "v1-eteint",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 760
+                  }
+                ]
+              },
+              {
+                "id": "v1-rouge",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 760
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "rec",
+                "type": "text",
+                "text": {
+                  "content": "REC",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 280,
+                    "y": 680
+                  }
+                ]
+              },
+              {
+                "id": "tally",
+                "type": "text",
+                "text": {
+                  "content": "Tally",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 1180
+                  }
+                ]
+              },
+              {
+                "id": "different",
+                "type": "text",
+                "text": {
+                  "content": "≠",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 900
+                  }
+                ]
+              },
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Tally ≠ REC",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1780
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 90,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "chute",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Voilà, le Tally, c'est le petit signal lumineux qui évite de regarder du mauvais côté !",
+        "purpose": "Chute humoristique avant / après.",
+        "mood": "comique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau-haut",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 480
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plateau-bas",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1440
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "plateau",
+            "objects": [
+              {
+                "id": "presentateur-avant",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 400,
+                    "y": 600
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "surprise"
+                  }
+                ]
+              },
+              {
+                "id": "presentateur-apres",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_140000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 400,
+                    "y": 1560
+                  }
+                ],
+                "start": 60,
+                "expressions": [
+                  {
+                    "frame": 60,
+                    "name": "sourire"
+                  }
+                ]
+              },
+              {
+                "id": "panneau-oups",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14000000000a",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 760,
+                    "y": 420
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "texte",
+            "objects": [
+              {
+                "id": "avant",
+                "type": "text",
+                "text": {
+                  "content": "Avant",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 160,
+                    "y": 120
+                  }
+                ]
+              },
+              {
+                "id": "apres",
+                "type": "text",
+                "text": {
+                  "content": "Après",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 160,
+                    "y": 1080
+                  }
+                ],
+                "start": 60
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 1800
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.3
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 60,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 60,
+                    "name": "rebond"
+                  },
+                  {
+                    "start": 90,
+                    "end": 170,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    }
+  ]
+}
