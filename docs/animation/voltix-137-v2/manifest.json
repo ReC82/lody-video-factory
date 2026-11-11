@@ -1,0 +1,142 @@
+{
+ "schema": "lody.animation-render/1",
+ "mode": "animation_2d",
+ "frames": 1918,
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "expected_seconds": 63.933,
+ "duration_seconds": 63.93,
+ "sha256": "d454ee1a8b15189fb9de7077e059577978cf4307916e31e698a1cccf0050faf9",
+ "size_bytes": 5291131,
+ "storyboard_sha256": "ba8a71aa61e39e0569c140af19ec9b8fc63f7a8c4db32701ef1496fec95fc290",
+ "render_ms": 369090,
+ "subtitle_cues": 25,
+ "audio": {
+  "voice": {
+   "provisional": true,
+   "source": "Piper fr_FR-upmc-medium (locuteur pierre), synthèse locale",
+   "license": "CC BY-SA 4.0 (modèle)",
+   "note": "Aucune voix choisie dans la fiche Voltix : voix de test provisoire, à remplacer."
+  },
+  "music": {
+   "provisional": true,
+   "source": "scripts/animation/musique_v2.py (générée)",
+   "license": "aucune piste tierce"
+  },
+  "music_level": 0.2,
+  "mixed": true
+ },
+ "scenes": [
+  {
+   "index": 1,
+   "id": "accroche",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 134,
+   "expected_seconds": 4.467,
+   "duration_seconds": 4.47,
+   "render_ms": 30230,
+   "sha256": "b6de8b252fd939fb7fc5026fb9554b90381e528d368da958243f413ea34b1468"
+  },
+  {
+   "index": 2,
+   "id": "definition",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 186,
+   "expected_seconds": 6.2,
+   "duration_seconds": 6.2,
+   "render_ms": 28105,
+   "sha256": "69fad5f0bc967b665e812e8131c3be7161c20e67023cf9da0d4a565890274805"
+  },
+  {
+   "index": 3,
+   "id": "broadcast",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 241,
+   "expected_seconds": 8.033,
+   "duration_seconds": 8.03,
+   "render_ms": 38432,
+   "sha256": "2556275a38050cf86290c7a5b4d268aac77d8da7922c6f4baedd2084b6c07da2"
+  },
+  {
+   "index": 4,
+   "id": "chaine",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 243,
+   "expected_seconds": 8.1,
+   "duration_seconds": 8.1,
+   "render_ms": 35633,
+   "sha256": "b2cdf3376f3568148c13b640325f145cdb3f05b771f247342562e343ae12a60c"
+  },
+  {
+   "index": 5,
+   "id": "audio",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 93,
+   "expected_seconds": 3.1,
+   "duration_seconds": 3.1,
+   "render_ms": 18234,
+   "sha256": "44e7d206cbbb667fd22ccd951961b010cc979f92d0af13605099c82cc462e36f"
+  },
+  {
+   "index": 6,
+   "id": "couches",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 220,
+   "expected_seconds": 7.333,
+   "duration_seconds": 7.33,
+   "render_ms": 32124,
+   "sha256": "100aa211512ec3d9adeeb8b12f3402604e58a56b5ca0650146e116a86c1ef6f7"
+  },
+  {
+   "index": 7,
+   "id": "ohms",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 247,
+   "expected_seconds": 8.233,
+   "duration_seconds": 8.23,
+   "render_ms": 42335,
+   "sha256": "c61680ad823a925c7e048631189cb9a9b9fc3bd7623a3941dcc817139be16e22"
+  },
+  {
+   "index": 8,
+   "id": "debits",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 278,
+   "expected_seconds": 9.267,
+   "duration_seconds": 9.27,
+   "render_ms": 38175,
+   "sha256": "38a540762bcfdd6b0c4463c494401fd231832ea7fc5cc452e5e465f1175bb7a5"
+  },
+  {
+   "index": 9,
+   "id": "conclusion",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 276,
+   "expected_seconds": 9.2,
+   "duration_seconds": 9.2,
+   "render_ms": 46999,
+   "sha256": "ae29f38d3d84644d3d0f7a839eda416048273cf7561e1d32b5765fe42f8b17de"
+  }
+ ],
+ "fallback_scenes": [],
+ "warnings": []
+}

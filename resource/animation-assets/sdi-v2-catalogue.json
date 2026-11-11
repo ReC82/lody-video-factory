@@ -1,0 +1,421 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_160000000001",
+      "name": "Salon : box → HDMI → télé",
+      "kind": "prop",
+      "description": "Accroche : objets branchés, câble HDMI visible.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 900,
+            "height": 460,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "box",
+              "cable-hdmi",
+              "etiquette-hdmi",
+              "meuble",
+              "tele"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/salon-hdmi/v1/salon-hdmi.svg",
+                "sha256": "0c6270654944fd296bce2bd3827e9c393e4cbef80866cee63483332b0d4bf118"
+              }
+            ]
+          },
+          "sha256": "e65396122f7a2dd5e42a1e7828265215302f82b3779419e8ff17fa3c393c34c5",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000002",
+      "name": "Bits en série",
+      "kind": "prop",
+      "description": "Les « 01 » expliqués : un bit après l'autre.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 960,
+            "height": 170,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "bits",
+              "fil",
+              "sens"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/bits-serie/v1/bits-serie.svg",
+                "sha256": "d4596ffc39a9ded405637385771a87acba48b5c79c650b73b64d27fd7c7a1971"
+              }
+            ]
+          },
+          "sha256": "fcc0fb879d51c974a1f5fa989ae72dbfeb0c047785c1cb4d061868e3f02e200b",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000010",
+      "name": "Lieu : plateau télé",
+      "kind": "prop",
+      "description": "Broadcast : production en studio.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 260,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "camera",
+              "decor",
+              "projecteur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/lieu-plateau/v1/lieu-plateau.svg",
+                "sha256": "69a1dec35260e2a381a5574578ad72f26f23c3cc2b404543cc08f56adff884bc"
+              }
+            ]
+          },
+          "sha256": "e1a53b6e318134735f70f98ae6b0a3aba41b5306a7f956e2fb211c6ac8eb07c7",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000011",
+      "name": "Lieu : car régie",
+      "kind": "prop",
+      "description": "Broadcast : production mobile.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 260,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "antenne",
+              "camion"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/lieu-car/v1/lieu-car.svg",
+                "sha256": "a180c847176af12667bb819012fde02d8d46c8e6c3678a1785effec733b8ce3c"
+              }
+            ]
+          },
+          "sha256": "a9f59790ace3c7d73f7de366cb30f4f38d991783ea526cb19c45d1d975270ef9",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000012",
+      "name": "Lieu : direct",
+      "kind": "prop",
+      "description": "Broadcast : événement en direct.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 260,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "direct",
+              "public",
+              "scene"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/lieu-direct/v1/lieu-direct.svg",
+                "sha256": "e4598472d17adf6c13e7059015fb594e164985284dd1671af0104dc9e4ce8cd3"
+              }
+            ]
+          },
+          "sha256": "ddc7b0f85625f3b7ffc28064bb2f4bc2b7813905fa0029a0a197860711d07e60",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000020",
+      "name": "Enregistreur",
+      "kind": "prop",
+      "description": "Enregistreur vidéo, entrée SDI en BNC.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 340,
+            "height": 170,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "boitier",
+              "entree-sdi"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/enregistreur/v1/enregistreur.svg",
+                "sha256": "d732cc9719e368cdb3b2d1a1b6bd58ca74b626b57d3be786ea04d2d7f3f0ea65"
+              }
+            ]
+          },
+          "sha256": "56a5529ebbc66fe75d904e74ce6035ea4a2712905dae6d76dd010461b602b4c5",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000021",
+      "name": "Grille de routage",
+      "kind": "prop",
+      "description": "Matrice qui aiguille les sources vers les sorties.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 400,
+            "height": 260,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "boitier",
+              "entrees",
+              "matrice"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/grille-routage/v1/grille-routage.svg",
+                "sha256": "675ee4df5a33ad0a30cf7568a0bedd177402fd247e4378e79a29282f066f568d"
+              }
+            ]
+          },
+          "sha256": "cee9346f38a9216720323190bc904f77d5aba5f7c48f1ed8ff5e994055107a19",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000022",
+      "name": "Convertisseur SDI → HDMI",
+      "kind": "prop",
+      "description": "Entrée BNC, sortie HDMI.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 320,
+            "height": 160,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "boitier",
+              "entree-sdi",
+              "sortie-hdmi"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/convertisseur/v1/convertisseur.svg",
+                "sha256": "df732aaacd65706402c3880fdd4058be2bf79729704973b7120adb760805e070"
+              }
+            ]
+          },
+          "sha256": "c37fe3dd857e9057e519f8121f88e70825d7db699651f0a4bfda85fc3f530757",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000023",
+      "name": "Flèche de signal",
+      "kind": "prop",
+      "description": "Liaison symbolique d'une chaîne indicative.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 220,
+            "height": 60,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fleche"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/fleche-signal/v1/fleche-signal.svg",
+                "sha256": "61e9d76fabdb60cbd52c34b7f282ec7fff6fa326ffc6f77d3c78289f622a9684"
+              }
+            ]
+          },
+          "sha256": "502b626b9a82eb511af4eec15515282b7ed34062fa44fd529d1a6cb851246ad3",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000030",
+      "name": "Coaxial coté (d, D)",
+      "kind": "prop",
+      "description": "75 Ω = impédance caractéristique (géométrie + isolant).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 760,
+            "height": 560,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "cote-grand-d",
+              "cote-petit-d",
+              "coupe",
+              "legende"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/coax-cotes/v1/coax-cotes.svg",
+                "sha256": "8993981f8c12962f6956163b6644c748646a672963a689e3153c249d0cd78b24"
+              }
+            ]
+          },
+          "sha256": "26237fd9ecbcafa40f1d0fcf52142ad4d491f271c018d0dd6f410d2f2ea04955",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_160000000040",
+      "name": "Liaison SDI connectée",
+      "kind": "prop",
+      "description": "Caméra → coaxial → moniteur, BNC verrouillés.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1000,
+            "height": 470,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "cadre",
+              "camera",
+              "coaxial",
+              "corps",
+              "ecran",
+              "entree-sdi",
+              "fiches-bnc",
+              "moniteur",
+              "objectif",
+              "pied",
+              "sortie-sdi",
+              "trepied",
+              "viseur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/liaison-connectee/v1/liaison-connectee.svg",
+                "sha256": "a580a5e88e7d91231e8b92c2f09f41cfba77200448325c38253221ed9163fc87"
+              }
+            ]
+          },
+          "sha256": "5a5f2d350ccef8d285d2ec35e9d5b675f43ce485d0b13e9c7a06c6efc5471b2b",
+          "notes": "Épisode #137, V2 éditoriale (#160) : schéma v1."
+        }
+      ]
+    }
+  ]
+}
