@@ -45,3 +45,9 @@ ainsi que l'existence des fichiers liés.
 
 - [LODYORCH](lodyorch.md) — orchestrateur autonome qui traite un ticket GitHub à la fois et
   livre une pull request, sans jamais fusionner ni déployer.
+
+## Audits
+
+- [Audit du backlog — novembre 2026](audits/2026-11-backlog-audit.md) — classement des anciens
+  tickets après le choix du rendu animé 2D : clôtures proposées avec preuves, dédoublonnage
+  #54/#71/#114, mode Classique et ordre de travail recommandé.
