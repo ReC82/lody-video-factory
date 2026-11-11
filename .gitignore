@@ -57,3 +57,6 @@ htmlcov/
 
 # Données locales de Lody Video Factory (base SQLite)
 /data/
+
+# Planche Voltix générée (scripts/animation/rig_pose.py) : seul le PNG est versionné (#136).
+/docs/animation/voltix/planche-voltix.svg

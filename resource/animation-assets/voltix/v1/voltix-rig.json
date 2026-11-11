@@ -1,0 +1,102 @@
+{
+  "schema": "lody.rig/1",
+  "asset": "voltix",
+  "version": 1,
+  "convention": "left/right = côté du personnage (son bras gauche est à droite de l'image). Rotations en degrés, sens horaire positif (repère SVG). Pivots : attribut data-pivot des groupes du SVG.",
+  "parts": [
+    "puppet", "shadow", "upper", "body", "hair", "hair-front", "face", "eyes", "pupils", "lids", "eyebrows",
+    "mouth-visemes", "arm-left", "arm-right", "forearm-left", "forearm-right", "hand-left", "hand-right",
+    "springs-left", "springs-right", "shoes", "toolbelt", "accessories"
+  ],
+  "variants": {
+    "eyebrows": ["neutre", "joie", "surprise", "confusion", "concentration"],
+    "lids": ["ouverts", "mi-clos", "fermes"],
+    "mouth-visemes": ["mbp", "a", "e", "i", "o", "ou", "fv", "repos", "sourire", "grimace"],
+    "hand-left": ["ouverte", "poing", "index"],
+    "hand-right": ["ouverte", "poing", "index"]
+  },
+  "slots": ["slot-belly", "slot-belt", "hand-left-slot", "hand-right-slot"],
+  "rest": {
+    "select": {"eyebrows": "neutre", "lids": "ouverts", "mouth-visemes": "repos", "hand-left": "ouverte",
+               "hand-right": "ouverte"},
+    "rotate": {"arm-left": 0, "arm-right": 0, "forearm-left": 0, "forearm-right": 0},
+    "pupils": [0, 0], "lift": 0, "squash": 0, "air": 0
+  },
+  "expressions": {
+    "neutre": {"select": {"eyebrows": "neutre", "lids": "ouverts", "mouth-visemes": "repos"}, "pupils": [0, 0]},
+    "sourire": {"select": {"eyebrows": "joie", "lids": "ouverts", "mouth-visemes": "sourire"}, "pupils": [0, 0]},
+    "surprise": {"select": {"eyebrows": "surprise", "lids": "ouverts", "mouth-visemes": "o"}, "pupils": [0, -4]},
+    "confusion": {"select": {"eyebrows": "confusion", "lids": "ouverts", "mouth-visemes": "grimace"},
+                  "pupils": [8, -10]},
+    "concentration": {"select": {"eyebrows": "concentration", "lids": "mi-clos", "mouth-visemes": "mbp"},
+                      "pupils": [0, 10]}
+  },
+  "visemes": {
+    "mbp": {"phonemes": ["m", "b", "p"], "exemple": "maman, bonjour, pomme"},
+    "a": {"phonemes": ["a", "â"], "exemple": "câble, ça va"},
+    "e": {"phonemes": ["é", "è", "ê", "e", "eu"], "exemple": "vidéo, fête, le"},
+    "i": {"phonemes": ["i", "y", "s", "z", "t", "d", "n", "l", "k", "g", "r"], "exemple": "signal, si, tension"},
+    "o": {"phonemes": ["o", "au", "on", "an", "en"], "exemple": "vidéo, son, an"},
+    "ou": {"phonemes": ["ou", "u", "w", "ch", "j"], "exemple": "pour, tu, oui, chou"},
+    "fv": {"phonemes": ["f", "v"], "exemple": "fil, vingt"},
+    "silence": {"phonemes": [], "mouth": "repos"}
+  },
+  "gestures": {
+    "cligner": {
+      "frames": 6, "sheet_key": 2,
+      "keys": [
+        {"frame": 0, "pose": {"select": {"lids": "ouverts"}}},
+        {"frame": 1, "pose": {"select": {"lids": "mi-clos"}}},
+        {"frame": 2, "pose": {"select": {"lids": "fermes"}}},
+        {"frame": 4, "pose": {"select": {"lids": "mi-clos"}}},
+        {"frame": 6, "pose": {"select": {"lids": "ouverts"}}}
+      ]
+    },
+    "saluer": {
+      "frames": 30, "sheet_key": 2,
+      "keys": [
+        {"frame": 0, "pose": {}},
+        {"frame": 6, "pose": {"rotate": {"arm-left": -128, "forearm-left": -28}, "select": {"hand-left": "ouverte"}}},
+        {"frame": 11, "pose": {"rotate": {"arm-left": -128, "forearm-left": -58}}},
+        {"frame": 16, "pose": {"rotate": {"arm-left": -128, "forearm-left": -18}}},
+        {"frame": 21, "pose": {"rotate": {"arm-left": -128, "forearm-left": -58}}},
+        {"frame": 30, "pose": {"rotate": {"arm-left": 0, "forearm-left": 0}}}
+      ]
+    },
+    "montrer": {
+      "frames": 24, "sheet_key": 1,
+      "keys": [
+        {"frame": 0, "pose": {}},
+        {"frame": 8, "pose": {"rotate": {"arm-right": 118, "forearm-right": 8}, "select": {"hand-right": "index"},
+                              "pupils": [-10, 0]}},
+        {"frame": 24, "pose": {"rotate": {"arm-right": 118, "forearm-right": 8}, "select": {"hand-right": "index"},
+                               "pupils": [-10, 0]}}
+      ]
+    },
+    "tenir-cable": {
+      "frames": 12, "sheet_key": 1,
+      "keys": [
+        {"frame": 0, "pose": {}},
+        {"frame": 12, "pose": {
+          "rotate": {"arm-right": -22, "forearm-right": -58, "arm-left": 22, "forearm-left": 58},
+          "select": {"hand-right": "poing", "hand-left": "poing"},
+          "pupils": [0, 10],
+          "accessories": [{"asset": "cable-sdi", "slot": "slot-belly", "scale": 0.5}]
+        }}
+      ]
+    },
+    "rebond": {
+      "frames": 28, "sheet_key": 1,
+      "keys": [
+        {"frame": 0, "pose": {}},
+        {"frame": 6, "pose": {"lift": -46, "squash": 0.06, "rotate": {"arm-left": -10, "arm-right": 10}}},
+        {"frame": 10, "pose": {"lift": 26, "squash": -0.04, "air": 30,
+                               "rotate": {"arm-left": -25, "arm-right": 25, "forearm-left": -10, "forearm-right": 10}}},
+        {"frame": 15, "pose": {"lift": 14, "air": 74,
+                               "rotate": {"arm-left": -35, "arm-right": 35, "forearm-left": -15, "forearm-right": 15}}},
+        {"frame": 22, "pose": {"lift": -32, "squash": 0.05, "air": 0}},
+        {"frame": 28, "pose": {}}
+      ]
+    }
+  }
+}
