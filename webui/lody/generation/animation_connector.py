@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from lody import settings
-from lody.animation import modes
+from lody.animation import modes, scene_cache
 from lody.animation import worker as animation_worker
 from lody.animation.assets import FILE_EXTENSIONS, AnimationAssetRepository, AssetNotFound
 from lody.animation.contract import (
@@ -80,7 +80,8 @@ def spawn_worker(directory: Path) -> None:
     """
     env = animation_worker.minimal_env()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
-    for key in (animation_worker.RENDERER_ENV, animation_worker.SCENE_TIMEOUT_ENV):
+    for key in (animation_worker.RENDERER_ENV, animation_worker.SCENE_TIMEOUT_ENV,
+                animation_worker.RENDERER_REVISION_ENV, scene_cache.MAX_CACHE_BYTES_ENV):
         if os.environ.get(key):
             env[key] = os.environ[key]
     with (directory / "worker.stderr").open("ab") as stderr:
@@ -97,6 +98,11 @@ def binding(request: GenerationRequest) -> tuple[str, dict[str, Any]] | None:
     if not isinstance(project_id, str) or not isinstance(storyboard, dict) or not storyboard:
         return None
     return project_id, storyboard
+
+
+def preview_scale_of(request: GenerationRequest) -> float:
+    """Échelle de prévisualisation demandée (``animation.preview_scale``, #121) ; 1 = rendu final."""
+    return animation_worker.preview_scale({"preview": {"scale": (request.animation or {}).get("preview_scale", 1.0)}})
 
 
 def narration_of(storyboard: dict[str, Any]) -> str:
@@ -352,6 +358,9 @@ class AnimationConnector(VideoGenerationProvider):
         job = {"schema": animation_worker.JOB_SCHEMA, "task_id": task_id, "project_id": project_id,
                "mode": self.mode_of(request), "storyboard": storyboard, "assets": job_assets,
                "asset_info": self._asset_info(project_id, files), "created_at": self._clock()}
+        scale = preview_scale_of(request)
+        if scale < 1.0:  # #121 : prévisualisation basse résolution, cache de scène séparé du rendu final
+            job["preview"] = {"scale": scale}
         animation_worker.write_json(staging / "job.json", job)
         animation_worker.write_json(staging / "state.json", {"state": "queued", "step": "En attente du worker",
                                                              "heartbeat_at": self._clock(), "restarts": 0})
