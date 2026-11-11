@@ -138,7 +138,8 @@ class CostEstimate:
 
 def _line(component: str, provider: str, quantity: tuple[int, int], unit_divisor: int, book: PriceBook) -> CostLine:
     label = COMPONENT_LABELS[component]
-    if (component, provider) in FREE_PROVIDERS:
+    # Rien à produire (ex. rendu 2D #120 : aucune image générée, aucune voix) : rien à payer, jamais « partiel ».
+    if (component, provider) in FREE_PROVIDERS or quantity == (0, 0):
         zero = Decimal(0)
         return CostLine(component, label, provider, quantity, UNIT_LABELS[component], zero, zero, zero, "free")
     rate = book.rate(component, provider)

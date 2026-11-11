@@ -26,6 +26,10 @@ from lody import catalog
 from lody import reference_images
 from lody.characters import CharacterRepository
 from lody.generation import kit_files, publication, thumbnail, typography
+from lody.animation import modes as render_modes
+from lody.animation.assets import AnimationAssetRepository
+from lody.animation.contract import AnimationValidationError
+from lody.animation.freeze import freeze_document
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
 from lody.generation.models import (
     ACTIVE_STATUSES,
@@ -112,6 +116,7 @@ def build_request(project: Project, subject: str, script: str = "") -> Generatio
         voice=VoiceSpec(project.voice_provider, settings["voice_id"], project.voice_name, settings["voice_model"]),
         text_provider=project.text_provider, visual_provider=project.visual_provider,
         music_provider=project.music_provider, script=script.strip(),
+        render_mode=render_modes.project_render_mode(project.settings),
     )
 
 
@@ -140,7 +145,7 @@ def make_snapshot(project: Project, request: GenerationRequest, captured_at: str
     import hashlib
     import json
 
-    data = copy.deepcopy(request.to_dict())
+    data = copy.deepcopy(stored_request(request))
     frozen = project_part(data)
     version = hashlib.sha256(json.dumps({"project": project.id, "params": frozen}, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:10]
     origins = {key: _PROJECT_ORIGIN for key in frozen}
@@ -151,7 +156,19 @@ def make_snapshot(project: Project, request: GenerationRequest, captured_at: str
 
 
 def request_of(production: Production) -> GenerationRequest:
-    return GenerationRequest.from_dict(production.params.get("request", {}))
+    request = GenerationRequest.from_dict(production.params.get("request", {}))
+    if production.animation:
+        # #120 : liaison au storyboard animé FIGÉ de cette production (sa propre colonne, jamais ``params``).
+        request = request.with_updates(animation={"project_id": production.project_id,
+                                                  "storyboard": production.animation})
+    return request
+
+
+def stored_request(request: GenerationRequest) -> dict[str, Any]:
+    """``request.to_dict()`` tel qu'enregistré dans ``params`` : sans la liaison au storyboard animé (#120)."""
+    data = request.to_dict()
+    data.pop("animation", None)
+    return data
 
 
 def validate_subject(subject: str) -> str:
@@ -180,7 +197,8 @@ class ProductionService:
     def __init__(self, repo: ProductionRepository, providers: dict[str, VideoGenerationProvider],
                  executor: Executor, price_book: Callable[[], PriceBook] = load_price_book,
                  clock: Callable[[], str] = _now, character_repo: CharacterRepository | None = None,
-                 location_repo: LocationRepository | None = None):
+                 location_repo: LocationRepository | None = None,
+                 animation_asset_repo: AnimationAssetRepository | None = None):
         self.repo = repo
         self._providers = providers
         self._executor = executor
@@ -190,6 +208,8 @@ class ProductionService:
         # inchangé). Aucun écran ne les propose encore (#34) ; runtime.build_service() les fournit déjà.
         self._character_repo = character_repo
         self._location_repo = location_repo
+        # #120 : catalogue d'assets 2D, pour figer le storyboard animé d'une production (mode Animation 2D/Hybride).
+        self._animation_asset_repo = animation_asset_repo
         self._inflight: set[str] = set()
         self._lock = threading.Lock()
 
@@ -264,7 +284,8 @@ class ProductionService:
 
     def prepare(self, project: Project, subject: str, *, provider_id: str, script: str = "",
                 draft_id: str | None = None, retry_of: str | None = None,
-                character_ids: Sequence[str] = (), location_id: str | None = None) -> Production:
+                character_ids: Sequence[str] = (), location_id: str | None = None,
+                animation: Any = None) -> Production:
         """Crée (ou met à jour) un brouillon avec son estimation : EN_ATTENTE_CONFIRMATION.
 
         ``retry_of`` = une production échouée du même projet : la nouvelle tentative lui est *liée* (elle ne
@@ -274,6 +295,10 @@ class ProductionService:
         copiée dans l'instantané (``snapshot.narrative_context``). Non modifiée par les éditions ultérieures
         du projet. Sans sélection (le cas de toute l'interface actuelle, #34 n'existant pas encore) : aucun
         changement de comportement.
+
+        ``animation`` (#120, facultatif) : storyboard ``lody.animation/1`` de la vidéo, FIGÉ ici dans le catalogue
+        du projet (versions explicites + empreintes) et enregistré dans ``productions.animation``. ``None`` (le
+        cas de toute production classique) : rien ne change ; un brouillon animé réutilisé garde son storyboard.
         """
         text = validate_subject(subject)
         script_text = typography.normalize_for_language(validate_script(script), project.language) if script.strip() else ""
@@ -287,11 +312,22 @@ class ProductionService:
         resolved_voice, voice_origin = resolve_voice(request.voice, narrative_context)
         if resolved_voice != request.voice:
             request = request.with_updates(voice=resolved_voice)
-        _, cost = self._plan(provider, request)
+        frozen_animation = self._freeze_animation(project.id, animation) if animation is not None else None
+        existing = None
+        if draft_id:
+            try:
+                existing = self.repo.get(draft_id)
+            except LookupError:
+                existing = None
+        if frozen_animation is None and existing and existing.project_id == project.id and existing.animation:
+            frozen_animation = existing.animation  # brouillon animé réutilisé : même storyboard figé
+        planned = (request.with_updates(animation={"project_id": project.id, "storyboard": frozen_animation})
+                   if frozen_animation else request)
+        _, cost = self._plan(provider, planned)
         fields: dict[str, Any] = {
             "brief": brief_lib.build_brief(project, text), "script": script_text,
             "script_source": "manual" if script_text else "",
-            "params": {"request": request.to_dict(), "engine": provider.describe_params(request),
+            "params": {"request": request.to_dict(), "engine": provider.describe_params(planned),
                       # #38 : jamais une transmission simulée pour un fournisseur qui ne la supporte pas —
                       # voir narrative_context.reference_images_status et provider.supports_reference_images.
                       "reference_images": reference_images_status(narrative_context, provider.supports_reference_images),
@@ -303,16 +339,12 @@ class ProductionService:
             "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of,
                                       narrative_context=narrative_context), **cost,
         }
+        if frozen_animation:
+            fields["animation"] = frozen_animation
         if retry_of:
             failed = self.repo.get(retry_of)
             if failed.project_id != project.id or failed.status is not ProductionStatus.ECHEC:
                 retry_of = None
-        existing = None
-        if draft_id:
-            try:
-                existing = self.repo.get(draft_id)
-            except LookupError:
-                existing = None
         if (existing and existing.project_id == project.id and existing.status in EDITABLE_STATUSES
                 and existing.parent_production_id == retry_of and existing.provider == provider_id):
             if self.repo.transition(existing.id, EDITABLE_STATUSES, subject=text,
@@ -321,6 +353,18 @@ class ProductionService:
         return self.repo.create(project_id=project.id, subject=text, provider=provider_id,
                                 status=ProductionStatus.EN_ATTENTE_CONFIRMATION,
                                 parent_production_id=retry_of, **fields)
+
+    def _freeze_animation(self, project_id: str, raw: Any) -> dict[str, Any]:
+        """Fige un storyboard animé dans le catalogue du projet (#119/#120), ou lève ``InvalidInput`` lisible."""
+        if self._animation_asset_repo is None:
+            raise LaunchError("Le catalogue d'animation 2D n'est pas disponible pour cette production.")
+        try:
+            return freeze_document(self._animation_asset_repo, project_id, raw)
+        except AnimationValidationError as error:
+            details = list(error.errors.items())
+            shown = "; ".join(f"{path} : {message}" for path, message in details[:3])
+            more = f" (+{len(details) - 3} autre(s))" if len(details) > 3 else ""
+            raise InvalidInput(f"Storyboard animé refusé — {shown}{more}") from None
 
     # -- V2 ---------------------------------------------------------------------
     def create_v2(self, parent_id: str) -> Production:
@@ -358,7 +402,7 @@ class ProductionService:
                                   visual_rules=request.visual_rules, visual_avoid=request.visual_avoid)
         fields = {
             "script": text, "script_source": "previous" if text == parent.script.strip() else "manual",
-            "params": {"request": request.to_dict(), "engine": provider.describe_params(request)},
+            "params": {"request": stored_request(request), "engine": provider.describe_params(request)},
             "storyboard": [scene.to_dict() for scene in scenes],
             "visual_prompts": [scene.prompt for scene in scenes],
             "current_step": "En attente de confirmation", "error_code": "", "error_message": "", **cost,
@@ -494,7 +538,7 @@ class ProductionService:
                 # prepare() — "reference_images" (#38), "voice_resolution" (#70) — qu'aucun appel ultérieur
                 # ne doit faire disparaître silencieusement.
                 self.repo.update(production_id, script=script, script_source="generated",
-                                 params={**production.params, "request": request.to_dict(),
+                                 params={**production.params, "request": stored_request(request),
                                         "engine": production.params.get("engine", {})})
                 event_detail = {"source": "generated", "longueur_mots": len(script.split())}
             else:
@@ -624,7 +668,7 @@ class ProductionService:
         de VRAIS secrets d'autorisation. Jamais utile de les relire depuis le stockage de toute façon : ils
         ne servent qu'une fois, juste avant ``provider.submit()`` (voir ``_run``, qui transmet le
         ``request`` COMPLET à ``submit()`` AVANT cet appel, jamais la version tronquée ci-dessous)."""
-        data = request.to_dict()
+        data = stored_request(request)
         for key in ("audio_asset_id", "audio_asset_scope", "character_reference_asset_id", "image_asset_scope"):
             data.pop(key, None)
         return data

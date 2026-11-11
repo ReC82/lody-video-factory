@@ -22,6 +22,8 @@ ainsi que l'existence des fichiers liés.
   utilisée comme connecteur hérité, relevé dans le code et connu du seul `mpt_connector.py`.
 - [Contrat de storyboard animé 2D](lody-animation-contract.md) — format `lody.animation/1` d'une
   scène animée, catalogue d'assets réutilisables versionnés et gel des versions par production.
+- [Fournisseur Animation 2D et rendu hybride](lody-animation-provider.md) — modes de rendu d'un
+  projet (Classique, Animation 2D, Hybride), fournisseur `animation_2d`, worker isolé et reprise.
 
 ## Voix
 
