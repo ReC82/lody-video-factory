@@ -162,6 +162,10 @@ SETTINGS = {
     "max_sessions_per_day": ("LQ_MAX_SESSIONS_PER_DAY", 24, 0, 500,
                              "Sessions lancées au plus par jour (fuseau LQ_DAY_TZ, UTC par défaut). 0 = sans plafond, accepté seulement si un "
                              "garde-fou de budget ou de quota fournisseur est actif."),
+    "max_prep_sessions_per_day": ("LQ_MAX_PREP_SESSIONS_PER_DAY", 3, 0, 50,
+                                  "File de préparation (#165) : sessions lancées au plus par jour sur un ticket dont "
+                                  "les dépendances ont une PR en revue non fusionnée (contrats, tests, maquettes). "
+                                  "Comptées aussi dans max_sessions_per_day. 0 = désactivé."),
     "max_cost_usd_per_day": ("LQ_MAX_COST_USD_PER_DAY", 0.0, 0.0, 10000.0,
                              "Plafond du coût estimé du jour (total_cost_usd de Claude Code, prix catalogue : "
                              "une estimation, pas une facture). 0 = désactivé."),
@@ -278,6 +282,13 @@ def db():
                       ("ci_checked_at", "TEXT DEFAULT ''"), ("ci_fixes", "INTEGER NOT NULL DEFAULT 0")):
         try:
             con.execute(f"ALTER TABLE tasks ADD COLUMN {col} {decl}")
+        except sqlite3.OperationalError:
+            pass
+    # #165 : clé de l'état des dépendances au moment de la dernière préparation (une seule
+    # préparation par état) et mode de chaque session (« prepare » pour la file de préparation).
+    for table, col, decl in (("tasks", "prep_key", "TEXT DEFAULT ''"), ("sessions", "mode", "TEXT DEFAULT ''")):
+        try:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
             pass
     return con
@@ -421,6 +432,159 @@ def actionable_dependency(con, missing):
         if not deps_satisfied(con, d["deps"]):
             return d
     return None
+
+
+# ---------------------------------------------------------------- file de préparation (#165)
+#
+# Quand aucun ticket n'est exécutable, un ticket dont TOUTES les dépendances ouvertes ont déjà une
+# PR en revue (ticket WAITING_OWNER avec PR) peut avancer en « préparation » : contrats, tests,
+# maquettes, sur sa propre branche partie d'origin/main, PR en brouillon. Jamais de fusion, jamais
+# un ticket bloqué ou suspendu (ils ne sont pas dans la file), une seule préparation par état des
+# dépendances, et un plafond quotidien dédié : pas de sessions de remplissage.
+
+def review_pr(con, n):
+    """Lien de la PR en revue du ticket n (WAITING_OWNER avec PR), sinon ''."""
+    d = task(con, n)
+    return str(d["pr"] or "").strip() if d and d["status"] == "WAITING_OWNER" else ""
+
+
+def prep_key(con, missing):
+    """État des dépendances ouvertes : la même préparation n'est jamais relancée pour le même état."""
+    return ",".join(f"{n}:{pr_number(review_pr(con, n)) or '?'}" for n in sorted(missing))
+
+
+def prep_sessions_today(con):
+    return con.execute("SELECT COUNT(*) c FROM sessions WHERE mode='prepare' AND started_at >= ?",
+                       (iso(day_start(con)),)).fetchone()["c"]
+
+
+def preparation_candidates(con, missing_of=None):
+    """[(ticket, dépendances_ouvertes)] préparables, dans l'ordre de la file. `missing_of` calcule les
+    dépendances ouvertes (par défaut deps_satisfied, avec GitHub ; local_missing pour la lecture seule)."""
+    missing_of = missing_of or (lambda deps: deps_satisfied(con, deps))
+    out = []
+    for t in con.execute("""SELECT * FROM tasks WHERE status IN ('RUNNING','TESTING','READY') AND issue != ?
+                            AND COALESCE(deps,'') != ''
+                            ORDER BY CASE status WHEN 'READY' THEN 1 ELSE 0 END, priority, issue""",
+                         (TRIAGE,)).fetchall():
+        if t["not_before"] and t["not_before"] > iso():
+            continue
+        missing = missing_of(t["deps"])
+        if not missing or not all(review_pr(con, n) for n in missing):
+            continue
+        if (t["prep_key"] or "") == prep_key(con, missing):
+            continue  # déjà préparé pour cet état des dépendances
+        out.append((t, missing))
+    return out
+
+
+def next_preparation(con):
+    """Le ticket à préparer quand rien n'est exécutable : (ticket, dépendances_ouvertes) ou None."""
+    cap = setting(con, "max_prep_sessions_per_day")[0]
+    if not cap or prep_sessions_today(con) >= cap:
+        return None
+    found = preparation_candidates(con)
+    return found[0] if found else None
+
+
+def local_missing(con, deps):
+    """Dépendances ouvertes d'après la seule base locale (lecture seule, sans réseau)."""
+    done = {r["issue"] for r in con.execute(
+        f"SELECT issue FROM tasks WHERE status IN ({','.join('?' * len(DEPS_DONE_STATES))})", DEPS_DONE_STATES)}
+    return [int(d) for d in re.findall(r"\d+", deps or "") if int(d) not in done]
+
+
+def queue_overview(con):
+    """Synthèse de la file, sans réseau : pourquoi on attend, ce qui reste à faire."""
+    rows = con.execute("""SELECT * FROM tasks WHERE status IN ('RUNNING','TESTING','READY') AND issue != ?
+                          ORDER BY CASE status WHEN 'READY' THEN 1 ELSE 0 END, priority, issue""",
+                       (TRIAGE,)).fetchall()
+    ov = {"executable": [], "waiting_deps": [], "delayed": [], "preparable": [], "prepared": []}
+    for t in rows:
+        missing = local_missing(con, t["deps"])
+        if t["not_before"] and t["not_before"] > iso():
+            ov["delayed"].append((t["issue"], t["not_before"]))
+        elif not missing:
+            ov["executable"].append(t["issue"])
+        else:
+            ov["waiting_deps"].append((t["issue"], missing))
+            if t["prep_key"] and all(review_pr(con, n) for n in missing) and t["prep_key"] == prep_key(con, missing):
+                ov["prepared"].append(t["issue"])
+    ov["preparable"] = [t["issue"] for t, _ in preparation_candidates(con, lambda deps: local_missing(con, deps))]
+    ov["in_review"] = [(r["issue"], r["pr"], r["ci_state"]) for r in con.execute(
+        "SELECT issue, pr, ci_state FROM tasks WHERE status='WAITING_OWNER' ORDER BY priority, issue")]
+    ov["blocked"] = [r["issue"] for r in con.execute(
+        "SELECT issue FROM tasks WHERE status IN ('BLOCKED','FAILED') ORDER BY priority, issue")]
+    cap = setting(con, "max_prep_sessions_per_day")[0]
+    ov["prep_used"], ov["prep_cap"] = prep_sessions_today(con), cap
+    return ov
+
+
+def _nums(items, limit=8):
+    items = list(items)
+    text = ", ".join(f"#{n}" for n in items[:limit])
+    return text + (f" (+{len(items) - limit})" if len(items) > limit else "")
+
+
+def overview_text(ov):
+    """Motif d'attente lisible : exécutable, préparation, PR en revue, bloqués, dépendances."""
+    parts = []
+    if ov["executable"]:
+        parts.append(f"{len(ov['executable'])} ticket(s) exécutable(s) : {_nums(ov['executable'])}")
+    else:
+        parts.append("aucun ticket exécutable")
+    if ov["preparable"]:
+        if ov["prep_cap"] and ov["prep_used"] < ov["prep_cap"]:
+            parts.append(f"prochain à préparer : #{ov['preparable'][0]} "
+                         f"(préparations du jour {ov['prep_used']}/{ov['prep_cap']})")
+        else:
+            parts.append(f"{len(ov['preparable'])} ticket(s) préparable(s) ({_nums(ov['preparable'])}) mais "
+                         + ("file de préparation désactivée" if not ov["prep_cap"] else
+                            f"plafond de préparation atteint ({ov['prep_used']}/{ov['prep_cap']})"))
+    ci = {"pending": "CI en cours", "failed": "CI en échec", "success": "CI verte"}
+    if ov["in_review"]:
+        detail = ", ".join(f"#{n}" + (f" PR #{pr_number(pr)}" if pr_number(pr) else "")
+                           + (f" {ci[c]}" if c in ci else "") for n, pr, c in ov["in_review"][:8])
+        more = f" (+{len(ov['in_review']) - 8})" if len(ov["in_review"]) > 8 else ""
+        parts.append(f"{len(ov['in_review'])} PR en revue chez le propriétaire : {detail}{more}")
+    if ov["blocked"]:
+        parts.append(f"{len(ov['blocked'])} bloqué(s) en attente de réponse : {_nums(ov['blocked'])}")
+    if ov["waiting_deps"]:
+        parts.append("attendent une dépendance non fusionnée : "
+                     + ", ".join(f"#{n}→{_nums(m, 4)}" for n, m in ov["waiting_deps"][:6])
+                     + (f" ({len(ov['prepared'])} déjà préparé(s) : {_nums(ov['prepared'])})" if ov["prepared"] else ""))
+    if ov["delayed"]:
+        parts.append("en délai de reprise : " + ", ".join(f"#{n} après {nb}" for n, nb in ov["delayed"][:4]))
+    return " ; ".join(parts) + "."
+
+
+def notify_idle(con, ov):
+    """Un seul email quand la file est réellement à l'arrêt (rien d'exécutable ni de préparable) et
+    que le propriétaire peut la débloquer (PR à relire, tickets bloqués). Dédoublonné sur l'état de la
+    file et espacé d'au moins 12 h : jamais de boucle d'emails identiques."""
+    if not NOTIFY_SMTP_ENV or ov["executable"] or ov["delayed"]:
+        return
+    if ov["preparable"] and ov["prep_cap"] and ov["prep_used"] < ov["prep_cap"]:
+        return
+    if not ov["in_review"] and not ov["blocked"]:
+        return
+    state = json.dumps([[n for n, *_ in ov["in_review"]], ov["blocked"], ov["waiting_deps"]])
+    digest = hashlib.sha256(state.encode()).hexdigest()[:16]
+    last = ctl_get(con, "idle_notice_at")
+    if ctl_get(con, "idle_notice_key") == digest or (last and time.time() - float(last) < 12 * 3600):
+        return
+    ctl_set(con, "idle_notice_key", digest)
+    ctl_set(con, "idle_notice_at", time.time())
+    lines = [f"{INSTANCE} n'a plus de travail utile : aucune session n'est lancée tant que rien ne change.", "",
+             "Synthèse :", overview_text(ov), "", "PR en attente de revue :"]
+    lines += [f"- #{n} : {pr or '(PR non renseignée)'}" for n, pr, _ in ov["in_review"]] or ["- aucune"]
+    if ov["blocked"]:
+        lines += ["", "Tickets bloqués (une réponse dans le ticket les relance) :"]
+        lines += [f"- https://github.com/{REPO}/issues/{n}" for n in ov["blocked"]]
+    lines += ["", "Aucune fusion automatique : la file reprend dès qu'une PR est fusionnée, qu'un ticket est "
+              "débloqué ou qu'un nouveau ticket agent:auto arrive."]
+    queue_notification(con, f"idle:{digest}", None, "File à l'arrêt",
+                       f"{NOTIFY_PREFIX} File à l'arrêt — {len(ov['in_review'])} PR en revue", "\n".join(lines))
 
 
 # ---------------------------------------------------------------- quota
@@ -635,7 +799,23 @@ def start_blocker(con):
 
 # ---------------------------------------------------------------- session
 
-def build_prompt(con, t, session_id, status_file):
+PREPARE_TEXT = """## Mode PRÉPARATION (#165) — à respecter strictement
+
+Ce ticket dépend de {deps}, dont la PR est en revue mais **non fusionnée** ({prs}). Rien d'autre
+n'est exécutable : le superviseur te confie une **préparation**, qui remplace la règle 5 ci-dessous.
+- Avance uniquement ce qui ne dépend pas du code non fusionné : contrats, schémas, tests (marqués
+  `skip` si besoin), maquettes, documentation de conception. Si rien d'utile n'est possible, ne
+  produis rien et explique-le.
+- Branche du ticket partie d'`origin/main`, dans ton worktree : n'empile jamais sur la branche
+  d'une dépendance, ne la modifie pas, ne fusionne, n'approuve et ne ferme aucune PR.
+- PR en **brouillon** (`gh pr create --draft`), avec la mention « Préparation : à compléter après
+  la fusion de {deps} ».
+- Rapport de fin : `"status": "READY"`, `"deps": "{deps_csv}"`, la branche et la PR brouillon.
+  Le superviseur reprendra le ticket en entier dès la fusion des dépendances.
+"""
+
+
+def build_prompt(con, t, session_id, status_file, prepare=None):
     base = PROMPT_FILE.read_text(encoding="utf-8")
     history = con.execute("""SELECT started_at, outcome, detail FROM sessions WHERE issue=?
                              ORDER BY started_at DESC LIMIT 5""", (t["issue"],)).fetchall()
@@ -643,6 +823,14 @@ def build_prompt(con, t, session_id, status_file):
     state = {k: t[k] for k in t.keys()}
     queue = [dict(issue=r["issue"], status=r["status"], title=r["title"]) for r in con.execute(
         "SELECT issue,status,title FROM tasks ORDER BY priority, issue").fetchall()]
+    mode = ""
+    if prepare:
+        mode = PREPARE_TEXT.format(deps=", ".join(f"#{n}" for n in prepare), deps_csv=",".join(map(str, prepare)),
+                                   prs=", ".join(review_pr(con, n) or f"#{n}" for n in prepare))
+    if "{{MODE}}" in base:
+        base = base.replace("{{MODE}}", mode)
+    elif mode:
+        base = mode + "\n" + base
     return (base.replace("{{ISSUE}}", str(t["issue"]))
             .replace("{{TITLE}}", t["title"] or "")
             .replace("{{STATE_JSON}}", json.dumps(state, ensure_ascii=False, indent=2))
@@ -681,19 +869,21 @@ def classify(exit_code, result, rate_events, killed):
     return "COMPLETED", text[:500], ""
 
 
-def run_session(con, t):
+def run_session(con, t, prepare=None):
     session_id = str(uuid.uuid4())
     log_path = LOG_DIR / f"{iso().replace(':', '')}-{t['issue']}-{session_id[:8]}.jsonl"
     status_file = LOG_DIR / f"{session_id}.status.json"
     # Présent = le propriétaire a repris la main : lu par le crochet de garde de la session.
     yield_file = LOG_DIR / f"{session_id}.yield"
     yield_at = 0.0
-    prompt = build_prompt(con, t, session_id, status_file)
-    con.execute("INSERT INTO sessions(id,issue,started_at,log_path) VALUES(?,?,?,?)",
-                (session_id, t["issue"], iso(), str(log_path)))
+    prompt = build_prompt(con, t, session_id, status_file, prepare)
+    key = prep_key(con, prepare) if prepare else ""
+    con.execute("INSERT INTO sessions(id,issue,started_at,log_path,mode) VALUES(?,?,?,?,?)",
+                (session_id, t["issue"], iso(), str(log_path), "prepare" if prepare else ""))
     update_task(con, t["issue"], status="RUNNING", last_session=session_id, last_activity=iso(),
                 attempts=t["attempts"] + 1)
-    event(con, t["issue"], "session_start", f"Session {session_id} (tentative {t['attempts'] + 1})")
+    event(con, t["issue"], "session_start", f"Session {session_id} (tentative {t['attempts'] + 1})"
+          + (f" — préparation : dépendances {', '.join(f'#{n}' for n in prepare)} en revue" if prepare else ""))
     if GH_SYNC and t["issue"] != TRIAGE:
         set_status_label(con, t["issue"], "RUNNING")
         if CLAIM_COMMENT:
@@ -830,6 +1020,8 @@ def run_session(con, t):
                 (iso(), outcome, proc.returncode, (report.get("summary") or detail)[:2000], cost, session_id))
     con.commit()
     apply_outcome(con, t["issue"], outcome, detail, reset, report)
+    if prepare and report.get("status") in STATUSES:
+        settle_preparation(con, t["issue"], prepare, key)
     if GH_SYNC and t["issue"] != TRIAGE:
         after_outcome(con, t["issue"], session_id, session_started, report)
     if t["issue"] != TRIAGE:
@@ -838,6 +1030,22 @@ def run_session(con, t):
     if outcome != "COMPLETED" or not report:
         ctl_set(con, "last_error", redact(f"{iso()} #{t['issue']} {outcome} — {detail}")[:500])
     return outcome
+
+
+def settle_preparation(con, issue, missing, key):
+    """Après une préparation rendue : le ticket ne part pas en revue (sa PR est un brouillon) ; il
+    garde ses dépendances et redevient READY pour être repris en entier dès leur fusion. La clé
+    empêche toute nouvelle préparation tant que l'état des dépendances ne change pas."""
+    t = task(con, issue)
+    known = {int(x) for x in re.findall(r"\d+", t["deps"] or "")}
+    fields = {"prep_key": key, "deps": ",".join(map(str, sorted(known | set(missing))))}
+    if t["status"] in ("WAITING_OWNER", "RUNNING", "READY"):
+        fields.update(status="READY", ci_state="", attempts=0, not_before="",
+                      next_action=f"Préparé ({t['pr'] or 'sans PR'}) : reprise complète après la fusion de "
+                                  + ", ".join(f"#{n}" for n in missing) + ".")
+    update_task(con, issue, **fields)
+    event(con, issue, "prepared", f"Préparation rendue ({t['status']}) : attend la fusion de "
+                                  + ", ".join(f"#{n}" for n in missing) + ".")
 
 
 def claim_issue(con, issue, session_id):
@@ -1839,6 +2047,11 @@ def supervise():
             pause_for(con, POLL_SECONDS)
             continue
         t = next_task(con)
+        prepare = None
+        if t is None:
+            found = next_preparation(con)
+            if found:
+                t, prepare = found
         if t is None:
             last = ctl_get(con, "last_triage")
             if TRIAGE_ENABLED and (not last or time.time() - float(last) > TRIAGE_EVERY_SECONDS):
@@ -1851,8 +2064,13 @@ def supervise():
                 continue
             later = con.execute("""SELECT issue, not_before FROM tasks WHERE status IN ('READY','RUNNING','TESTING')
                                    AND not_before > ? ORDER BY not_before LIMIT 1""", (iso(),)).fetchone()
-            ctl_set(con, "idle_reason", f"En attente : #{later['issue']} reprend après {later['not_before']}." if later
-                    else "Aucun ticket éligible : tous terminés, bloqués ou en attente du propriétaire.")
+            ov = queue_overview(con)
+            ctl_set(con, "idle_reason", (f"En attente : #{later['issue']} reprend après {later['not_before']}. " if later
+                                         else "File à l'arrêt, aucune session lancée : ") + overview_text(ov))
+            try:
+                notify_idle(con, ov)
+            except Exception as exc:  # noqa: BLE001 — un email raté ne doit jamais arrêter la file
+                event(con, None, "notify", f"Email de file à l'arrêt non mis en file : {type(exc).__name__}: {exc}"[:500])
             pause_for(con, POLL_SECONDS * 10)
             continue
         refused = session_preflight()
@@ -1867,7 +2085,7 @@ def supervise():
             continue
         ctl_set(con, "preflight_error", "")
         ctl_set(con, "idle_reason", "")
-        run_session(con, t)
+        run_session(con, t, prepare)
         if GH_SYNC:
             ctl_set(con, "sync_requested", "1")
 
@@ -1933,6 +2151,7 @@ def cmd_status(con, _):
               "le quota restant réel n'est pas connu.")
     else:
         print("Fournisseur : aucune donnée de quota observée (rien n'est déduit de l'interface claude.ai).")
+    print(f"File : {overview_text(queue_overview(con))}")
     counts = con.execute("SELECT status, COUNT(*) c FROM tasks GROUP BY status").fetchall()
     print("Tickets : " + ", ".join(f"{r['status']} {r['c']}" for r in counts))
     if GH_SYNC:
@@ -2145,6 +2364,9 @@ def observe(con):
         if all(int(d) in local_ok for d in re.findall(r"\d+", t["deps"] or "")):
             o["next"] = t
             break
+    o["overview"] = ov = queue_overview(con)
+    o["prepare_next"] = (task(con, ov["preparable"][0]) if not o["next"] and ov["preparable"] and ov["prep_cap"]
+                         and ov["prep_used"] < ov["prep_cap"] else None)
 
     # État et catégorie d'inactivité (pulse) : repos normal, quota, session bloquée, erreur, validation.
     if not alive and mode in ("STOP", "STOP_NOW") and not cur:
@@ -2169,9 +2391,12 @@ def observe(con):
     elif mode != "RUNNING":
         state, why, cat = "BLOQUÉ", f"mode {mode} — " + (ctl_get(con, "pause_reason") or f"{CLI_NAME} resume pour reprendre."), \
             "en pause"
-    elif not queue_rows and (blocked or o["waiting"]):
-        state, why, cat = "BLOQUÉ", (f"aucun ticket traitable : {len(blocked)} bloqué(s) et {o['waiting']} livré(s) "
-                                     f"attendent votre réponse ou validation."), "attente de validation"
+    elif o["prepare_next"]:
+        state, why, cat = "AU REPOS", ("rien d'exécutable, préparation au prochain tour — " + overview_text(ov)), \
+            "repos normal"
+    elif not o["next"] and not ov["delayed"] and (blocked or o["waiting"]):
+        state, why, cat = "BLOQUÉ", ("en attente du propriétaire, aucune session lancée — " + overview_text(ov)), \
+            "attente de validation"
     elif blocker:
         state, why, cat = "AU REPOS", blocker[0], "repos normal"
     elif not queue_rows:
@@ -2227,6 +2452,8 @@ def cmd_pulse(con, _):
         ticket = f"#{cur['issue']} {ptitle(t)[:58]}"
     elif o["next"]:
         ticket = f"prochain : #{o['next']['issue']} {ptitle(o['next'])[:52]}"
+    elif o["prepare_next"]:
+        ticket = f"préparation : #{o['prepare_next']['issue']} {ptitle(o['prepare_next'])[:48]}"
     else:
         ticket = "aucun ticket traitable"
     usage = freshest_usage(con)
@@ -2492,6 +2719,11 @@ def cmd_status_tickets(con, _):
     print("Prochain ticket prévu : " + (f"#{nxt['issue']} {ptitle(nxt)[:75]} "
                                         "(estimé sur l'état local, sans appel GitHub)" if nxt else
                                         "indéterminé (file vide ou dépendances à vérifier sur GitHub)"))
+    ov = o["overview"]
+    if o["prepare_next"]:
+        print(f"Prochain ticket à préparer (#165) : #{o['prepare_next']['issue']} {ptitle(o['prepare_next'])[:60]} "
+              f"— préparations du jour {ov['prep_used']}/{ov['prep_cap']}")
+    print(f"Synthèse de la file : {overview_text(ov)}")
     later = [t for t in queue_rows if t is not nxt]
     if later:
         print("Ensuite : " + ", ".join(f"#{t['issue']} P{t['priority'] // 10}" for t in later[:12])
