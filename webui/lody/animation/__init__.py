@@ -10,4 +10,5 @@ sans animation ne lit jamais ce paquet : comportement strictement inchangé.
 - ``modes`` (#120) : mode de rendu d'un projet — Classique (défaut, inchangé), Animation 2D, Hybride.
 - ``worker`` (#120) : worker de rendu isolé (dossier par tâche, un rendu à la fois, reprise, repli hybride) ;
   le fournisseur correspondant est ``lody.generation.animation_connector``.
+- ``render_audit`` (#168) : audit en lecture seule d'un rendu (étapes, cache, coût, invalidations, nettoyage).
 """
