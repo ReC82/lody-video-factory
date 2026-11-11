@@ -21,6 +21,7 @@ Sessions précédentes sur ce ticket :
 
 File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis par numéro) : {{QUEUE_JSON}}
 
+{{MODE}}
 ## Environnement — À LIRE
 
 - `{{LAUNCH_DIR}}` est un **clone dédié** à l'orchestrateur (aucun `config.toml`, aucun secret).
@@ -56,7 +57,7 @@ File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis pa
    commentaires existants portant `<!-- lodyorch -->`) le plan (3 à 6 points) et le nom de la
    branche. Une reprise après crash ne republie pas le plan : elle le complète si besoin.
 5. **Dépendances** : si le ticket a besoin d'un autre ticket ouvert non fusionné, rends `READY`
-   avec `"deps": "<n>"` sans rien coder.
+   avec `"deps": "<n>"` sans rien coder (sauf en mode PRÉPARATION, voir plus haut).
 6. **Décisions** : prends les décisions techniques courantes et documente-les. Ne bloque que pour
    une information réellement indispensable ou une vraie décision produit. Livre ce qui est
    faisable sans la réponse.
