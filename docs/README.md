@@ -23,6 +23,12 @@ ainsi que l'existence des fichiers liés.
 - [Contrat de storyboard animé 2D](lody-animation-contract.md) — format `lody.animation/1` d'une
   scène animée, catalogue d'assets réutilisables versionnés et gel des versions par production.
 
+## Épisodes (préproduction)
+
+- [Voltix — Le Genlock](episodes/voltix-genlock.md) — scénario, script TTS-safe, storyboard
+  `lody.animation/1` et preset de production de l'épisode « Pourquoi synchroniser les caméras ? »
+  (#141).
+
 ## Voix
 
 - [Catalogue des voix ElevenLabs](lody-elevenlabs-voices.md) — choix d'une voix ElevenLabs
