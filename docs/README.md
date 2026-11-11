@@ -24,6 +24,8 @@ ainsi que l'existence des fichiers liés.
   scène animée, catalogue d'assets réutilisables versionnés et gel des versions par production.
 - [Fournisseur Animation 2D et rendu hybride](lody-animation-provider.md) — modes de rendu d'un
   projet (Classique, Animation 2D, Hybride), fournisseur `animation_2d`, worker isolé et reprise.
+- [Voltix — fiche personnage et rig SVG](lody-voltix.md) — mascotte jaune aux jambes à ressort :
+  palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 
 ## Voix
 

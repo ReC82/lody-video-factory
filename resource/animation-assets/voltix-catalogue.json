@@ -1,0 +1,242 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_136000000001",
+      "name": "Voltix — marionnette",
+      "kind": "character",
+      "description": "Mascotte jaune aux jambes à ressort (#136). Concept approchant la référence choisie : à valider.",
+      "is_active": true,
+      "character": "Voltix",
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 900,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.98
+            },
+            "parts": [
+              "puppet",
+              "shadow",
+              "upper",
+              "body",
+              "hair",
+              "hair-front",
+              "face",
+              "eyes",
+              "pupils",
+              "lids",
+              "eyebrows",
+              "mouth-visemes",
+              "arm-left",
+              "arm-right",
+              "forearm-left",
+              "forearm-right",
+              "hand-left",
+              "hand-right",
+              "springs-left",
+              "springs-right",
+              "shoes",
+              "toolbelt",
+              "accessories"
+            ],
+            "expressions": [
+              "concentration",
+              "confusion",
+              "neutre",
+              "sourire",
+              "surprise"
+            ],
+            "gestures": [
+              "cligner",
+              "montrer",
+              "rebond",
+              "saluer",
+              "tenir-cable"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/voltix/v1/voltix-face.svg",
+                "sha256": "0fd173af12eb83a3b19906e64318c4ee4659871c95a1eab4e71eae4c292fbfd2"
+              },
+              {
+                "role": "trois-quarts",
+                "path": "animation-assets/voltix/v1/voltix-trois-quarts.svg",
+                "sha256": "486e962e480e1fc78499193d1ac668ddbebb74553c9364d0290f710e3a4eb85a"
+              },
+              {
+                "role": "rig",
+                "path": "animation-assets/voltix/v1/voltix-rig.json",
+                "sha256": "d473544ad923ae726df3a24394ca465bde9e3f143f294fd6aa61fcacf8dd58ce"
+              }
+            ]
+          },
+          "sha256": "ddf8a04d0177474ab09335994ced9f825e05ade1630a8157760e1afee31dce97",
+          "notes": "Version 1 : vues de face et 3/4, 5 expressions, 7 visèmes, 5 gestes."
+        }
+      ]
+    },
+    {
+      "id": "ast_136000000002",
+      "name": "Câble SDI 75 Ω enroulé",
+      "kind": "prop",
+      "description": "Câble coaxial noir enroulé, fiche BNC mâle.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 420,
+            "height": 300,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "bobine",
+              "extremite",
+              "connecteur",
+              "etiquette"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/cable-sdi/v1/cable-sdi.svg",
+                "sha256": "5a79f92f459a63688d3bee54609bc2fa22c84696a30f18e2abd52a3a37820ec5"
+              }
+            ]
+          },
+          "sha256": "93412f4b868636b5b87ce4b5d6f530591ab855cc6c70a1a2eaed9cdc66278020",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "ast_136000000003",
+      "name": "Fiche BNC mâle",
+      "kind": "prop",
+      "description": "Profil : broche centrale, isolant, manchon à baïonnette avec fente en J.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 420,
+            "height": 180,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "cable",
+              "manchon-souple",
+              "sertissage",
+              "corps",
+              "baionnette",
+              "face-avant",
+              "broche",
+              "etiquette"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/bnc-male/v1/bnc-male.svg",
+                "sha256": "a91f421567dea14fd9a8ab69cf0bf855ac68837ea880e8cf745c05487a28c73c"
+              }
+            ]
+          },
+          "sha256": "8352fed3fa3570cfb6cc5f4d8e556a50f871d66b3ecd10fed45f6bf2fc96948c",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "ast_136000000004",
+      "name": "Embase BNC femelle",
+      "kind": "prop",
+      "description": "Profil : douille centrale, fût avec deux ergots de baïonnette, écrou, filetage.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 300,
+            "height": 200,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "face-avant",
+              "fut",
+              "ergots",
+              "ecrou",
+              "filetage"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/bnc-femelle/v1/bnc-femelle.svg",
+                "sha256": "00885be89be199064952ea99e89fe5ba7356d7a24374e7d0f3a416de33b6c331"
+              }
+            ]
+          },
+          "sha256": "b9ee29528da4a07dde80647ee6e1c76ce160b800acab616abf0e0614b2d69d09",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "id": "ast_136000000005",
+      "name": "Tournevis",
+      "kind": "prop",
+      "description": "Outil générique rangé dans la sacoche de Voltix.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 320,
+            "height": 80,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "manche",
+              "tige",
+              "pointe"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/tournevis/v1/tournevis.svg",
+                "sha256": "dce7c06246d7df6b018f7c035e8be5272596113f32fdcdc50c0dc6863c995914"
+              }
+            ]
+          },
+          "sha256": "4959c0222411661cd7492db4982019941950771389a15824b0d10931030328d4",
+          "notes": ""
+        }
+      ]
+    }
+  ]
+}
