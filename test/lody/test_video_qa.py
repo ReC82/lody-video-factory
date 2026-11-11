@@ -234,6 +234,11 @@ def test_probe_without_ffprobe_reads_the_ffmpeg_header(tmp_path):
     info = qa.probe(FFMPEG, None, video)
     assert info["video"]["width"] == 270 and info["video"]["height"] == 480 and info["video"]["fps"] == 30
     assert info["audio"]["codec"] == "aac" and abs(info["duration"] - 1.0) < 0.1
+    pilot = qa.probe(FFMPEG, None, PILOT / "voltix-150.mp4")  # « yuv420p(tv, …, progressive) »
+    assert pilot["video"] == {"codec": "h264", "pix_fmt": "yuv420p", "width": 1080, "height": 1920, "fps": 30.0,
+                              "frames": None, "duration": None}
+    assert qa.technical_checks(pilot, json.loads((PILOT / "storyboard.json").read_text(encoding="utf-8")), None,
+                               None) == []
 
 
 @needs_ffmpeg

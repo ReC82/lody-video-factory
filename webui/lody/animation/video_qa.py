@@ -574,12 +574,19 @@ def probe(ffmpeg: str, ffprobe: str | None, path: Path) -> dict[str, Any]:
     done = _run([ffmpeg, "-hide_banner", "-i", str(path)], 60)  # repli sans ffprobe : lecture de l'en-tête
     log = done.stderr if done else ""
     duration = re.search(r"Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)", log)
-    video = re.search(r"Video: (\w+)[^,]*, (\w+)[^,]*?, (\d+)x(\d+)[^\n]*?([\d.]+) fps", log)
+    line = re.search(r"Stream #[^\n]*?Video: ([^\n]*)", log)
+    video = None
+    if line:  # ex. « h264 (High) (avc1 / …), yuv420p(tv, bt709, progressive), 1080x1920 [SAR 1:1], …, 30 fps »
+        size = re.search(r"\b(\d{2,5})x(\d{2,5})\b", line[1])
+        rate = re.search(r"([\d.]+) fps", line[1])
+        pix = re.search(r"\b((?:yuv|yuvj|nv|rgb|bgr|gray|gbr)\w*)", line[1])
+        video = {"codec": line[1].split()[0].rstrip(","), "pix_fmt": pix[1] if pix else None,
+                 "width": int(size[1]) if size else None, "height": int(size[2]) if size else None,
+                 "fps": float(rate[1]) if rate else None, "frames": None, "duration": None}
     sound = re.search(r"Audio: (\w+)[^,]*, (\d+) Hz, (\w+)", log)
     return {
         "duration": (int(duration[1]) * 3600 + int(duration[2]) * 60 + float(duration[3])) if duration else None,
-        "video": video and {"codec": video[1], "pix_fmt": video[2], "width": int(video[3]), "height": int(video[4]),
-                            "fps": float(video[5]), "frames": None, "duration": None},
+        "video": video,
         "audio": sound and {"codec": sound[1], "sample_rate": int(sound[2]), "channels": sound[3], "duration": None},
     }
 
