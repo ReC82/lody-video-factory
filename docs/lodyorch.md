@@ -215,7 +215,7 @@ lodyorch notifications [--retry] emails envoyés / en attente ; --retry : nouvel
   `api_key=…`, `Bearer …`) masqués avant écriture des journaux de session et des événements.
 - **Ressources** : l'hôte est partagé avec la production. Les sessions sont freinées au-delà de 1,4 Go de RAM
   et ne dépassent jamais 1,8 Go ni 1,5 CPU, avec des poids CPU et disque réduits (`lodyorch.service`).
-- **Budget** : 8 sessions/jour au démarrage, pause à 80 % de la fenêtre Claude de 5 h et à 70 % de
+- **Budget** : 50 sessions/jour (relevé par le propriétaire), pause à 80 % de la fenêtre Claude de 5 h et à 70 % de
   celle de 7 jours (quota **partagé** avec les autres superviseurs, dont les bases sont lues en
   lecture seule), session ≤ 2 h, coupure après 1 h sans sortie, 3 tentatives par ticket,
   disjoncteur après 4 sessions consécutives sans rapport. Réglages : `lodyorch config`.
