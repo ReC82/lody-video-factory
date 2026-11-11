@@ -23,7 +23,7 @@ Chaîne complète, scène par scène (seules les scènes PARLÉES, c'est-à-dire
 Échec = échec : aucune bascule vers une autre voix (Piper ou autre), aucune vidéo muette en douce.
 
 Ce module ne lit aucune clé : l'appel payant est une fonction injectée (en production
-``MoneyPrinterTurboConnector.generate_voice_preview``, qui passe par le moteur, seul détenteur de la clé).
+``generate_voice_preview`` du connecteur moteur (``mpt_connector``), qui passe par le moteur, seul détenteur de la clé).
 """
 
 from __future__ import annotations
