@@ -28,6 +28,10 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Épisode « Voltix explique le câble SDI »](animation/voltix-137/README.md) (#137) — script chronométré,
+  storyboard 9 scènes, schémas SVG coaxial / BNC, preset, estimation des coûts, MP4 provisoire.
+  [V2 éditoriale](animation/voltix-137-v2/README.md) (#160) — diff V1 → V2, script TTS-safe et prononciations
+  contrôlées, storyboard 9:16, sources, plan de réédition #121, MP4 V2 provisoire.
 
 ## Voix
 

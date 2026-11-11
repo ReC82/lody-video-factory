@@ -1,0 +1,3486 @@
+{
+ "schema": "lody.animation/1",
+ "canvas": {
+  "fps": 30,
+  "width": 1080,
+  "height": 1920
+ },
+ "scenes": [
+  {
+   "id": "accroche",
+   "duration_frames": 134,
+   "intent": {
+    "narration": "Ta box et ta télé ? Reliées en HDMI. Et chez les pros de la vidéo ?",
+    "purpose": "Accroche : HDMI à la maison, et chez les pros ?",
+    "mood": "curieux"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "objets",
+      "objects": [
+       {
+        "id": "salon",
+        "type": "asset",
+        "asset": {
+         "id": "ast_ae6dc850359e",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 600
+         },
+         {
+          "frame": 89,
+          "x": 540,
+          "y": 600
+         },
+         {
+          "frame": 103,
+          "x": 330,
+          "y": 520
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.45
+         },
+         {
+          "frame": 10,
+          "value": 1.05
+         },
+         {
+          "frame": 89,
+          "value": 1.05
+         },
+         {
+          "frame": 103,
+          "value": 0.62
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "camera-pro",
+        "type": "asset",
+        "asset": {
+         "id": "ast_13b84528af21",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 1300,
+          "y": 560
+         },
+         {
+          "frame": 95,
+          "x": 1300,
+          "y": 560
+         },
+         {
+          "frame": 109,
+          "x": 820,
+          "y": 560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "maison",
+        "type": "text",
+        "text": {
+         "content": "À la maison",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 330,
+          "y": 330
+         }
+        ],
+        "start": 99,
+        "opacity": [
+         {
+          "frame": 99,
+          "value": 0
+         },
+         {
+          "frame": 109,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "pros",
+        "type": "text",
+        "text": {
+         "content": "Chez les pros ?",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 820,
+          "y": 330
+         }
+        ],
+        "start": 109,
+        "opacity": [
+         {
+          "frame": 109,
+          "value": 0
+         },
+         {
+          "frame": 119,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "HDMI… et chez les pros ?",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 180
+         }
+        ],
+        "start": 4,
+        "scale": [
+         {
+          "frame": 4,
+          "value": 0.4
+         },
+         {
+          "frame": 16,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1490
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.78
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 89,
+          "name": "surprise"
+         },
+         {
+          "frame": 124,
+          "name": "concentration"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 0,
+          "end": 20,
+          "name": "rebond"
+         },
+         {
+          "start": 20,
+          "end": 86,
+          "name": "montrer"
+         },
+         {
+          "start": 105,
+          "end": 134,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.06,
+       "rotation": 0
+      },
+      {
+       "frame": 86,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Ta box et ta télé ? Reliées en HDMI.",
+       "start": 4,
+       "end": 86
+      },
+      {
+       "text": "Et chez les pros de la vidéo ?",
+       "start": 89,
+       "end": 130
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 126
+    }
+   }
+  },
+  {
+   "id": "definition",
+   "duration_frames": 186,
+   "intent": {
+    "narration": "Du SDI : Serial Digital Interface. Interface numérique série : des bits, un par un.",
+    "purpose": "SDI = Serial Digital Interface",
+    "mood": "clair"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "schema",
+      "objects": [
+       {
+        "id": "bits",
+        "type": "asset",
+        "asset": {
+         "id": "ast_322701462d58",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": -500,
+          "y": 760
+         },
+         {
+          "frame": 137,
+          "x": -500,
+          "y": 760
+         },
+         {
+          "frame": 161,
+          "x": 540,
+          "y": 760
+         },
+         {
+          "frame": 186,
+          "x": 620,
+          "y": 760
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.0
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "sigle",
+        "type": "text",
+        "text": {
+         "content": "SDI",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.4
+         },
+         {
+          "frame": 10,
+          "value": 1.6
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "anglais",
+        "type": "text",
+        "text": {
+         "content": "Serial Digital Interface",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 430
+         }
+        ],
+        "start": 37,
+        "scale": [
+         {
+          "frame": 37,
+          "value": 0.4
+         },
+         {
+          "frame": 49,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "francais",
+        "type": "text",
+        "text": {
+         "content": "interface numérique série",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 560
+         }
+        ],
+        "start": 90,
+        "opacity": [
+         {
+          "frame": 90,
+          "value": 0
+         },
+         {
+          "frame": 100,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1490
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.66
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 90,
+          "name": "concentration"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 0,
+          "end": 18,
+          "name": "rebond"
+         },
+         {
+          "start": 137,
+          "end": 186,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Du SDI : Serial Digital Interface.",
+       "start": 4,
+       "end": 87
+      },
+      {
+       "text": "Interface numérique série :",
+       "start": 90,
+       "end": 134
+      },
+      {
+       "text": "des bits, un par un.",
+       "start": 137,
+       "end": 180
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 175
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "broadcast",
+   "duration_frames": 241,
+   "intent": {
+    "narration": "Le standard du broadcast : production et diffusion pro. Comme le HDMI : de la vidéo numérique… … mais câbles longs et prises verrouillées.",
+    "purpose": "Broadcast : production et diffusion pro ; pont avec le HDMI",
+    "mood": "enjoué"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "lieux",
+      "objects": [
+       {
+        "id": "plateau",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b815a4d212c8",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 560
+         }
+        ],
+        "end": 98,
+        "start": 31,
+        "scale": [
+         {
+          "frame": 31,
+          "value": 0.4
+         },
+         {
+          "frame": 43,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "car",
+        "type": "asset",
+        "asset": {
+         "id": "ast_7ff723bd147f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 560
+         }
+        ],
+        "end": 98,
+        "start": 54,
+        "scale": [
+         {
+          "frame": 54,
+          "value": 0.4
+         },
+         {
+          "frame": 66,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "direct",
+        "type": "asset",
+        "asset": {
+         "id": "ast_11af1a9826fe",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 560
+         }
+        ],
+        "end": 98,
+        "start": 76,
+        "scale": [
+         {
+          "frame": 76,
+          "value": 0.4
+         },
+         {
+          "frame": 88,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "broadcast",
+        "type": "text",
+        "text": {
+         "content": "Broadcast",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 200
+         }
+        ],
+        "start": 4,
+        "scale": [
+         {
+          "frame": 4,
+          "value": 0.4
+         },
+         {
+          "frame": 16,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "def",
+        "type": "text",
+        "text": {
+         "content": "production + diffusion pro",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 340
+         }
+        ],
+        "start": 47,
+        "opacity": [
+         {
+          "frame": 47,
+          "value": 0
+         },
+         {
+          "frame": 57,
+          "value": 1
+         }
+        ],
+        "end": 98
+       },
+       {
+        "id": "l-plateau",
+        "type": "text",
+        "text": {
+         "content": "Plateau télé",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 730
+         }
+        ],
+        "start": 35,
+        "opacity": [
+         {
+          "frame": 35,
+          "value": 0
+         },
+         {
+          "frame": 45,
+          "value": 1
+         }
+        ],
+        "end": 98
+       },
+       {
+        "id": "l-car",
+        "type": "text",
+        "text": {
+         "content": "Car régie",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 730
+         }
+        ],
+        "start": 58,
+        "opacity": [
+         {
+          "frame": 58,
+          "value": 0
+         },
+         {
+          "frame": 68,
+          "value": 1
+         }
+        ],
+        "end": 98
+       },
+       {
+        "id": "l-direct",
+        "type": "text",
+        "text": {
+         "content": "Direct",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 730
+         }
+        ],
+        "start": 80,
+        "opacity": [
+         {
+          "frame": 80,
+          "value": 0
+         },
+         {
+          "frame": 90,
+          "value": 1
+         }
+        ],
+        "end": 98
+       },
+       {
+        "id": "hdmi",
+        "type": "text",
+        "text": {
+         "content": "HDMI : vidéo numérique",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 440
+         }
+        ],
+        "start": 98,
+        "opacity": [
+         {
+          "frame": 98,
+          "value": 0
+         },
+         {
+          "frame": 108,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "sdi",
+        "type": "text",
+        "text": {
+         "content": "SDI : câbles longs, prises verrouillées",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 580
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "start": 189,
+        "opacity": [
+         {
+          "frame": 189,
+          "value": 0
+         },
+         {
+          "frame": 199,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "pas-pareil",
+        "type": "text",
+        "text": {
+         "content": "Pas les mêmes prises !",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 740
+         }
+        ],
+        "start": 217,
+        "opacity": [
+         {
+          "frame": 217,
+          "value": 0
+         },
+         {
+          "frame": 227,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1490
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.62
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 98,
+          "name": "concentration"
+         },
+         {
+          "frame": 231,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 28,
+          "end": 95,
+          "name": "montrer"
+         },
+         {
+          "start": 178,
+          "end": 202,
+          "name": "rebond"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 95,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.03,
+       "rotation": 0
+      },
+      {
+       "frame": 241,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Le standard du broadcast :",
+       "start": 4,
+       "end": 44
+      },
+      {
+       "text": "production et diffusion pro.",
+       "start": 47,
+       "end": 95
+      },
+      {
+       "text": "Comme le HDMI : de la vidéo numérique…",
+       "start": 98,
+       "end": 175
+      },
+      {
+       "text": "… mais câbles longs et prises verrouillées.",
+       "start": 178,
+       "end": 235
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 91
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 6
+    }
+   }
+  },
+  {
+   "id": "chaine",
+   "duration_frames": 243,
+   "intent": {
+    "narration": "Caméra, grille de routage, moniteur, enregistreur… … mélangeur, qui choisit les sources… … ou convertisseur, pour finir en HDMI.",
+    "purpose": "Chaîne indicative d'équipements",
+    "mood": "rythmé"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "equipements",
+      "objects": [
+       {
+        "id": "camera",
+        "type": "asset",
+        "asset": {
+         "id": "ast_13b84528af21",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 150,
+          "y": 640
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.55
+         }
+        ],
+        "start": 0,
+        "opacity": [
+         {
+          "frame": 0,
+          "value": 0
+         },
+         {
+          "frame": 6,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "grille",
+        "type": "asset",
+        "asset": {
+         "id": "ast_4e0e7ee0bf99",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 500,
+          "y": 640
+         }
+        ],
+        "start": 20,
+        "scale": [
+         {
+          "frame": 20,
+          "value": 0.24
+         },
+         {
+          "frame": 32,
+          "value": 0.6
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-grille",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a407bdc3b733",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 310,
+          "y": 640
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": 0.0
+         }
+        ],
+        "start": 17,
+        "scale": [
+         {
+          "frame": 17,
+          "value": 0.1
+         },
+         {
+          "frame": 25,
+          "value": 0.45
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_081258062d67",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 330
+         }
+        ],
+        "start": 55,
+        "scale": [
+         {
+          "frame": 55,
+          "value": 0.2
+         },
+         {
+          "frame": 67,
+          "value": 0.5
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a407bdc3b733",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 692,
+          "y": 485
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": -66.5
+         }
+        ],
+        "start": 51,
+        "scale": [
+         {
+          "frame": 51,
+          "value": 0.1
+         },
+         {
+          "frame": 59,
+          "value": 0.8
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "enregistreur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_c05ec5b4ce6f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 540
+         }
+        ],
+        "start": 79,
+        "scale": [
+         {
+          "frame": 79,
+          "value": 0.248
+         },
+         {
+          "frame": 91,
+          "value": 0.62
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-enregistreur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a407bdc3b733",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 692,
+          "y": 590
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": -36.5
+         }
+        ],
+        "start": 75,
+        "scale": [
+         {
+          "frame": 75,
+          "value": 0.1
+         },
+         {
+          "frame": 83,
+          "value": 0.53
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "melangeur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_10c4df2b6f6e",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 750
+         }
+        ],
+        "start": 103,
+        "scale": [
+         {
+          "frame": 103,
+          "value": 0.184
+         },
+         {
+          "frame": 115,
+          "value": 0.46
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-melangeur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a407bdc3b733",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 692,
+          "y": 695
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": 39.2
+         }
+        ],
+        "start": 99,
+        "scale": [
+         {
+          "frame": 99,
+          "value": 0.1
+         },
+         {
+          "frame": 107,
+          "value": 0.55
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "convertisseur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_19a330796e8c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 950
+         }
+        ],
+        "start": 174,
+        "scale": [
+         {
+          "frame": 174,
+          "value": 0.248
+         },
+         {
+          "frame": 186,
+          "value": 0.62
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-convertisseur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a407bdc3b733",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 692,
+          "y": 795
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": 66.5
+         }
+        ],
+        "start": 170,
+        "scale": [
+         {
+          "frame": 170,
+          "value": 0.1
+         },
+         {
+          "frame": 178,
+          "value": 0.8
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "Exemple de chaîne",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 150
+         }
+        ],
+        "start": 4,
+        "opacity": [
+         {
+          "frame": 4,
+          "value": 0
+         },
+         {
+          "frame": 14,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "note",
+        "type": "text",
+        "text": {
+         "content": "(indicative, pas un câblage type)",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 240
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.75
+         }
+        ],
+        "start": 12,
+        "opacity": [
+         {
+          "frame": 12,
+          "value": 0
+         },
+         {
+          "frame": 22,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-grille",
+        "type": "text",
+        "text": {
+         "content": "grille de routage",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 500,
+          "y": 770
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.8
+         }
+        ],
+        "start": 27,
+        "opacity": [
+         {
+          "frame": 27,
+          "value": 0
+         },
+         {
+          "frame": 37,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-melangeur",
+        "type": "text",
+        "text": {
+         "content": "mélangeur : choisit les sources",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1090
+         }
+        ],
+        "start": 118,
+        "opacity": [
+         {
+          "frame": 118,
+          "value": 0
+         },
+         {
+          "frame": 128,
+          "value": 1
+         }
+        ],
+        "end": 167
+       },
+       {
+        "id": "l-hdmi",
+        "type": "text",
+        "text": {
+         "content": "convertisseur → HDMI",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1090
+         }
+        ],
+        "start": 192,
+        "opacity": [
+         {
+          "frame": 192,
+          "value": 0
+         },
+         {
+          "frame": 202,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1540
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.52
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "concentration"
+         },
+         {
+          "frame": 237,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 4,
+          "end": 160,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Caméra, grille de routage, moniteur, enregistreur…",
+       "start": 4,
+       "end": 98
+      },
+      {
+       "text": "… mélangeur, qui choisit les sources…",
+       "start": 101,
+       "end": 160
+      },
+      {
+       "text": "… ou convertisseur, pour finir en HDMI.",
+       "start": 163,
+       "end": 237
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 229
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "audio",
+   "duration_frames": 93,
+   "intent": {
+    "narration": "Ce même signal peut aussi intégrer le son.",
+    "purpose": "Audio intégré possible",
+    "mood": "léger"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "canal",
+      "objects": [
+       {
+        "id": "cable",
+        "type": "asset",
+        "asset": {
+         "id": "ast_c950c18dfee1",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 700
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.0
+         }
+        ]
+       },
+       {
+        "id": "video",
+        "type": "asset",
+        "asset": {
+         "id": "ast_ba8ea1fbde9b",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 300,
+          "y": 460
+         },
+         {
+          "frame": 38,
+          "x": 300,
+          "y": 460
+         },
+         {
+          "frame": 56,
+          "x": 470,
+          "y": 700
+         }
+        ],
+        "scale": [
+         {
+          "frame": 38,
+          "value": 1.0
+         },
+         {
+          "frame": 56,
+          "value": 0.45
+         }
+        ],
+        "easing": "ease_in_out",
+        "start": 0,
+        "opacity": [
+         {
+          "frame": 0,
+          "value": 0
+         },
+         {
+          "frame": 6,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "audio",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0765bba79505",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 780,
+          "y": 460
+         },
+         {
+          "frame": 44,
+          "x": 780,
+          "y": 460
+         },
+         {
+          "frame": 62,
+          "x": 610,
+          "y": 700
+         }
+        ],
+        "scale": [
+         {
+          "frame": 44,
+          "value": 1.0
+         },
+         {
+          "frame": 62,
+          "value": 0.45
+         }
+        ],
+        "easing": "ease_in_out",
+        "start": 52,
+        "opacity": [
+         {
+          "frame": 52,
+          "value": 0
+         },
+         {
+          "frame": 62,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "flux",
+      "objects": [
+       {
+        "id": "paquet-0",
+        "type": "asset",
+        "asset": {
+         "id": "ast_96f04c8ce1ba",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 62,
+          "x": 220,
+          "y": 700
+         },
+         {
+          "frame": 82,
+          "x": 860,
+          "y": 700
+         }
+        ],
+        "start": 62,
+        "end": 82,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-1",
+        "type": "asset",
+        "asset": {
+         "id": "ast_96f04c8ce1ba",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 72,
+          "x": 220,
+          "y": 700
+         },
+         {
+          "frame": 92,
+          "x": 860,
+          "y": 700
+         }
+        ],
+        "start": 72,
+        "end": 92,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "Vidéo + son intégré",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 240
+         }
+        ],
+        "start": 8,
+        "opacity": [
+         {
+          "frame": 8,
+          "value": 0
+         },
+         {
+          "frame": 18,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "possible",
+        "type": "text",
+        "text": {
+         "content": "possible, pas obligatoire",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 880
+         }
+        ],
+        "start": 58,
+        "opacity": [
+         {
+          "frame": 58,
+          "value": 0
+         },
+         {
+          "frame": 68,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1490
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.6
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 4,
+          "end": 93,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Ce même signal peut aussi intégrer le son.",
+       "start": 4,
+       "end": 85
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 68
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 6
+    }
+   }
+  },
+  {
+   "id": "couches",
+   "duration_frames": 220,
+   "intent": {
+    "narration": "Le SDI, c'est le signal. Ici, il passe dans un coaxial… … branché en BNC, verrouillé d'un quart de tour.",
+    "purpose": "Signal SDI / câble coaxial / connecteur BNC",
+    "mood": "net"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "signal",
+      "objects": [
+       {
+        "id": "onde",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8680e4839f47",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 330
+         }
+        ],
+        "start": 27,
+        "scale": [
+         {
+          "frame": 27,
+          "value": 0.34
+         },
+         {
+          "frame": 39,
+          "value": 0.85
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "cable",
+      "objects": [
+       {
+        "id": "coax-gaine",
+        "type": "asset",
+        "asset": {
+         "id": "ast_e3f302a600b9",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 620
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 66,
+        "opacity": [
+         {
+          "frame": 66,
+          "value": 0
+         },
+         {
+          "frame": 74,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "coax-blindage",
+        "type": "asset",
+        "asset": {
+         "id": "ast_e8ecd3c7fae4",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 620
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 68,
+        "opacity": [
+         {
+          "frame": 68,
+          "value": 0
+         },
+         {
+          "frame": 76,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "coax-isolant",
+        "type": "asset",
+        "asset": {
+         "id": "ast_fed8a5aae529",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 620
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 70,
+        "opacity": [
+         {
+          "frame": 70,
+          "value": 0
+         },
+         {
+          "frame": 78,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "coax-ame",
+        "type": "asset",
+        "asset": {
+         "id": "ast_3dcd04ba6058",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 620
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 72,
+        "opacity": [
+         {
+          "frame": 72,
+          "value": 0
+         },
+         {
+          "frame": 80,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "connecteurs",
+      "objects": [
+       {
+        "id": "bnc-femelle",
+        "type": "asset",
+        "asset": {
+         "id": "ast_56a761435e96",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 1400,
+          "y": 930
+         },
+         {
+          "frame": 151,
+          "x": 700,
+          "y": 930
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.0
+         }
+        ],
+        "easing": "ease_out",
+        "start": 130
+       },
+       {
+        "id": "bnc-male",
+        "type": "asset",
+        "asset": {
+         "id": "ast_6f5afec6969b",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": -300,
+          "y": 930
+         },
+         {
+          "frame": 151,
+          "x": 250,
+          "y": 930
+         },
+         {
+          "frame": 167,
+          "x": 250,
+          "y": 930
+         },
+         {
+          "frame": 177,
+          "x": 400,
+          "y": 930
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.0
+         }
+        ],
+        "easing": "ease_out",
+        "start": 130
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "l-signal",
+        "type": "text",
+        "text": {
+         "content": "SDI = le signal",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 200
+         }
+        ],
+        "start": 27,
+        "opacity": [
+         {
+          "frame": 27,
+          "value": 0
+         },
+         {
+          "frame": 37,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-coax",
+        "type": "text",
+        "text": {
+         "content": "coaxial = le câble (ici)",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 480
+         }
+        ],
+        "start": 96,
+        "opacity": [
+         {
+          "frame": 96,
+          "value": 0
+         },
+         {
+          "frame": 106,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-bnc",
+        "type": "text",
+        "text": {
+         "content": "BNC = le connecteur",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1090
+         }
+        ],
+        "start": 142,
+        "opacity": [
+         {
+          "frame": 142,
+          "value": 0
+         },
+         {
+          "frame": 152,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "quart",
+        "type": "text",
+        "text": {
+         "content": "↻ ¼ de tour : clic !",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 820,
+          "y": 790
+         }
+        ],
+        "start": 201,
+        "scale": [
+         {
+          "frame": 201,
+          "value": 0.36
+         },
+         {
+          "frame": 213,
+          "value": 0.9
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "concentration"
+         },
+         {
+          "frame": 201,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 4,
+          "end": 127,
+          "name": "montrer"
+         },
+         {
+          "start": 201,
+          "end": 220,
+          "name": "rebond"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Le SDI, c'est le signal.",
+       "start": 4,
+       "end": 63
+      },
+      {
+       "text": "Ici, il passe dans un coaxial…",
+       "start": 66,
+       "end": 127
+      },
+      {
+       "text": "… branché en BNC, verrouillé d'un quart de tour.",
+       "start": 130,
+       "end": 214
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 207
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "ohms",
+   "duration_frames": 247,
+   "intent": {
+    "narration": "Pas n'importe quel coaxial : du 75 ohms. Pas une résistance : son impédance caractéristique, fixée par ses diamètres et son isolant.",
+    "purpose": "75 Ω = impédance caractéristique",
+    "mood": "pédagogique"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "schema",
+      "objects": [
+       {
+        "id": "coax-cotes",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f0370c7a1d53",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 620
+         }
+        ],
+        "start": 8,
+        "scale": [
+         {
+          "frame": 8,
+          "value": 0.38
+         },
+         {
+          "frame": 20,
+          "value": 0.95
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "tag-75",
+        "type": "asset",
+        "asset": {
+         "id": "ast_4ef7f4c122c5",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1040
+         }
+        ],
+        "start": 212,
+        "scale": [
+         {
+          "frame": 212,
+          "value": 0.3
+         },
+         {
+          "frame": 224,
+          "value": 0.75
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "75 Ω",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 200
+         }
+        ],
+        "start": 50,
+        "scale": [
+         {
+          "frame": 50,
+          "value": 0.4
+         },
+         {
+          "frame": 62,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "pas-r",
+        "type": "text",
+        "text": {
+         "content": "pas une résistance",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 320
+         }
+        ],
+        "start": 84,
+        "opacity": [
+         {
+          "frame": 84,
+          "value": 0
+         },
+         {
+          "frame": 94,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "z",
+        "type": "text",
+        "text": {
+         "content": "impédance caractéristique",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 930
+         }
+        ],
+        "start": 117,
+        "opacity": [
+         {
+          "frame": 117,
+          "value": 0
+         },
+         {
+          "frame": 127,
+          "value": 1
+         }
+        ],
+        "end": 209
+       },
+       {
+        "id": "prevus",
+        "type": "text",
+        "text": {
+         "content": "câble + connecteurs en 75 Ω",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 920
+         }
+        ],
+        "start": 209,
+        "opacity": [
+         {
+          "frame": 209,
+          "value": 0
+         },
+         {
+          "frame": 217,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "concentration"
+         },
+         {
+          "frame": 212,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 170,
+          "end": 241,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 170,
+       "x": 540,
+       "y": 900,
+       "zoom": 1.05,
+       "rotation": 0
+      },
+      {
+       "frame": 247,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Pas n'importe quel coaxial : du 75 ohms.",
+       "start": 4,
+       "end": 81
+      },
+      {
+       "text": "Pas une résistance : son impédance caractéristique,",
+       "start": 84,
+       "end": 167
+      },
+      {
+       "text": "fixée par ses diamètres et son isolant.",
+       "start": 170,
+       "end": 241
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 226
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 6
+    }
+   }
+  },
+  {
+   "id": "debits",
+   "duration_frames": 278,
+   "intent": {
+    "narration": "HD-SDI, 3G-SDI, 12G-SDI : des débits, pas des résolutions. Plus ça monte, plus câble et connecteurs doivent suivre.",
+    "purpose": "HD / 3G / 12G = débits",
+    "mood": "rythmé"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "barres",
+      "objects": [
+       {
+        "id": "barre-hd",
+        "type": "asset",
+        "asset": {
+         "id": "ast_29dfe1af0a6f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 90,
+          "y": 420
+         }
+        ],
+        "start": 9,
+        "scale": [
+         {
+          "frame": 9,
+          "value": 0.05
+         },
+         {
+          "frame": 21,
+          "value": 1.0
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "barre-3g",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a7d4a50fa931",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 90,
+          "y": 590
+         }
+        ],
+        "start": 48,
+        "scale": [
+         {
+          "frame": 48,
+          "value": 0.05
+         },
+         {
+          "frame": 60,
+          "value": 1.0
+         }
+        ],
+        "easing": "ease_out"
+       },
+       {
+        "id": "barre-12g",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b5be65d09cc5",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 90,
+          "y": 760
+         }
+        ],
+        "start": 86,
+        "scale": [
+         {
+          "frame": 86,
+          "value": 0.05
+         },
+         {
+          "frame": 98,
+          "value": 1.0
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "l-hd",
+        "type": "text",
+        "text": {
+         "content": "HD-SDI",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 340
+         }
+        ],
+        "start": 9,
+        "opacity": [
+         {
+          "frame": 9,
+          "value": 0
+         },
+         {
+          "frame": 19,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-3g",
+        "type": "text",
+        "text": {
+         "content": "3G-SDI",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 510
+         }
+        ],
+        "start": 48,
+        "opacity": [
+         {
+          "frame": 48,
+          "value": 0
+         },
+         {
+          "frame": 58,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-12g",
+        "type": "text",
+        "text": {
+         "content": "12G-SDI",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 680
+         }
+        ],
+        "start": 86,
+        "opacity": [
+         {
+          "frame": 86,
+          "value": 0
+         },
+         {
+          "frame": 96,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "Des débits, pas des résolutions",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 200
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.95
+         }
+        ],
+        "start": 125,
+        "opacity": [
+         {
+          "frame": 125,
+          "value": 0
+         },
+         {
+          "frame": 135,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "cable",
+        "type": "text",
+        "text": {
+         "content": "câble + connecteurs prévus pour ce débit",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 960
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.85
+         }
+        ],
+        "start": 209,
+        "opacity": [
+         {
+          "frame": 209,
+          "value": 0
+         },
+         {
+          "frame": 219,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "etiquette",
+        "type": "text",
+        "text": {
+         "content": "« 75 Ω » seul ne suffit pas",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1060
+         }
+        ],
+        "start": 249,
+        "opacity": [
+         {
+          "frame": 249,
+          "value": 0
+         },
+         {
+          "frame": 259,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.52
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "concentration"
+         },
+         {
+          "frame": 182,
+          "name": "confusion"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 125,
+          "end": 179,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "HD-SDI, 3G-SDI, 12G-SDI :",
+       "start": 4,
+       "end": 122
+      },
+      {
+       "text": "des débits, pas des résolutions.",
+       "start": 125,
+       "end": 179
+      },
+      {
+       "text": "Plus ça monte, plus câble et connecteurs doivent suivre.",
+       "start": 182,
+       "end": 272
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 263
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "conclusion",
+   "duration_frames": 276,
+   "intent": {
+    "narration": "Bref : le SDI, le signal de la vidéo pro. Dans un coaxial 75 ohms, branché en BNC… … et l'image arrive !",
+    "purpose": "Récapitulatif sur une liaison réellement branchée",
+    "mood": "victorieux"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "liaison",
+      "objects": [
+       {
+        "id": "liaison",
+        "type": "asset",
+        "asset": {
+         "id": "ast_cecb34823e9f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 600
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.95
+         }
+        ],
+        "start": 0,
+        "opacity": [
+         {
+          "frame": 0,
+          "value": 0
+         },
+         {
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "mire",
+        "type": "asset",
+        "asset": {
+         "id": "ast_fc41d6276dde",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 825,
+          "y": 505
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.95
+         }
+        ],
+        "start": 213,
+        "opacity": [
+         {
+          "frame": 213,
+          "value": 0
+         },
+         {
+          "frame": 221,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "l-signal",
+        "type": "text",
+        "text": {
+         "content": "① signal SDI",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 300,
+          "y": 330
+         }
+        ],
+        "start": 42,
+        "opacity": [
+         {
+          "frame": 42,
+          "value": 0
+         },
+         {
+          "frame": 52,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-coax",
+        "type": "text",
+        "text": {
+         "content": "② coaxial 75 Ω",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 654,
+          "y": 846
+         }
+        ],
+        "start": 129,
+        "opacity": [
+         {
+          "frame": 129,
+          "value": 0
+         },
+         {
+          "frame": 139,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-bnc-1",
+        "type": "text",
+        "text": {
+         "content": "③ BNC",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 506,
+          "y": 530
+         }
+        ],
+        "start": 174,
+        "opacity": [
+         {
+          "frame": 174,
+          "value": 0
+         },
+         {
+          "frame": 184,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-bnc-2",
+        "type": "text",
+        "text": {
+         "content": "③ BNC",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 949,
+          "y": 699
+         }
+        ],
+        "start": 174,
+        "opacity": [
+         {
+          "frame": 174,
+          "value": 0
+         },
+         {
+          "frame": 184,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "titre",
+        "type": "text",
+        "text": {
+         "content": "SDI : le signal de la vidéo pro",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 180
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.95
+         }
+        ],
+        "start": 4,
+        "opacity": [
+         {
+          "frame": 4,
+          "value": 0
+         },
+         {
+          "frame": 14,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b7eeea545b27",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1520
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 213,
+          "name": "surprise"
+         },
+         {
+          "frame": 223,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 4,
+          "end": 101,
+          "name": "montrer"
+         },
+         {
+          "start": 213,
+          "end": 239,
+          "name": "rebond"
+         },
+         {
+          "start": 241,
+          "end": 271,
+          "name": "saluer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 276,
+       "x": 540,
+       "y": 940,
+       "zoom": 1.03,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Bref : le SDI, le signal de la vidéo pro.",
+       "start": 4,
+       "end": 101
+      },
+      {
+       "text": "Dans un coaxial 75 ohms, branché en BNC…",
+       "start": 104,
+       "end": 204
+      },
+      {
+       "text": "… et l'image arrive !",
+       "start": 207,
+       "end": 236
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 229
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 6
+    },
+    "transition_out": {
+     "type": "fade",
+     "frames": 12
+    }
+   }
+  }
+ ],
+ "frozen": {
+  "at": "2026-11-11T18:27:37+00:00",
+  "assets": [
+   {
+    "id": "ast_0765bba79505",
+    "version": 1,
+    "sha256": "781bd0a50f3e4c51513fb4ac5cf21f35d5dc074b94c9eecba7e64693ef803414",
+    "kind": "prop",
+    "name": "Icône audio"
+   },
+   {
+    "id": "ast_081258062d67",
+    "version": 1,
+    "sha256": "45c9ecafb7ab443f3d0e1a99d51a9686547e5b9865eed42e9b863f6e63701948",
+    "kind": "prop",
+    "name": "Moniteur de contrôle"
+   },
+   {
+    "id": "ast_10c4df2b6f6e",
+    "version": 1,
+    "sha256": "194e073c680d2341714941509a119798f0413a0aa1470dd278ad4bbb9f64e9bf",
+    "kind": "prop",
+    "name": "Mélangeur vidéo"
+   },
+   {
+    "id": "ast_11af1a9826fe",
+    "version": 1,
+    "sha256": "ddc7b0f85625f3b7ffc28064bb2f4bc2b7813905fa0029a0a197860711d07e60",
+    "kind": "prop",
+    "name": "Lieu : direct"
+   },
+   {
+    "id": "ast_13b84528af21",
+    "version": 1,
+    "sha256": "a2acb5b47fd85b79d6473eea38770309556418f3c85c9f3b01d699abd6aa4b80",
+    "kind": "prop",
+    "name": "Caméra de plateau"
+   },
+   {
+    "id": "ast_19a330796e8c",
+    "version": 1,
+    "sha256": "c37fe3dd857e9057e519f8121f88e70825d7db699651f0a4bfda85fc3f530757",
+    "kind": "prop",
+    "name": "Convertisseur SDI → HDMI"
+   },
+   {
+    "id": "ast_29dfe1af0a6f",
+    "version": 1,
+    "sha256": "d12d19d8454aa2e59ba23b8e230c51c1457a55805aab66a4e4580ca206cc445a",
+    "kind": "prop",
+    "name": "Débit HD-SDI"
+   },
+   {
+    "id": "ast_322701462d58",
+    "version": 1,
+    "sha256": "fcc0fb879d51c974a1f5fa989ae72dbfeb0c047785c1cb4d061868e3f02e200b",
+    "kind": "prop",
+    "name": "Bits en série"
+   },
+   {
+    "id": "ast_3dcd04ba6058",
+    "version": 1,
+    "sha256": "241b10a59e2b3412e7925591db8c262a328467a8cdea5000fd3062778b0db60b",
+    "kind": "prop",
+    "name": "Coax longitudinal — Âme en cuivre"
+   },
+   {
+    "id": "ast_4e0e7ee0bf99",
+    "version": 1,
+    "sha256": "cee9346f38a9216720323190bc904f77d5aba5f7c48f1ed8ff5e994055107a19",
+    "kind": "prop",
+    "name": "Grille de routage"
+   },
+   {
+    "id": "ast_4ef7f4c122c5",
+    "version": 1,
+    "sha256": "5a5027e96dcf0f3a39f9e3e07e15362d1c9354ac5b25313a21b33d39f4bd066b",
+    "kind": "prop",
+    "name": "Étiquette 75 Ω"
+   },
+   {
+    "id": "ast_56a761435e96",
+    "version": 1,
+    "sha256": "b9ee29528da4a07dde80647ee6e1c76ce160b800acab616abf0e0614b2d69d09",
+    "kind": "prop",
+    "name": "Embase BNC femelle"
+   },
+   {
+    "id": "ast_6f5afec6969b",
+    "version": 1,
+    "sha256": "8352fed3fa3570cfb6cc5f4d8e556a50f871d66b3ecd10fed45f6bf2fc96948c",
+    "kind": "prop",
+    "name": "Fiche BNC mâle"
+   },
+   {
+    "id": "ast_7ff723bd147f",
+    "version": 1,
+    "sha256": "a9f59790ace3c7d73f7de366cb30f4f38d991783ea526cb19c45d1d975270ef9",
+    "kind": "prop",
+    "name": "Lieu : car régie"
+   },
+   {
+    "id": "ast_8680e4839f47",
+    "version": 1,
+    "sha256": "ea8063f864a476b7d916b51ad99b7b18e18f6c0671f074016664e85c5e65a189",
+    "kind": "prop",
+    "name": "Signal numérique stable"
+   },
+   {
+    "id": "ast_96f04c8ce1ba",
+    "version": 1,
+    "sha256": "3ac0a45fb9f497d4567d0920465008ff8a67730e592d528fd00d9b0c8e01484f",
+    "kind": "prop",
+    "name": "Paquet numérique"
+   },
+   {
+    "id": "ast_a407bdc3b733",
+    "version": 1,
+    "sha256": "502b626b9a82eb511af4eec15515282b7ed34062fa44fd529d1a6cb851246ad3",
+    "kind": "prop",
+    "name": "Flèche de signal"
+   },
+   {
+    "id": "ast_a7d4a50fa931",
+    "version": 1,
+    "sha256": "e75bec44c90b8f4b81524cd32ecf60e3bfcda837db1808aeefb8586262b31604",
+    "kind": "prop",
+    "name": "Débit 3G-SDI"
+   },
+   {
+    "id": "ast_ae6dc850359e",
+    "version": 1,
+    "sha256": "e65396122f7a2dd5e42a1e7828265215302f82b3779419e8ff17fa3c393c34c5",
+    "kind": "prop",
+    "name": "Salon : box → HDMI → télé"
+   },
+   {
+    "id": "ast_b5be65d09cc5",
+    "version": 1,
+    "sha256": "933efdd0e1fbe3318c56154c994739e5aa047db4d1695e91a4d487a1b1a2dd06",
+    "kind": "prop",
+    "name": "Débit 12G-SDI"
+   },
+   {
+    "id": "ast_b7eeea545b27",
+    "version": 1,
+    "sha256": "ddf8a04d0177474ab09335994ced9f825e05ade1630a8157760e1afee31dce97",
+    "kind": "character",
+    "name": "Voltix — marionnette"
+   },
+   {
+    "id": "ast_b815a4d212c8",
+    "version": 1,
+    "sha256": "e1a53b6e318134735f70f98ae6b0a3aba41b5306a7f956e2fb211c6ac8eb07c7",
+    "kind": "prop",
+    "name": "Lieu : plateau télé"
+   },
+   {
+    "id": "ast_ba8ea1fbde9b",
+    "version": 1,
+    "sha256": "f0a6e63087e6d244028bb37a555aa1d8c454323b4f63fbce76f1aae9a80b7cce",
+    "kind": "prop",
+    "name": "Icône vidéo"
+   },
+   {
+    "id": "ast_c05ec5b4ce6f",
+    "version": 1,
+    "sha256": "56a5529ebbc66fe75d904e74ce6035ea4a2712905dae6d76dd010461b602b4c5",
+    "kind": "prop",
+    "name": "Enregistreur"
+   },
+   {
+    "id": "ast_c950c18dfee1",
+    "version": 1,
+    "sha256": "acc1ce69fb23ffa66d832af37054fd4ccf396d4959e21c58b8d91d8b91cf04b7",
+    "kind": "prop",
+    "name": "Câble SDI droit"
+   },
+   {
+    "id": "ast_cecb34823e9f",
+    "version": 1,
+    "sha256": "5a5f2d350ccef8d285d2ec35e9d5b675f43ce485d0b13e9c7a06c6efc5471b2b",
+    "kind": "prop",
+    "name": "Liaison SDI connectée"
+   },
+   {
+    "id": "ast_e3f302a600b9",
+    "version": 1,
+    "sha256": "78d0a57de57bddaaae2f2f2e664b02fca951241c5c12fdf3311d048fc40da240",
+    "kind": "prop",
+    "name": "Coax longitudinal — Gaine extérieure"
+   },
+   {
+    "id": "ast_e8ecd3c7fae4",
+    "version": 1,
+    "sha256": "ac29097895201b4aba5771d545d43b1ea045d2f84948f1f8f9be3e5afc93b234",
+    "kind": "prop",
+    "name": "Coax longitudinal — Blindage : feuille + tresse"
+   },
+   {
+    "id": "ast_f0370c7a1d53",
+    "version": 1,
+    "sha256": "26237fd9ecbcafa40f1d0fcf52142ad4d491f271c018d0dd6f410d2f2ea04955",
+    "kind": "prop",
+    "name": "Coaxial coté (d, D)"
+   },
+   {
+    "id": "ast_fc41d6276dde",
+    "version": 1,
+    "sha256": "a33f912012a46c9b40ba8825f9545eeba4506746ae13625534db8805c7a39cbb",
+    "kind": "prop",
+    "name": "Mire de barres"
+   },
+   {
+    "id": "ast_fed8a5aae529",
+    "version": 1,
+    "sha256": "58225a6e2d63dc1f787a00ed9dfa0c82a84e9cc47ff4f5876bda6d9e8332920e",
+    "kind": "prop",
+    "name": "Coax longitudinal — Diélectrique (isolant)"
+   }
+  ],
+  "sha256": "ba8a71aa61e39e0569c140af19ec9b8fc63f7a8c4db32701ef1496fec95fc290"
+ }
+}

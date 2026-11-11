@@ -1,0 +1,100 @@
+1
+00:00:00,133 --> 00:00:02,867
+Ta box et ta télé ? Reliées en HDMI.
+
+2
+00:00:02,967 --> 00:00:04,333
+Et chez les pros de la vidéo ?
+
+3
+00:00:04,600 --> 00:00:07,367
+Du SDI : Serial Digital Interface.
+
+4
+00:00:07,467 --> 00:00:08,933
+Interface numérique série :
+
+5
+00:00:09,033 --> 00:00:10,467
+des bits, un par un.
+
+6
+00:00:10,800 --> 00:00:12,133
+Le standard du broadcast :
+
+7
+00:00:12,233 --> 00:00:13,833
+production et diffusion pro.
+
+8
+00:00:13,933 --> 00:00:16,500
+Comme le HDMI : de la vidéo numérique…
+
+9
+00:00:16,600 --> 00:00:18,500
+… mais câbles longs et prises verrouillées.
+
+10
+00:00:18,833 --> 00:00:21,967
+Caméra, grille de routage, moniteur, enregistreur…
+
+11
+00:00:22,067 --> 00:00:24,033
+… mélangeur, qui choisit les sources…
+
+12
+00:00:24,133 --> 00:00:26,600
+… ou convertisseur, pour finir en HDMI.
+
+13
+00:00:26,933 --> 00:00:29,633
+Ce même signal peut aussi intégrer le son.
+
+14
+00:00:30,033 --> 00:00:32,000
+Le SDI, c'est le signal.
+
+15
+00:00:32,100 --> 00:00:34,133
+Ici, il passe dans un coaxial…
+
+16
+00:00:34,233 --> 00:00:37,033
+… branché en BNC, verrouillé d'un quart de tour.
+
+17
+00:00:37,367 --> 00:00:39,933
+Pas n'importe quel coaxial : du 75 ohms.
+
+18
+00:00:40,033 --> 00:00:42,800
+Pas une résistance : son impédance caractéristique,
+
+19
+00:00:42,900 --> 00:00:45,267
+fixée par ses diamètres et son isolant.
+
+20
+00:00:45,600 --> 00:00:49,533
+HD-SDI, 3G-SDI, 12G-SDI :
+
+21
+00:00:49,633 --> 00:00:51,433
+des débits, pas des résolutions.
+
+22
+00:00:51,533 --> 00:00:54,533
+Plus ça monte, plus câble et connecteurs doivent suivre.
+
+23
+00:00:54,867 --> 00:00:58,100
+Bref : le SDI, le signal de la vidéo pro.
+
+24
+00:00:58,200 --> 00:01:01,533
+Dans un coaxial 75 ohms, branché en BNC…
+
+25
+00:01:01,633 --> 00:01:02,600
+… et l'image arrive !
+

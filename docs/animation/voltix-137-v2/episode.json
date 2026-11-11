@@ -1,0 +1,200 @@
+{
+ "task": "anim-352897cc3eb3f921018c",
+ "tts_seconds": 81.6,
+ "render_seconds": 369.2,
+ "duration_seconds": 63.93,
+ "voice_plan": {
+  "status": "provisional",
+  "provider": "",
+  "voice_id": "",
+  "needs_cost_approval": false,
+  "message": "Aucune voix choisie dans la fiche Voltix : voix de test provisoire, à remplacer."
+ },
+ "catalog_warnings": [],
+ "scenes": {
+  "accroche": {
+   "offset": 0,
+   "duration": 134,
+   "cues": [
+    {
+     "text": "Ta box et ta télé ? Reliées en HDMI.",
+     "start": 4,
+     "end": 86
+    },
+    {
+     "text": "Et chez les pros de la vidéo ?",
+     "start": 89,
+     "end": 130
+    }
+   ]
+  },
+  "definition": {
+   "offset": 134,
+   "duration": 186,
+   "cues": [
+    {
+     "text": "Du SDI : Serial Digital Interface.",
+     "start": 4,
+     "end": 87
+    },
+    {
+     "text": "Interface numérique série :",
+     "start": 90,
+     "end": 134
+    },
+    {
+     "text": "des bits, un par un.",
+     "start": 137,
+     "end": 180
+    }
+   ]
+  },
+  "broadcast": {
+   "offset": 320,
+   "duration": 241,
+   "cues": [
+    {
+     "text": "Le standard du broadcast :",
+     "start": 4,
+     "end": 44
+    },
+    {
+     "text": "production et diffusion pro.",
+     "start": 47,
+     "end": 95
+    },
+    {
+     "text": "Comme le HDMI : de la vidéo numérique…",
+     "start": 98,
+     "end": 175
+    },
+    {
+     "text": "… mais câbles longs et prises verrouillées.",
+     "start": 178,
+     "end": 235
+    }
+   ]
+  },
+  "chaine": {
+   "offset": 561,
+   "duration": 243,
+   "cues": [
+    {
+     "text": "Caméra, grille de routage, moniteur, enregistreur…",
+     "start": 4,
+     "end": 98
+    },
+    {
+     "text": "… mélangeur, qui choisit les sources…",
+     "start": 101,
+     "end": 160
+    },
+    {
+     "text": "… ou convertisseur, pour finir en HDMI.",
+     "start": 163,
+     "end": 237
+    }
+   ]
+  },
+  "audio": {
+   "offset": 804,
+   "duration": 93,
+   "cues": [
+    {
+     "text": "Ce même signal peut aussi intégrer le son.",
+     "start": 4,
+     "end": 85
+    }
+   ]
+  },
+  "couches": {
+   "offset": 897,
+   "duration": 220,
+   "cues": [
+    {
+     "text": "Le SDI, c'est le signal.",
+     "start": 4,
+     "end": 63
+    },
+    {
+     "text": "Ici, il passe dans un coaxial…",
+     "start": 66,
+     "end": 127
+    },
+    {
+     "text": "… branché en BNC, verrouillé d'un quart de tour.",
+     "start": 130,
+     "end": 214
+    }
+   ]
+  },
+  "ohms": {
+   "offset": 1117,
+   "duration": 247,
+   "cues": [
+    {
+     "text": "Pas n'importe quel coaxial : du 75 ohms.",
+     "start": 4,
+     "end": 81
+    },
+    {
+     "text": "Pas une résistance : son impédance caractéristique,",
+     "start": 84,
+     "end": 167
+    },
+    {
+     "text": "fixée par ses diamètres et son isolant.",
+     "start": 170,
+     "end": 241
+    }
+   ]
+  },
+  "debits": {
+   "offset": 1364,
+   "duration": 278,
+   "cues": [
+    {
+     "text": "HD-SDI, 3G-SDI, 12G-SDI :",
+     "start": 4,
+     "end": 122
+    },
+    {
+     "text": "des débits, pas des résolutions.",
+     "start": 125,
+     "end": 179
+    },
+    {
+     "text": "Plus ça monte, plus câble et connecteurs doivent suivre.",
+     "start": 182,
+     "end": 272
+    }
+   ]
+  },
+  "conclusion": {
+   "offset": 1642,
+   "duration": 276,
+   "cues": [
+    {
+     "text": "Bref : le SDI, le signal de la vidéo pro.",
+     "start": 4,
+     "end": 101
+    },
+    {
+     "text": "Dans un coaxial 75 ohms, branché en BNC…",
+     "start": 104,
+     "end": 204
+    },
+    {
+     "text": "… et l'image arrive !",
+     "start": 207,
+     "end": 236
+    }
+   ]
+  }
+ },
+ "voice": {
+  "engine": "Piper (provisoire)",
+  "length_scale": 0.84
+ },
+ "music": "scripts/animation/musique_v2.py (générée, provisoire)"
+}
