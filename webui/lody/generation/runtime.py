@@ -6,8 +6,9 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 from lody import settings
+from lody.animation.assets import AnimationAssetRepository
 from lody.characters import CharacterRepository
-from lody.generation import demo, mpt_connector
+from lody.generation import animation_connector, demo, mpt_connector
 from lody.generation.kit_service import KitService
 from lody.generation.kit_store import KitRepository
 from lody.generation.service import ProductionService
@@ -19,6 +20,7 @@ logger = logging.getLogger("lody.runtime")
 
 DEFAULT_PROVIDER = mpt_connector.PROVIDER_ID
 DEMO_PROVIDER = demo.PROVIDER_ID
+ANIMATION_PROVIDER = animation_connector.PROVIDER_ID
 
 
 def build_service() -> ProductionService:
@@ -30,12 +32,16 @@ def build_service() -> ProductionService:
     providers = {
         mpt_connector.PROVIDER_ID: mpt_connector.build_from_environment(),
         demo.PROVIDER_ID: demo.DemoConnector(),
+        # #120 : rendu 2D (modes Animation 2D / Hybride du projet), à côté du moteur historique inchangé.
+        animation_connector.PROVIDER_ID: animation_connector.AnimationConnector(
+            asset_repo=AnimationAssetRepository(settings.db_path())),
     }
     # character_repo/location_repo (#35) : sans écran de sélection encore (#34), rien ne les utilise ; ils
     # rendent prepare() capable de résoudre une sélection dès que cet écran existera, sans nouveau branchement.
     service = ProductionService(repo, providers, ThreadPoolExecutor(max_workers=2, thread_name_prefix="lody-production"),
                                 character_repo=CharacterRepository(settings.db_path()),
-                                location_repo=LocationRepository(settings.db_path()))
+                                location_repo=LocationRepository(settings.db_path()),
+                                animation_asset_repo=AnimationAssetRepository(settings.db_path()))
     try:
         service.resume_active()
     except Exception as error:  # le démarrage de l'interface ne doit jamais dépendre du moteur

@@ -12,15 +12,19 @@ snapshot immuable qui la porte au lancement).
 
 from __future__ import annotations
 
+import json
+
 import streamlit as st
 
 from lody import brief as brief_lib
 from lody import nav, view_estimate
+from lody.animation import modes as render_modes
 from lody.characters import Character, CharacterRepository
 from lody.generation.models import PreflightReport
-from lody.generation.runtime import DEFAULT_PROVIDER, DEMO_PROVIDER
+from lody.generation.runtime import ANIMATION_PROVIDER, DEFAULT_PROVIDER, DEMO_PROVIDER
 from lody.generation.service import (
     AlreadyRunning,
+    InvalidInput,
     LaunchError,
     ProductionService,
     build_request,
@@ -49,6 +53,7 @@ def _keys(project: Project) -> dict[str, str]:
         "retry": f"retry_{project.id}",
         "characters": f"chars_sel_{project.id}",
         "location": f"loc_sel_{project.id}",
+        "animation": f"animation_storyboard_{project.id}",
     }
 
 
@@ -134,7 +139,25 @@ def _use_example(project: Project) -> None:
 
 
 def _provider_id(project: Project) -> str:
-    return DEMO_PROVIDER if st.session_state.get(_keys(project)["demo"]) else DEFAULT_PROVIDER
+    """Démonstration si demandée ; sinon le fournisseur du mode de rendu du projet (#120)."""
+    if st.session_state.get(_keys(project)["demo"]):
+        return DEMO_PROVIDER
+    return render_modes.provider_for_mode(render_modes.project_render_mode(project.settings), DEFAULT_PROVIDER)
+
+
+def _uploaded_storyboard(project: Project) -> object | None:
+    """Storyboard animé importé (JSON lody.animation/1), ``None`` sans fichier. Lève ``InvalidInput`` si illisible."""
+    uploaded = st.session_state.get(_keys(project)["animation"])
+    if uploaded is None:
+        return None
+    try:
+        return json.loads(uploaded.getvalue().decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise InvalidInput("Le storyboard animé n’est pas un fichier JSON lisible (UTF-8).") from None
+
+
+def _forget_draft(project: Project) -> None:
+    st.session_state.pop(_keys(project)["draft"], None)
 
 
 def _draft_narrative(draft: Production) -> tuple[list[str], str | None]:
@@ -164,7 +187,7 @@ def fresh_draft(service: ProductionService, project: Project) -> Production | No
     # du projet nu que build_request() vient de recalculer) — comparée séparément plus bas, via la sélection
     # de personnages/lieu elle-même (inchangée = voix toujours fraîche, la résolution étant une fonction pure
     # du snapshot déjà figé). L'ignorer ici évite de considérer à tort un brouillon frais comme périmé.
-    if draft.subject != text or draft_request.with_updates(voice=current_request.voice) != current_request:
+    if draft.subject != text or draft_request.with_updates(voice=current_request.voice, animation={}) != current_request:
         return None
     if draft.parent_production_id != (st.session_state.get(keys["retry"]) or None):
         return None
@@ -188,10 +211,12 @@ def _primary(project: Project, service: ProductionService) -> None:
     try:
         draft = fresh_draft(service, project)
         if draft is None:
-            prepared = service.prepare(project, text, provider_id=_provider_id(project), script=script,
+            provider_id = _provider_id(project)
+            prepared = service.prepare(project, text, provider_id=provider_id, script=script,
                                        draft_id=st.session_state.get(keys["draft"]),
                                        retry_of=st.session_state.get(keys["retry"]) or None,
-                                       character_ids=character_ids, location_id=location_id)
+                                       character_ids=character_ids, location_id=location_id,
+                                       animation=_uploaded_storyboard(project) if provider_id == ANIMATION_PROVIDER else None)
             st.session_state[keys["draft"]] = prepared.id
             return
         launched = service.confirm(draft.id, accept_partial=bool(st.session_state.get(keys["accept"])))
@@ -312,6 +337,13 @@ def render(project: Project, service: ProductionService, character_repo: Charact
             st.text_area("Script à utiliser", key=keys["script"], height=150, max_chars=8000,
                          placeholder="Colle ici ton texte : aucun script ne sera écrit par un fournisseur.")
         _render_narrative_section(project, character_repo, location_repo)
+        mode = render_modes.project_render_mode(project.settings)
+        if render_modes.is_animated(mode):
+            st.file_uploader(
+                f"Storyboard animé — mode {render_modes.RENDER_MODES[mode]} (JSON lody.animation/1)", type=["json"],
+                key=keys["animation"], on_change=_forget_draft, args=(project,),
+                help=render_modes.DESCRIPTIONS[mode] + " Les assets doivent exister dans le catalogue du projet ; "
+                     "leurs versions sont figées à la préparation.")
         st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"])
         with st.container(horizontal=True, vertical_alignment="center", key="composer_actions"):
             st.markdown(

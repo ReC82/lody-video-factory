@@ -6,9 +6,82 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
+  # #127 : une PR purement documentaire (fichiers .md hors deploy/, .github/, app/, webui/, test/) ne
+  # relance pas la matrice complète : seul le job « docs-checks » tourne, avec les tests qui lisent la
+  # documentation (index, liens, espace de noms…). Les jobs complets sont alors « skipped », ce que
+  # GitHub compte comme réussi pour les vérifications requises. Tout autre fichier déclenche le
+  # pipeline complet, comme avant ; un push sur main le déclenche toujours.
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA"); then
+            echo "Diff impossible : pipeline complet."; echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "$files"
+          code=$(printf '%s\n' "$files" | grep -Ev '^([^/]+\.md|docs/.*\.md)$' | grep -c . || true)
+          if [ -z "$files" ] || [ "$code" != "0" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Modification purement documentaire : tests non relancés."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  docs-checks:
+    name: Documentation checks
+    needs: changes
+    if: needs.changes.outputs.code == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --python 3.11
+
+      - name: Run tests that read the documentation
+        run: |
+          tests=$(grep -rlE 'docs/|README|\.md\b|"docs"' test --include='test_*.py' | sort)
+          echo "$tests"
+          uv run --no-sync python -X utf8 -m pytest -q $tests
+
   tests:
     name: Python ${{ matrix.python-version }} tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -77,6 +150,8 @@ jobs:
 
   windows-smoke:
     name: Windows smoke tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
 

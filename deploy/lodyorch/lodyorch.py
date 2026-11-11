@@ -30,7 +30,7 @@ Commandes :
   lodyorch pause | resume    ne plus démarrer / reprendre
   lodyorch stop [--now]      arrêter (après la session en cours, ou tout de suite)
   lodyorch skip N [raison]   mettre le ticket N de côté (BLOCKED) et passer au suivant
-  lodyorch add N [--prio P] [--deps 35,321] [--note "…"]   ajouter / remettre en file
+  lodyorch add N [--prio P] [--deps 35,321] [--note "…"]   débloquer / reprioriser (facultatif : agent:auto suffit)
   lodyorch set N champ valeur                               corriger un champ d'un ticket
   lodyorch sync              synchroniser maintenant les tickets GitHub (si LQ_GH_SYNC=1)
   lodyorch phase TEXTE       phase de travail de la session en cours (appelé par la session)
@@ -522,6 +522,78 @@ def human_state(con):
     return ("quiet", ctl_get(con, "human_at"), end) if end > time.time() else ("idle", ctl_get(con, "human_at"), 0)
 
 
+def normalize_text(text):
+    """Minuscules, sans accents ni ponctuation, espaces réduits : base des classements ci-dessous."""
+    import unicodedata
+    text = unicodedata.normalize("NFKD", str(text or "").lower())
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = re.sub(r"[`'’\"«»]", " ", text)
+    text = re.sub(r"[^a-z0-9#\s]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+# Formules de politesse tolérées autour d'une consultation (« stp », « merci »…), retirées avant classement.
+_POLITE = re.compile(r"\b(stp|svp|s il te plait|s il vous plait|please|pls|merci|thanks|alors|bon|dis moi|"
+                     r"donne moi|montre moi|peux tu me dire|tu peux me dire|rapidement|vite fait|hello|salut|"
+                     r"bonjour|bonsoir|hey|coucou)\b")
+_READ_COMMANDS = r"(status|statut|etat|pulse|queue|file|sessions|log|logs|journal|notifications|reports?|check|statusline)"
+# Consultations reconnues (#139) : la phrase ENTIÈRE doit correspondre, après normalisation. Tout le
+# reste reste une vraie demande (priorité humaine), choix prudent par défaut.
+CONSULT_PATTERNS = [re.compile(p) for p in (
+    rf"^(lodyorch )?{_READ_COMMANDS}( #?\d+)?$",
+    r"^(ou|on) en (est|es|sont|sommes)( on| tu| vous| nous| il| elle| la file| le ticket| les tickets| lodyorch"
+    r"| l orchestrateur| la ci| les pr| le travail| la session)?( #?\d+)?( on)?( maintenant| actuellement)?$",
+    r"^on en est ou( avec #?\d+| sur #?\d+)?$",
+    r"^(quel|quelle|c est quoi|qu est ce que c est que) (est |sont )?(l |le |la |les )?"
+    r"(etat|statut|status|avancement|situation|progression)( de| du| des)?( la| l| le| les)?"
+    r"( file| ticket| tickets| orchestrateur| lodyorch| ci| pr| session| travail)?( #?\d+)?( actuel| actuelle)?$",
+    r"^(l |le |la )?(etat|statut|status|avancement|situation|point)( de| du| des)?( la| l| le| les)?"
+    r"( file| ticket| tickets| orchestrateur| lodyorch| ci| pr| session| travail)?( #?\d+)?$",
+    r"^(fais|fait|faire) (le |un )?point$",
+    r"^(quoi de neuf|du nouveau|ca avance|ca avance bien|ca en est ou|ca donne quoi|tu en es ou|tu es ou)$",
+    r"^(what s|what is|whats) (the )?(status|state|progress)( of (the )?(queue|ticket|ci|pr))?( #?\d+)?( now)?$",
+    r"^(status|progress) (update|check|report)$",
+    r"^(any )?(news|update|updates)$",
+    r"^(que|qu est ce que|qu est ce qu) (fait|fais) (la file|lodyorch|l orchestrateur|la session|tu)( maintenant| actuellement)?$",
+    r"^(quel|quels|quelle|quelles) (est|sont) (le |la |les )?(ticket|tickets|pr|session|sessions|prochain|"
+    r"prochains)( en cours| suivant| suivants| en attente| ouverts| ouvertes)?$",
+)]
+
+
+def is_consultation(prompt):
+    """Vrai si le message du propriétaire n'est qu'une consultation de l'état (#139) : il ne doit ni
+    préempter la session de file, ni relancer le délai de calme. Court, et entièrement reconnu."""
+    text = normalize_text(prompt)
+    if not text or len(text) > 160:
+        return False
+    text = re.sub(r"\s+", " ", _POLITE.sub(" ", text)).strip()
+    return bool(text) and any(p.match(text) for p in CONSULT_PATTERNS)
+
+
+# Commentaires GitHub qui n'appellent aucun travail (#139) : remerciement, accusé de réception,
+# simple question d'avancement. La phrase ENTIÈRE doit être reconnue ; sinon le ticket est relancé.
+ACK_PATTERNS = [re.compile(p) for p in (
+    r"^((merci|thanks|thank you|thx|bravo|super|parfait|top|genial|excellent|nickel|cool|great|nice|"
+    r"bien recu|recu|vu|ok|okay|d accord|entendu|note|c est note|good job|well done|beau travail|"
+    r"bon travail|tres bien|impeccable|felicitations|lu)( beaucoup| bien| a toi| a vous| pour (le|ce|ton|votre|"
+    r"cette) (travail|rapport|pr|retour|livraison))?\s*)+$",
+    r"^(pour|for) (le|ce|ton|votre|cette|the|your) (travail|rapport|pr|retour|livraison|work|report)$",
+)]
+
+
+def is_acknowledgement(body):
+    """Vrai si le commentaire n'est qu'un remerciement / accusé de réception / question de statut."""
+    raw = str(body or "")
+    stripped = re.sub(r"[\U0001F300-\U0001FAFF☀-➿️]", " ", raw)  # émojis (👍, 🎉, ✅…)
+    text = normalize_text(stripped)
+    if len(text) > 160:
+        return False
+    if not text:
+        return bool(raw.strip())  # uniquement des émojis
+    text = re.sub(r"\s+", " ", _POLITE.sub(" ", text)).strip()
+    return not text or any(p.match(text) for p in ACK_PATTERNS) or is_consultation(text)
+
+
 def start_blocker(con):
     """Pourquoi aucune session ne peut démarrer maintenant : (raison, reprise_iso) ou None.
     Les limites du fournisseur passent avant la politique locale et ne sont jamais contournées."""
@@ -695,6 +767,15 @@ def run_session(con, t):
                     watch_ci(con)
                 except Exception as exc:  # noqa: BLE001 — un suivi de CI raté ne doit jamais tuer la session
                     event(con, None, "ci_error", f"{type(exc).__name__}: {exc}"[:500])
+            if GH_SYNC and (time.time() - float(ctl_get(con, "last_sync_ts", "0") or 0) > SYNC_EVERY_SECONDS
+                            or ctl_get(con, "sync_requested")):
+                # #139 : la file GitHub reste à jour pendant une longue session (nouveaux tickets,
+                # priorités, labels) ; le statut du ticket en cours n'est jamais changé par la synchronisation.
+                try:
+                    sync_github(con)
+                except Exception as exc:  # noqa: BLE001 — une synchro ratée ne doit jamais tuer la session
+                    event(con, None, "sync_error", f"{type(exc).__name__}: {exc}"[:500])
+                    ctl_set(con, "last_sync_ts", time.time())
             reason = ""
             if human_state(con)[0] == "busy":
                 # Le propriétaire parle dans la console : la session de file range son travail
@@ -980,6 +1061,7 @@ def set_status_label(con, issue, status):
         # d'autre, il met le ticket de côté (voir sync_github).
         update_task(con, issue, own_lock=int(want == STATUS_LABELS.get("RUNNING")),
                     gh_labels=json.dumps(sorted((current - set(STATUS_LABELS.values())) | ({want} if want else set()))))
+    return ok
 
 
 def sync_github(con):
@@ -1056,6 +1138,14 @@ def sync_github(con):
                 fields.update(status="READY", attempts=0, not_before="", gh_since=iso(),
                               next_action=f"Label « {STATUS_LABELS['BLOCKED']} » retiré sur GitHub : reprendre.")
                 event(con, n, "resumed", f"Label {STATUS_LABELS['BLOCKED']} retiré : ticket remis en file.")
+            elif t["status"] in ("BLOCKED", "FAILED") and eligible and STATUS_LABELS["BLOCKED"] not in labels:
+                # #139 : GitHub est la file. Un blocage purement local (skip, essai, label non posé) est
+                # reporté sur le ticket ; le retirer suffit ensuite à reprendre, sans `lodyorch add`.
+                if set_status_label(con, n, "BLOCKED"):
+                    labels = sorted(set(labels) | {STATUS_LABELS["BLOCKED"]})
+                    fields["gh_labels"] = json.dumps(labels)
+                    event(con, n, "label", f"Blocage local reporté sur GitHub (« {STATUS_LABELS['BLOCKED']} ») : "
+                                           "le retirer remet le ticket en file.")
             elif t["status"] in ("READY", "RUNNING"):
                 for status in ("BLOCKED", "WAITING_OWNER", "DONE"):
                     if STATUS_LABELS[status] in added:
@@ -1218,6 +1308,11 @@ def scan_replies(con):
         if t["status"] not in ("BLOCKED", "WAITING_OWNER", "FAILED") or c["created_at"] <= (t["gh_since"] or ""):
             continue
         if session_running(con, n):
+            continue
+        if is_acknowledgement(c.get("body")):
+            # #139 : remerciement, accusé de réception ou question d'avancement : aucune session Claude.
+            event(con, n, "reply_ignored", f"Commentaire sans demande de travail ({c.get('html_url', '')}) : "
+                                           f"ticket laissé {t['status']}, aucune session lancée.")
             continue
         update_task(con, n, status="READY", attempts=0, not_before="",
                     note=f"Nouveau commentaire du propriétaire après l'état {t['status']} : {c.get('html_url', '')} "
@@ -2240,7 +2335,9 @@ def cmd_status_tickets(con, _):
     print("  console : " + {"busy": "le propriétaire a la main (demande en cours)",
                              "quiet": "conversation récente, file en attente du délai de calme",
                              "idle": "libre, la file peut travailler"}[human]
-          + (f" — dernier échange {localtime(human_at)}" if human_at else " — aucun échange signalé (crochets installés ?)"))
+          + (f" — dernier échange {localtime(human_at)}" if human_at else " — aucun échange signalé (crochets installés ?)")
+          + (f" ; dernière consultation {localtime(ctl_get(con, 'human_consult_at'))} (sans pause)"
+             if ctl_get(con, "human_consult_at") else ""))
 
     # ── Session Claude en cours et détection de blocage ─────────────────────────────────────
     head("SESSION CLAUDE")
@@ -2524,22 +2621,34 @@ def cmd_skip(con, args):
         return
     update_task(con, args.issue, status="BLOCKED", blockers=args.reason or "Mis de côté par le propriétaire (skip).")
     event(con, args.issue, "control", "skip")
-    print(f"#{args.issue} → BLOCKED")
+    if GH_SYNC and args.issue != TRIAGE and not set_status_label(con, args.issue, "BLOCKED"):
+        print("Label GitHub non posé maintenant : il le sera à la prochaine synchronisation.")
+    print(f"#{args.issue} → BLOCKED" + (f" (label {STATUS_LABELS['BLOCKED']} : le retirer sur GitHub remet en file)"
+                                         if GH_SYNC else ""))
 
 
 def cmd_add(con, args):
+    """Remise en file explicite (déblocage, repriorisation). Facultative depuis #139 : les tickets
+    `agent:auto` entrent seuls dans la file à la synchronisation. Sans --prio, la priorité GitHub
+    (labels priority:P0…P3) est conservée ; avec la synchronisation, le label de blocage est retiré."""
     t = task(con, args.issue)
+    prio = args.prio
     if t:
-        update_task(con, args.issue, status="READY", attempts=0, not_before="", priority=args.prio,
+        prio = t["priority"] if prio is None else prio
+        update_task(con, args.issue, status="READY", attempts=0, not_before="", priority=prio,
                     deps=args.deps if args.deps is not None else t["deps"],
                     note=args.note if args.note is not None else t["note"])
     else:
-        state, title = issue_state(args.issue)
+        data = gh_json(f"repos/{REPO}/issues/{args.issue}") or {}
+        if prio is None:
+            prio = priority_level([lbl.get("name", "") for lbl in data.get("labels", [])]) * 10 if data else 50
         con.execute("INSERT INTO tasks(issue,title,priority,deps,note,updated_at) VALUES(?,?,?,?,?,?)",
-                    (args.issue, title, args.prio, args.deps or "", args.note or "", iso()))
+                    (args.issue, data.get("title", ""), prio, args.deps or "", args.note or "", iso()))
         con.commit()
     event(con, args.issue, "control", "add")
-    print(f"#{args.issue} → READY (priorité {args.prio})")
+    if GH_SYNC and args.issue != TRIAGE:
+        set_status_label(con, args.issue, "READY")
+    print(f"#{args.issue} → READY (priorité {prio})")
 
 
 def cmd_set(con, args):
@@ -2738,17 +2847,52 @@ def cmd_console(con, _):
     os.execvp("tmux", ["tmux", "attach", "-t", f"={TMUX_SESSION}"])
 
 
+def hook_prompt():
+    """Message du propriétaire transmis par le crochet UserPromptSubmit (JSON sur l'entrée standard,
+    champ `prompt`). None si rien de lisible (appel manuel, terminal, JSON invalide)."""
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return None
+        raw = sys.stdin.read(200_000)
+        data = json.loads(raw) if raw.strip() else {}
+        return data.get("prompt") if isinstance(data, dict) and isinstance(data.get("prompt"), str) else None
+    except (OSError, ValueError):
+        return None
+
+
 def cmd_human(con, args):
     """Appelé par les crochets de la console : `busy` à chaque demande du propriétaire
     (UserPromptSubmit), `idle` quand Claude a répondu (Stop). Ne bloque jamais la console : toute
-    erreur est ignorée. Sur `busy`, une ligne de contexte signale à Claude la session de file en cours."""
+    erreur est ignorée. Sur `busy`, une ligne de contexte signale à Claude la session de file en cours.
+
+    #139 : une simple CONSULTATION (`lodyorch status`, `queue`, « où en est-on ? »…) n'est pas une
+    prise de main : ni priorité humaine, ni délai de calme, ni rangement de la session de file. Le
+    tour est noté « consult » pour que le `idle` qui suit ne relance pas non plus le délai de calme.
+    Toute autre demande (ou un message illisible) garde la priorité humaine : choix prudent."""
     try:
-        ctl_set(con, "human_state", "busy" if args.state == "busy" else "quiet")
+        if args.state == "busy":
+            prompt = hook_prompt()
+            if prompt is not None and is_consultation(prompt):
+                ctl_set(con, "human_turn", "consult")
+                ctl_set(con, "human_consult_at", iso())
+                cur = con.execute("SELECT issue FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+                print("[lodyorch] Consultation en lecture seule : la file continue sans pause"
+                      + (f" (session en cours sur #{cur['issue']}, non interrompue)" if cur else "")
+                      + f". Réponds avec `{CLI_NAME} status` (ou queue / log / sessions), sans rien modifier.")
+                return 0
+            ctl_set(con, "human_turn", "work")
+            ctl_set(con, "human_state", "busy")
+            ctl_set(con, "human_at", iso())
+            cur = con.execute("SELECT issue FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+            if cur:
+                print(f"[lodyorch] Une session de file travaille sur #{cur['issue']} : elle range son travail et "
+                      f"s'arrête pour te laisser la main ; elle reprendra après la conversation.")
+            return 0
+        if ctl_get(con, "human_turn") == "consult":
+            ctl_set(con, "human_turn", "")  # fin d'une consultation : rien n'a changé
+            return 0
+        ctl_set(con, "human_state", "quiet")
         ctl_set(con, "human_at", iso())
-        cur = con.execute("SELECT issue FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
-        if args.state == "busy" and cur:
-            print(f"[lodyorch] Une session de file travaille sur #{cur['issue']} : elle range son travail et "
-                  f"s'arrête pour te laisser la main ; elle reprendra après la conversation.")
     except sqlite3.Error:
         pass
     return 0
@@ -2849,7 +2993,7 @@ def main():
     s.add_argument("reason", nargs="?", default="")
     s = sub.add_parser("add")
     s.add_argument("issue", type=int)
-    s.add_argument("--prio", type=int, default=50)
+    s.add_argument("--prio", type=int, default=None)
     s.add_argument("--deps", default=None)
     s.add_argument("--note", default=None)
     s = sub.add_parser("set")

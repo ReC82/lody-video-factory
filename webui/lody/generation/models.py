@@ -118,9 +118,19 @@ class GenerationRequest:
     # asset_id est non vide.
     character_reference_asset_id: str = ""
     image_asset_scope: str = ""
+    # #120 : mode de rendu du projet (``lody.animation.modes``) et liaison au storyboard animé figé de la
+    # production (``{"project_id", "storyboard"}``, posée par ``service.request_of``, jamais persistée dans
+    # ``params`` : le storyboard a sa propre colonne). Absents de ``to_dict`` à leur valeur par défaut : une
+    # production classique a EXACTEMENT la même demande, le même instantané et la même empreinte qu'avant #120.
+    render_mode: str = "classique"
+    animation: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
+        if data.get("render_mode") == "classique":
+            data.pop("render_mode")
+        if not data.get("animation"):
+            data.pop("animation")
         data["structure"] = list(self.structure)
         data["visual_prompts"] = list(self.visual_prompts)
         data["visual_avoid"] = list(self.visual_avoid)
