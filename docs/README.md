@@ -28,6 +28,8 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Garde-fou éditorial avant génération](lody-garde-fou-editorial.md) — vérifier qu'un épisode reste
+  au niveau débutant, que chaque phrase a son image et que le texte parlé est prêt pour la voix (#167).
 
 ## Voix
 

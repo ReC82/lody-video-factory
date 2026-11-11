@@ -1,0 +1,81 @@
+{
+  "schema": "lody.preprod/1",
+  "brief": {
+    "title": "Régression — Voltix « Le Genlock » (script du ticket #141)",
+    "objective": "Comprendre pourquoi on synchronise les caméras d'une émission.",
+    "audience": "novice",
+    "assumed_knowledge": [
+      "caméra",
+      "musicien",
+      "horloge",
+      "image",
+      "direct",
+      "tempo"
+    ],
+    "new_terms": [
+      {
+        "term": "Genlock",
+        "explanation": "un signal commun qui donne le même top départ à toutes les caméras"
+      }
+    ],
+    "examples": [
+      "deux musiciens qui jouent à la même vitesse mais pas sur le même tempo"
+    ],
+    "cta": "Moralité : même fréquence ne veut pas forcément dire même instant !",
+    "words_per_second": 3.1,
+    "target_seconds": [
+      45,
+      65
+    ]
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "spoken": "Deux caméras filment à la même cadence. Alors pourquoi leurs images ne sont-elles pas forcément synchronisées ?",
+      "visual": "Deux petites caméras et deux chronomètres qui avancent au même rythme avec un décalage visible.",
+      "duration_s": 6
+    },
+    {
+      "id": "musiciens",
+      "spoken": "Imaginez deux musiciens qui jouent à la même vitesse… mais pas sur le même tempo !",
+      "visual": "Deux musiciens et deux métronomes décalés ; Voltix compare les rythmes.",
+      "duration_s": 6
+    },
+    {
+      "id": "horloges",
+      "spoken": "C'est pareil avec deux caméras : chacune possède sa propre horloge.",
+      "visual": "Deux caméras avec leurs signaux de trames non alignés sur deux bandes temporelles.",
+      "duration_s": 7
+    },
+    {
+      "id": "reference",
+      "spoken": "En broadcast, on peut leur envoyer une référence commune. Ça s'appelle le Genlock.",
+      "visual": "Un générateur de référence unique envoie des branches vers l'entrée GENLOCK de chaque caméra.",
+      "duration_s": 7
+    },
+    {
+      "id": "alignement",
+      "spoken": "Les caméras alignent alors leur timing sur ce signal de référence.",
+      "visual": "Les bandes de trames s'alignent sur la même référence ; repères temporels concordants.",
+      "duration_s": 7
+    },
+    {
+      "id": "resultat",
+      "spoken": "Résultat : on facilite la synchronisation des sources et les changements de plan, surtout dans des installations exigeantes.",
+      "visual": "Le mélangeur coupe la caméra A puis la caméra B, bascules propres.",
+      "duration_s": 7
+    },
+    {
+      "id": "nuance",
+      "spoken": "Mais attention : certains mélangeurs savent resynchroniser des sources qui ne sont pas verrouillées. Le Genlock n'est donc pas obligatoire pour tous les directs.",
+      "visual": "Synchroniseur d'image dans le mélangeur ; un retard éventuel est montré sans chiffre.",
+      "duration_s": 8
+    },
+    {
+      "id": "chute",
+      "spoken": "Et non : cette référence ne transporte pas l'image de la caméra. Elle sert à synchroniser le temps. Moralité : même fréquence ne veut pas forcément dire même instant !",
+      "visual": "Comparaison d'un câble vidéo SDI qui transporte l'image et d'un câble de référence GENLOCK qui ne transporte que le timing.",
+      "duration_s": 9
+    }
+  ]
+}

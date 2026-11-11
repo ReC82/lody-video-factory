@@ -1,0 +1,81 @@
+{
+  "schema": "lody.preprod/1",
+  "brief": {
+    "title": "Régression — Voltix « Le Tally » (script du ticket #140)",
+    "objective": "Comprendre à quoi sert le voyant rouge d'une caméra en direct.",
+    "audience": "novice",
+    "assumed_knowledge": [
+      "caméra",
+      "présentateur",
+      "émission",
+      "direct",
+      "lumière",
+      "réalisateur",
+      "antenne"
+    ],
+    "new_terms": [
+      {
+        "term": "Tally",
+        "explanation": "le voyant qui indique quelle caméra passe à l'antenne"
+      }
+    ],
+    "examples": [
+      "le présentateur qui parle à la mauvaise caméra"
+    ],
+    "words_per_second": 3.1,
+    "target_seconds": [
+      45,
+      65
+    ]
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "spoken": "Cette petite lumière rouge sur une caméra ? Elle peut vous éviter une énorme bourde en direct !",
+      "visual": "Le présentateur s'adresse à la mauvaise caméra ; Voltix jaillit avec un panneau « Oups ! ».",
+      "duration_s": 6
+    },
+    {
+      "id": "regie",
+      "spoken": "Dans une émission avec plusieurs caméras, le réalisateur choisit l'image qui passe à l'antenne.",
+      "visual": "Régie avec le réalisateur, un pupitre de mélangeur, et les caméras 1, 2 et 3 sur le plateau.",
+      "duration_s": 6
+    },
+    {
+      "id": "question",
+      "spoken": "Et comment le présentateur sait quelle caméra le filme en direct ? Grâce au Tally !",
+      "visual": "Schéma de flux caméra vers mélangeur vers sortie programme, flèche rouge distincte.",
+      "duration_s": 6
+    },
+    {
+      "id": "voyant",
+      "spoken": "Quand la caméra passe à l'antenne, son voyant s'allume généralement en rouge.",
+      "visual": "Gros plan sur le voyant rouge de la caméra 1, réellement situé sur la caméra.",
+      "duration_s": 7
+    },
+    {
+      "id": "preview",
+      "spoken": "Sur certains systèmes, une autre couleur indique la caméra préparée en prévisualisation.",
+      "visual": "Voyant d'une autre couleur sur la caméra préparée, étiqueté « selon équipement ».",
+      "duration_s": 7
+    },
+    {
+      "id": "commutation",
+      "spoken": "Regardez : caméra un, rouge. On change de plan… caméra deux, rouge !",
+      "visual": "Commutation : le programme passe de la caméra 1 à la caméra 2 ; le voyant rouge se déplace.",
+      "duration_s": 7
+    },
+    {
+      "id": "regard",
+      "spoken": "Le présentateur regarde la bonne caméra, et l'opérateur sait quand conserver son cadrage. Attention : les couleurs et les fonctions exactes dépendent du matériel.",
+      "visual": "Le présentateur tourne son regard vers la bonne caméra ; l'opérateur tient son cadre.",
+      "duration_s": 8
+    },
+    {
+      "id": "chute",
+      "spoken": "Voilà, le Tally, c'est le petit signal lumineux qui évite de regarder dans la mauvaise direction !",
+      "visual": "Voltix montre avant/après : mauvaise direction puis bonne caméra, chute humoristique.",
+      "duration_s": 8
+    }
+  ]
+}

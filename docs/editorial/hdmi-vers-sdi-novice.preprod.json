@@ -1,0 +1,126 @@
+{
+  "schema": "lody.preprod/1",
+  "brief": {
+    "title": "Voltix — Le SDI, c'est le HDMI des pros (exemple novice)",
+    "objective": "Comprendre que le SDI est la prise vidéo des professionnels, comme le HDMI à la maison.",
+    "audience": "novice",
+    "assumed_knowledge": [
+      "télé",
+      "box",
+      "câble",
+      "prise",
+      "HDMI",
+      "caméra",
+      "écran",
+      "image",
+      "plateau de télé",
+      "présentateur"
+    ],
+    "new_terms": [
+      {
+        "term": "SDI",
+        "explanation": "la prise et le câble vidéo des professionnels de la télé, faits pour les longues distances"
+      }
+    ],
+    "examples": [
+      "la box reliée à la télé par un câble HDMI",
+      "la caméra d'un plateau télé reliée à un écran éloigné"
+    ],
+    "cta": "Et toi, sais-tu comment le présentateur devine quelle caméra le filme ?",
+    "next_episode": "Le voyant rouge des caméras (Tally) — à présenter par la question, sans le nommer avant l'épisode.",
+    "pronunciations": {
+      "SDI": "èss di aï",
+      "HDMI": "hache dé èm i"
+    },
+    "words_per_second": 2.6,
+    "scene_seconds": [
+      5,
+      7
+    ],
+    "target_seconds": [
+      25,
+      45
+    ]
+  },
+  "scenes": [
+    {
+      "id": "accroche",
+      "spoken": "À la maison, ta box et ta télé sont reliées par un câble hache dé èm i.",
+      "captions": [
+        "À la maison, ta box et ta télé sont reliées par un câble HDMI."
+      ],
+      "displayed": [
+        "À la maison"
+      ],
+      "visual": "Salon : une box posée sous une télé, un câble HDMI noir branché des deux côtés ; Voltix montre le câble du doigt.",
+      "duration_s": 7.0
+    },
+    {
+      "id": "probleme",
+      "spoken": "Mais sur un plateau de télé, les caméras sont loin des écrans. Comment faire ?",
+      "captions": [
+        "Mais sur un plateau de télé, les caméras sont loin des écrans. Comment faire ?"
+      ],
+      "displayed": [],
+      "visual": "Plateau de télévision : une caméra au fond, un écran à l'autre bout de la pièce, une longue flèche entre les deux ; Voltix se gratte la tête.",
+      "duration_s": 6.0
+    },
+    {
+      "id": "definition",
+      "spoken": "Les pros utilisent une autre prise : le èss di aï. C'est le câble vidéo des professionnels.",
+      "captions": [
+        "Les pros utilisent une autre prise : le SDI.",
+        "C'est le câble vidéo des professionnels."
+      ],
+      "displayed": [
+        "SDI"
+      ],
+      "visual": "Gros plan sur la caméra du plateau : sa prise SDI s'illumine, un câble y est branché ; le titre « SDI » apparaît au-dessus.",
+      "duration_s": 7.0
+    },
+    {
+      "id": "comparaison",
+      "spoken": "Comme le hache dé èm i, il transporte l'image. Mais son câble peut aller très loin.",
+      "captions": [
+        "Comme le HDMI, il transporte l'image.",
+        "Mais son câble peut aller très loin."
+      ],
+      "displayed": [],
+      "visual": "Écran partagé : à gauche le câble HDMI du salon, court ; à droite le câble SDI qui traverse tout le plateau jusqu'à l'écran.",
+      "duration_s": 7.0
+    },
+    {
+      "id": "exemple",
+      "spoken": "Regarde : la caméra envoie son image dans ce câble, jusqu'à l'écran.",
+      "captions": [
+        "Regarde : la caméra envoie son image dans ce câble, jusqu'à l'écran."
+      ],
+      "displayed": [],
+      "visual": "La caméra et l'écran reliés par un long câble SDI ; un point lumineux parcourt le câble de la caméra vers l'écran, où l'image apparaît.",
+      "duration_s": 6.0
+    },
+    {
+      "id": "conclusion",
+      "spoken": "Le èss di aï, c'est le hache dé èm i des pros !",
+      "captions": [
+        "Le SDI, c'est le HDMI des pros !"
+      ],
+      "displayed": [
+        "HDMI",
+        "SDI"
+      ],
+      "visual": "Voltix entre la box du salon et la caméra du plateau, chacune reliée à son écran par son câble ; étiquettes « HDMI » et « SDI ».",
+      "duration_s": 6.0
+    },
+    {
+      "id": "suite",
+      "spoken": "Et toi, sais-tu comment le présentateur devine quelle caméra le filme ?",
+      "captions": [
+        "Et toi, sais-tu comment le présentateur devine quelle caméra le filme ?"
+      ],
+      "displayed": [],
+      "visual": "Plateau : trois caméras face à une présentatrice qui hésite ; Voltix se gratte la tête, un point d'interrogation au-dessus de lui.",
+      "duration_s": 5.0
+    }
+  ]
+}

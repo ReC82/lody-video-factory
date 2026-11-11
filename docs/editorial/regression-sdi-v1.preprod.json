@@ -1,0 +1,168 @@
+{
+  "schema": "lody.preprod/1",
+  "brief": {
+    "title": "Régression — épisode SDI V1 (#137, PR #158)",
+    "objective": "Le SDI, c'est quoi et pourquoi en vidéo professionnelle ?",
+    "audience": "novice",
+    "assumed_knowledge": [
+      "caméra",
+      "câble",
+      "vidéo",
+      "image",
+      "son",
+      "télé"
+    ],
+    "new_terms": [
+      {
+        "term": "SDI",
+        "explanation": "interface vidéo numérique des professionnels"
+      }
+    ],
+    "examples": [
+      "une caméra reliée à un mélangeur"
+    ],
+    "words_per_second": 3.1,
+    "target_seconds": [
+      55,
+      65
+    ]
+  },
+  "scenes": [
+    {
+      "id": "accroche",
+      "captions": [
+        "Tu vois ce câble ?",
+        "En régie, il peut relier une caméra à un mélangeur vidéo."
+      ],
+      "spoken": "Tu vois ce câble ? En régie, il peut relier une caméra à un mélangeur vidéo.",
+      "displayed": [
+        "SDI : c'est quoi ?"
+      ],
+      "visual": "Au moment de la question, Voltix est seul à l'écran sous le titre ; la caméra et le mélangeur n'entrent qu'ensuite (capture relevée par le propriétaire, #160 §10).",
+      "duration_s": 5.8,
+      "audio_s": 4.7
+    },
+    {
+      "id": "liaison",
+      "captions": [
+        "C'est une liaison SDI :",
+        "de la vidéo numérique professionnelle."
+      ],
+      "spoken": "C'est une liaison, èsse dé i : de la vidéo numérique professionnelle.",
+      "displayed": [
+        "liaison SDI",
+        "Signal vidéo numérique"
+      ],
+      "visual": "Caméra reliée au mélangeur par un câble coaxial ; des paquets numériques traversent le câble ; Voltix suit le trajet du doigt.",
+      "duration_s": 4.6,
+      "audio_s": 3.7
+    },
+    {
+      "id": "coupe",
+      "captions": [
+        "Regarde à l'intérieur.",
+        "Ce câble coaxial possède un conducteur central, un isolant…",
+        "… et un blindage, protégés par une gaine."
+      ],
+      "spoken": "Regarde à l'intérieur ! Ce câble coaxial possède un conducteur central, un isolant, et un blindage, protégés par une gaine.",
+      "displayed": [
+        "Conducteur",
+        "Isolant",
+        "Blindage",
+        "Gaine"
+      ],
+      "visual": "Coupe longitudinale du câble en quatre couches qui se séparent dans l'axe, puis coupe transversale légendée.",
+      "duration_s": 8.4,
+      "audio_s": 7.2
+    },
+    {
+      "id": "bnc",
+      "captions": [
+        "Et cette fiche métallique ? C'est un connecteur BNC.",
+        "On l'insère, on le tourne, et il se verrouille !"
+      ],
+      "spoken": "Et cette fiche métallique ? C'est un connecteur, bé ène cé. On l'insère, on le tourne, et il se verrouille !",
+      "displayed": [
+        "Insérer · tourner · verrouiller",
+        "Clic !"
+      ],
+      "visual": "Fiche mâle et embase femelle : approche, insertion ; vue de face, la bague tourne d'un quart de tour et masque les ergots.",
+      "duration_s": 7.4,
+      "audio_s": 6.4
+    },
+    {
+      "id": "distinction",
+      "captions": [
+        "Attention : le BNC, c'est le connecteur.",
+        "Le SDI, c'est le signal."
+      ],
+      "spoken": "Attention : le bé ène cé, c'est le connecteur. Le èsse dé i, c'est le signal.",
+      "displayed": [
+        "SDI = signal",
+        "BNC = connecteur"
+      ],
+      "visual": "À gauche un signal numérique, à droite une fiche BNC ; Voltix montre l'un puis l'autre.",
+      "duration_s": 6.1,
+      "audio_s": 5.2
+    },
+    {
+      "id": "audio",
+      "captions": [
+        "Et le son peut aussi voyager avec l'image."
+      ],
+      "spoken": "Et le son peut aussi voyager avec l'image.",
+      "displayed": [
+        "Audio intégré possible"
+      ],
+      "visual": "Icônes vidéo et audio qui rejoignent le même câble, puis des paquets.",
+      "duration_s": 3.0,
+      "audio_s": 2.2
+    },
+    {
+      "id": "debits",
+      "captions": [
+        "Tu entendras parler de HD-SDI, de 3G-SDI et de 12G-SDI.",
+        "Selon le format, on transporte plus de données…",
+        "… par exemple de la 4K à 60 images par seconde en 12G."
+      ],
+      "spoken": "Tu entendras parler de hache dé, èsse dé i, de trois G, èsse dé i, et de douze G, èsse dé i. Selon le format, on transporte plus de données, par exemple de la quatre K à soixante images par seconde, en douze G.",
+      "displayed": [
+        "HD / 3G / 12G",
+        "ex. 4K à 60 images/s en 12G"
+      ],
+      "visual": "Barres proportionnelles aux débits nominaux 1,485 / 2,97 / 11,88 Gbit/s.",
+      "duration_s": 13.9,
+      "audio_s": 12.8
+    },
+    {
+      "id": "limites",
+      "captions": [
+        "Mais attention : ce n'est pas magique !",
+        "La qualité du câble, de ses connecteurs…",
+        "… et sa longueur comptent énormément."
+      ],
+      "spoken": "Mais attention : ce n'est pas magique ! La qualité du câble, de ses connecteurs, et sa longueur, comptent énormément.",
+      "displayed": [
+        "Pas magique !",
+        "Câble et connecteurs adaptés"
+      ],
+      "visual": "Câble adapté : signal net ; câble inadapté ou trop long : signal dégradé avec coupures ; étiquette 75 Ω.",
+      "duration_s": 8.1,
+      "audio_s": 6.9
+    },
+    {
+      "id": "conclusion",
+      "captions": [
+        "Voilà : le signal SDI, un bon coaxial et des BNC adaptés.",
+        "Et la régie retrouve son image !"
+      ],
+      "spoken": "Voilà : le signal èsse dé i, un bon coaxial, et des bé ène cé adaptés. Et la régie retrouve son image !",
+      "displayed": [
+        "SDI + coaxial + BNC"
+      ],
+      "visual": "Caméra, câble et moniteur ; la mire apparaît sur l'écran ; Voltix salue.",
+      "duration_s": 7.2,
+      "audio_s": 6.5
+    }
+  ]
+}
