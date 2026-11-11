@@ -57,4 +57,5 @@ uv run --no-sync python scripts/animation/demo_voltix_150.py --out /tmp/voltix-1
     --piper-model /chemin/fr_FR-upmc-medium.onnx      # piper via « uvx --from piper-tts piper »
 ```
 
-Fichiers versionnés ici : MP4, captures, `storyboard.json` gelé, `manifest.json`, `subtitles.srt`.
+Fichiers versionnés ici : MP4, captures, `storyboard.json` gelé, `manifest.json`, `subtitles.srt`,
+`asset-info.json` (dimensions des assets pour le [contrôle qualité automatique](../../lody-video-qa.md), #166).

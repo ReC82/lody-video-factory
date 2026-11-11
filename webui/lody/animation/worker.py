@@ -8,6 +8,7 @@ Protocole (tout est dans ``<données>/animation/<projet>/<tâche>/``, rien n'est
     state.json      état courant (queued | running | interrupted | done | failed | cancelled), avancement, battement
     subtitles.srt   sous-titres tirés des repères de parole du storyboard (aucun appel, aucun coût)
     out.mp4         vidéo finale (H.264 yuv420p) ; ``manifest.json`` la décrit (empreinte, durée, scènes, replis)
+    qa/index.html   contrôle qualité automatique du MP4 (#166, ``video_qa``) ; résumé dans ``manifest.json["qa"]``
     cancel          drapeau d'arrêt demandé : le worker s'arrête entre deux scènes (état ``cancelled``)
     worker.log      journal NETTOYÉ (aucun secret : voir ``lody.generation.safety.sanitize``)
 
@@ -579,8 +580,25 @@ def _execute(ctx: _Context) -> None:
                      f"({t['fallback_source']})." for t in fallbacks],
     }
     write_json(ctx.directory / "manifest.json", manifest)
+    ctx.save_state(step="Contrôle qualité automatique")
+    manifest["qa"] = quality_check(ctx.directory, ctx.ffmpeg, ctx.log)
+    write_json(ctx.directory / "manifest.json", manifest)
     ctx.save_state(state="done", step="Terminée", rendered_frames=total)
     ctx.log(f"rendu terminé : {manifest['duration_seconds']} s, {len(fallbacks)} repli(s)")
+
+
+def quality_check(directory: Path, ffmpeg: str, log: Callable[[str], None]) -> dict[str, Any]:
+    """Contrôle qualité automatique du MP4 (#166) : ``qa/index.html`` + ``qa/qa.json``. Jamais bloquant."""
+    from lody.animation import video_qa
+
+    try:
+        report = video_qa.run(directory, ffmpeg=ffmpeg)
+    except Exception as error:  # le rendu reste livré : le contrôle est un confort de relecture
+        log(f"contrôle qualité impossible ({type(error).__name__})")
+        return {"schema": video_qa.QA_SCHEMA, "status": "unavailable"}
+    summary = report["summary"]
+    log(f"contrôle qualité : {summary['error']} erreur(s), {summary['warning']} à vérifier, {summary['info']} info(s)")
+    return {"schema": video_qa.QA_SCHEMA, "status": "done", "report": f"{video_qa.QA_DIR}/index.html", **summary}
 
 
 # -- point d'entrée du processus dédié -----------------------------------------------------------------------

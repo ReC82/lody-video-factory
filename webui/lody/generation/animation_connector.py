@@ -112,6 +112,15 @@ def narration_of(storyboard: dict[str, Any]) -> str:
     return " ".join(parts)
 
 
+def qa_warnings(manifest: dict[str, Any]) -> tuple[str, ...]:
+    """Résumé du contrôle qualité automatique (#166), visible avec les avertissements de la production."""
+    qa = manifest.get("qa") if isinstance(manifest.get("qa"), dict) else None
+    if not qa or qa.get("status") != "done" or not (qa.get("error") or qa.get("warning")):
+        return ()
+    return (f"Contrôle qualité automatique : {qa.get('error', 0)} erreur(s), {qa.get('warning', 0)} point(s) à "
+            f"vérifier — rapport {qa.get('report', 'qa/index.html')} dans le dossier du rendu.",)
+
+
 class AnimationConnector(VideoGenerationProvider):
     id = PROVIDER_ID
     display_name = "Animation 2D"
@@ -416,8 +425,10 @@ class AnimationConnector(VideoGenerationProvider):
             return None
         ref = self._video_ref(directory)
         assets: list[dict[str, str]] = [{"kind": "video", "ref": ref}]
+        if (directory / "qa" / "index.html").is_file():  # #166 : rapport de contrôle qualité automatique
+            assets.append({"kind": "qa_report", "ref": f"animation/{directory.parent.name}/{directory.name}/qa/index.html"})
         return GenerationResult(ref, manifest.get("duration_seconds") or manifest.get("expected_seconds"),
-                                assets=tuple(assets), warnings=tuple(manifest.get("warnings") or ()))
+                                assets=tuple(assets), warnings=(*(manifest.get("warnings") or ()), *qa_warnings(manifest)))
 
     def poll(self, task: ExternalTask) -> TaskSnapshot:
         directory = self._directory(task)

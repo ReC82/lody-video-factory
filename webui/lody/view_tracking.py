@@ -225,6 +225,7 @@ def _render_result(service: ProductionService, project: Project, production: Pro
             st.download_button("Télécharger la vidéo", data=lambda: video_path.read_bytes(),
                                file_name=f"{project.name}-{production.label}.mp4".replace(" ", "-"), mime="video/mp4",
                                icon=":material/download:", key=f"download_{production.id}", type="primary")
+        _render_qa_report(service, project, production)
         duration = f"{production.video_duration:.0f} secondes" if production.video_duration else "non communiquée"
         st.markdown(_kv([
             ("Durée finale", duration),
@@ -243,6 +244,20 @@ def _render_result(service: ProductionService, project: Project, production: Pro
                       on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         st.markdown('<p class="muted-note">Une V2 conserve cette version intacte et lance de nouveaux appels payants.</p>',
                     unsafe_allow_html=True)
+
+
+def _render_qa_report(service: ProductionService, project: Project, production: Production) -> None:
+    """Rapport HTML autonome du contrôle qualité automatique (#166), quand le rendu en a produit un."""
+    report = _asset(production, "qa_report")
+    if not report:
+        return
+    try:
+        report_path = service.resolve_report(production, report["ref"])
+    except (ValueError, TypeError):
+        return
+    st.download_button("Rapport de contrôle qualité (HTML)", data=lambda: report_path.read_bytes(),
+                       file_name=f"{project.name}-{production.label}-controle-qualite.html".replace(" ", "-"),
+                       mime="text/html", icon=":material/fact_check:", key=f"download_qa_{production.id}")
 
 
 def _asset(production: Production, kind: str) -> dict | None:
