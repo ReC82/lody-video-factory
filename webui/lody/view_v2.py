@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from lody import nav, view_estimate
+from lody import nav, view_estimate, view_reedit
 from lody.generation.models import ProductionStatus as S
 from lody.generation.provider import WORDS_PER_MINUTE
 from lody.generation.runtime import DEMO_PROVIDER
@@ -69,6 +69,10 @@ def render(service: ProductionService, project: Project, production_id: str) -> 
 
     keys = _keys(production)
     parent = service.repo.get(production.parent_production_id)
+    if production.is_animated and parent.is_animated:
+        # #159 : vidéo animée — on modifie des scènes (sans JSON), pas le script ; seules elles sont recalculées.
+        view_reedit.render_editor(service, project, production, parent)
+        return
     request = request_of(production)
     demo = production.provider == DEMO_PROVIDER
     st.session_state.setdefault(keys["script"], production.script)

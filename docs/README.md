@@ -29,7 +29,7 @@ ainsi que l'existence des fichiers liés.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
 - [Réédition ciblée et contrôle qualité du rendu 2D](lody-animation-reedit.md) — cache de scène par
-  empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4.
+  empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4 ; écran « Nouvelle version » scène par scène (#159).
 
 ## Voix
 
