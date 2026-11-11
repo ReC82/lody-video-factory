@@ -33,6 +33,9 @@ ainsi que l'existence des fichiers liés.
 
 - [Catalogue des voix ElevenLabs](lody-elevenlabs-voices.md) — choix d'une voix ElevenLabs
   depuis l'interface sans recopier son `voice_id`, à partir d'un catalogue généré côté hôte.
+- [Prononciation et règle éditoriale des sigles](lody-pronunciation.md) — lexique par projet
+  (SDI, HDMI, 3G-SDI…) : lecture de la voix distincte des sous-titres, écoute puis validation, contrôle
+  éditorial « un concept par Short ».
 
 ## Sécurité
 

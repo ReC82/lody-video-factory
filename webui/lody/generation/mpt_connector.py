@@ -240,6 +240,14 @@ def build_payload(request: GenerationRequest, facts: EngineFacts) -> dict[str, A
     if request.character_reference_asset_id:
         payload["character_reference_asset_id"] = request.character_reference_asset_id
         payload["image_asset_scope"] = request.image_asset_scope
+    # #162 : lexique de prononciation validé — la voix lit ``video_script_spoken`` (ex. « èss-dé-i »), les
+    # sous-titres gardent ``video_script`` (ex. « SDI »). Clé ajoutée UNIQUEMENT si le rendu diffère : sans
+    # lexique applicable, le payload historique reste inchangé au caractère près. Un moteur antérieur à #162
+    # ignore la clé (lecture d'origine), jamais un échec.
+    if request.subtitle_script:
+        payload["video_script"] = request.subtitle_script
+    if request.spoken_script and request.spoken_script != payload["video_script"]:
+        payload["video_script_spoken"] = request.spoken_script
     return payload
 
 

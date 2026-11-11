@@ -1058,6 +1058,16 @@ def ensure_legacy_submaker_fields(sub_maker: SubMaker) -> SubMaker:
     return sub_maker
 
 
+def written_submaker(text: str, audio_duration_seconds: float) -> SubMaker:
+    """Lody #162: subtitle maker built from the WRITTEN script when the voice read a different text
+    (validated pronunciation lexicon), so subtitles keep the exact on-screen form."""
+    return populate_legacy_submaker_with_full_text(
+        sub_maker=ensure_legacy_submaker_fields(SubMaker()),
+        text=text,
+        audio_duration_seconds=audio_duration_seconds,
+    )
+
+
 def populate_legacy_submaker_with_full_text(
     sub_maker: SubMaker, text: str, audio_duration_seconds: float
 ) -> SubMaker:

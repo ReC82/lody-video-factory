@@ -535,11 +535,21 @@ def generate_audio(
             return None, None, None
 
     if not custom_audio_file:
-        reusable_preview = _resolve_reusable_voice_preview(
-            task_id,
-            params,
-            video_script,
-            voice_preview,
+        # Lody #162: the voice may read a different text than the one shown on screen (validated
+        # pronunciation lexicon). Never reuse a cached preview in that case: it was synthesised from the
+        # written script.
+        spoken_script = str(getattr(params, "video_script_spoken", "") or "").strip()
+        if spoken_script == str(video_script or "").strip():
+            spoken_script = ""
+        reusable_preview = (
+            None
+            if spoken_script
+            else _resolve_reusable_voice_preview(
+                task_id,
+                params,
+                video_script,
+                voice_preview,
+            )
         )
         if reusable_preview:
             return reusable_preview
@@ -547,7 +557,7 @@ def generate_audio(
         logger.info("no custom audio file provided, using TTS to generate audio.")
         audio_file = path.join(utils.task_dir(task_id), "audio.mp3")
         sub_maker = voice.tts(
-            text=video_script,
+            text=spoken_script or video_script,
             voice_name=voice.parse_voice_name(params.voice_name),
             voice_rate=params.voice_rate,
             voice_file=audio_file,
@@ -573,6 +583,14 @@ def generate_audio(
         if audio_duration == 0:
             _mark_task_failed(task_id, "audio", "generated audio duration is zero")
             return None, None, None
+        if spoken_script:
+            # Subtitles must show the written form ("SDI"), never the spoken spelling: rebuild the subtitle
+            # maker from the written script over the real audio duration (same proportional timing as the
+            # ElevenLabs path, which has no word boundaries either).
+            sub_maker = voice.written_submaker(
+                str(video_script or ""),
+                file_duration if file_duration > 0 else audio_duration,
+            )
         return audio_file, audio_duration, sub_maker
     else:
         logger.info(f"using custom audio file: {custom_audio_file}")
