@@ -1,0 +1,28 @@
+1
+00:00:00,467 --> 00:00:02,400
+Salut, moi c'est Voltix !
+
+2
+00:00:02,667 --> 00:00:05,033
+Aujourd'hui : le câble SDI.
+
+3
+00:00:06,033 --> 00:00:08,633
+Le signal vidéo voyage dans un câble coaxial…
+
+4
+00:00:08,900 --> 00:00:10,667
+… d'une impédance de 75 ohms.
+
+5
+00:00:11,600 --> 00:00:13,833
+Au bout : une fiche BNC.
+
+6
+00:00:14,100 --> 00:00:16,467
+On pousse, on tourne d'un quart de tour…
+
+7
+00:00:16,733 --> 00:00:18,200
+Clic ! C'est verrouillé.
+

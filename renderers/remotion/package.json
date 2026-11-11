@@ -1,0 +1,22 @@
+{
+  "name": "lody-remotion-renderer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Moteur de scène 2D de Lody (#150) : interprète lody.animation-scene/1 et le rig lody.rig/1 avec Remotion",
+  "type": "module",
+  "bin": {"lody-remotion": "bin/lody-remotion.mjs"},
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.542",
+    "@remotion/renderer": "4.0.542",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.542"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.0",
+    "typescript": "5.6.3"
+  }
+}

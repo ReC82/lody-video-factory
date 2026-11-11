@@ -54,7 +54,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from lody.animation import modes
+from lody.animation import audio, modes
 from lody.animation.contract import (
     AnimationValidationError,
     canonical_json,
@@ -349,6 +349,13 @@ def scene_input(ctx: _Context, index: int, scene: dict[str, Any]) -> Path:
               for key in sorted(used) if key in (ctx.job.get("assets") or {})}
     data = {"schema": SCENE_SCHEMA, "canvas": ctx.job["storyboard"]["canvas"], "index": index, "scene": scene,
             "assets": assets}
+    info = ctx.job.get("asset_info") or {}
+    if info:  # #150 : type, dimensions et ancrage du manifeste (placement exact par le moteur de scène)
+        data["asset_info"] = {key: info[key] for key in sorted(used) if key in info}
+    voice = ctx.directory / audio.VOICE_FILE
+    if voice.is_file():  # #150 : voix seule pour la synchro labiale, décalée au début de CETTE scène
+        offset = sum(s["duration_frames"] for s in ctx.job["storyboard"]["scenes"][: index - 1])
+        data["voice"] = {"path": str(voice), "offset_frames": offset}
     path = ctx.directory / "scenes" / f"{index:02d}-input.json"
     write_json(path, data)
     return path
@@ -399,11 +406,16 @@ def _fallback(ctx: _Context, index: int, scene: dict[str, Any], input_path: Path
     return "carton neutre"
 
 
+def _voice_digest(ctx: _Context) -> str:
+    voice = ctx.directory / audio.VOICE_FILE
+    return sha256_file(voice) if voice.is_file() else ""
+
+
 def _render_scene(ctx: _Context, index: int, scene: dict[str, Any]) -> dict[str, Any]:
     scenes_dir = ctx.directory / "scenes"
     output = scenes_dir / f"{index:02d}.mp4"
     trace_path = scenes_dir / f"{index:02d}.json"
-    expected = canonical_json(scene)
+    expected = canonical_json(scene) + _voice_digest(ctx)  # une voix changée rend la scène à refaire (bouche)
     cached = read_json(trace_path)
     if (cached and cached.get("scene_sha256") == hashlib.sha256(expected.encode()).hexdigest()
             and output.is_file() and sha256_file(output) == cached.get("sha256")):
@@ -443,9 +455,10 @@ def _concat(ctx: _Context, outputs: list[Path], target: Path) -> None:
     listing.write_text("".join(f"file '{path.name}'\n" for path in outputs), encoding="utf-8")
     temporary = ctx.directory / "out.partial.mp4"
     command = [ctx.ffmpeg, "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing)]
-    audio = ctx.directory / "audio.wav"
-    if audio.is_file():
-        command += ["-i", str(audio), "-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-shortest"]
+    soundtrack = ctx.directory / audio.MIX_FILE
+    if soundtrack.is_file():
+        command += ["-i", str(soundtrack), "-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-b:a", "160k",
+                    "-shortest"]
     else:
         command += ["-an"]
     command += ["-vf", f"fps={canvas['fps']},scale={canvas['width']}:{canvas['height']},format=yuv420p",
@@ -542,6 +555,12 @@ def _execute(ctx: _Context) -> None:
     ctx.tick()
     ctx.save_state(step="Assemblage de la vidéo")
     target = ctx.directory / "out.mp4"
+    try:
+        sound = audio.prepare_soundtrack(ctx.ffmpeg, ctx.directory, total / storyboard["canvas"]["fps"])
+    except (audio.SoundtrackError, subprocess.SubprocessError, OSError):
+        raise JobError("Le mixage de la voix et de la musique a échoué.") from None
+    if sound:
+        ctx.log(f"bande son : {sound}")
     _concat(ctx, [ctx.directory / "scenes" / f"{i:02d}.mp4" for i in range(1, len(scenes) + 1)], target)
     cues = write_subtitles(ctx.directory, storyboard)
     fallbacks = [t for t in traces if t["status"] == "fallback"]
@@ -553,6 +572,7 @@ def _execute(ctx: _Context) -> None:
         "duration_seconds": media_duration(ctx.ffmpeg, target), "sha256": sha256_file(target),
         "size_bytes": target.stat().st_size, "storyboard_sha256": document_sha256(storyboard),
         "render_ms": int((time.monotonic() - started) * 1000), "subtitle_cues": cues,
+        "audio": audio.describe(ctx.directory),
         "scenes": [{key: value for key, value in t.items() if key != "scene_sha256"} for t in traces],
         "fallback_scenes": [t["index"] for t in fallbacks],
         "warnings": [f"Scène {t['index']} « {t['id']} » : animation en échec, remplacée par l'image de repli "

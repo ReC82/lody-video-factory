@@ -1,0 +1,70 @@
+{
+ "schema": "lody.animation-render/1",
+ "mode": "animation_2d",
+ "frames": 586,
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "expected_seconds": 19.533,
+ "duration_seconds": 19.53,
+ "sha256": "52290e430c74ff8df7d517eb458c3b97481f06a8d4f051dc9f1b4ada757586c1",
+ "size_bytes": 2195198,
+ "storyboard_sha256": "0fb9a6ca3387d106adca9e2e9187a33d1a7de39efb518d325ffaf39b88e66720",
+ "render_ms": 139446,
+ "subtitle_cues": 7,
+ "audio": {
+  "voice": {
+   "provisional": true,
+   "source": "Piper fr_FR-upmc-medium (locuteur pierre), synthèse locale",
+   "license": "CC BY-SA 4.0 (modèle)",
+   "note": "Aucune voix choisie dans la fiche Voltix : voix de test provisoire, à remplacer."
+  },
+  "music": {
+   "provisional": true,
+   "source": "scripts/animation/musique_test.py (générée)",
+   "license": "aucune piste tierce"
+  },
+  "music_level": 0.2,
+  "mixed": true
+ },
+ "scenes": [
+  {
+   "index": 1,
+   "id": "accueil",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 167,
+   "expected_seconds": 5.567,
+   "duration_seconds": 5.57,
+   "render_ms": 40320,
+   "sha256": "0f247e0dec9de257ff05bf305b7c820d2d2c638fdb8524a34521f1e501918649"
+  },
+  {
+   "index": 2,
+   "id": "coaxial",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 167,
+   "expected_seconds": 5.567,
+   "duration_seconds": 5.57,
+   "render_ms": 33914,
+   "sha256": "4b9728eeab1d4f728488e271a5808cebbfd5e0812da830fff03fe90a5fc96a17"
+  },
+  {
+   "index": 3,
+   "id": "bnc",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 252,
+   "expected_seconds": 8.4,
+   "duration_seconds": 8.4,
+   "render_ms": 43797,
+   "sha256": "8ae227a81bb62a35f7bf784eabe75aa2b4313d4f01b599109462392e910608a5"
+  }
+ ],
+ "fallback_scenes": [],
+ "warnings": []
+}

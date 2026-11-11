@@ -351,7 +351,7 @@ class AnimationConnector(VideoGenerationProvider):
                 job_assets[key][role] = {"path": relative, "sha256": entry["sha256"]}
         job = {"schema": animation_worker.JOB_SCHEMA, "task_id": task_id, "project_id": project_id,
                "mode": self.mode_of(request), "storyboard": storyboard, "assets": job_assets,
-               "created_at": self._clock()}
+               "asset_info": self._asset_info(project_id, files), "created_at": self._clock()}
         animation_worker.write_json(staging / "job.json", job)
         animation_worker.write_json(staging / "state.json", {"state": "queued", "step": "En attente du worker",
                                                              "heartbeat_at": self._clock(), "restarts": 0})
@@ -363,6 +363,20 @@ class AnimationConnector(VideoGenerationProvider):
                 raise ProviderError(ErrorKind.PROVIDER, "Impossible de préparer le dossier de rendu 2D.") from None
         self._launch(directory)
         return ExternalTask(PROVIDER_ID, task_id)
+
+    def _asset_info(self, project_id: str, files: dict[str, dict]) -> dict[str, dict]:
+        """Type, dimensions, ancrage et nom court de chaque version figée : placement exact par le moteur (#150)."""
+        info: dict[str, dict] = {}
+        for key in files:
+            asset_id, version = key.split("@")
+            asset = self.assets().get(project_id, asset_id)
+            manifest = self.assets().get_version(project_id, asset_id, int(version)).manifest
+            base = next((item["path"] for item in manifest["files"] if item["role"] == "base"), "")
+            parts = Path(base).parts
+            slug = parts[1] if len(parts) > 2 and parts[0] == "animation-assets" else ""
+            info[key] = {"kind": asset.kind, "width": manifest.get("width"), "height": manifest.get("height"),
+                         "anchor": manifest.get("anchor") or {"x": 0.5, "y": 0.5}, "slug": slug}
+        return info
 
     def _launch(self, directory: Path) -> None:
         try:
