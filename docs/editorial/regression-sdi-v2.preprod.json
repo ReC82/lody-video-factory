@@ -1,0 +1,189 @@
+{
+  "schema": "lody.preprod/1",
+  "brief": {
+    "title": "Régression — épisode SDI V2 (#160, PR #161)",
+    "objective": "Le SDI, c'est quoi et pourquoi en vidéo professionnelle ?",
+    "audience": "novice",
+    "assumed_knowledge": [
+      "HDMI",
+      "box",
+      "télé",
+      "caméra",
+      "vidéo",
+      "câble",
+      "son",
+      "image"
+    ],
+    "new_terms": [
+      {
+        "term": "SDI",
+        "explanation": "Serial Digital Interface : interface numérique série de la vidéo pro",
+        "aliases": [
+          "Serial Digital Interface",
+          "interface numérique série"
+        ]
+      }
+    ],
+    "examples": [
+      "box et télé reliées en HDMI"
+    ],
+    "pronunciations": {
+      "SDI": "èss di aï",
+      "Serial Digital Interface": "sirieul didjiteul innteurfeïss",
+      "HDMI": "hache dé èm i",
+      "BNC": "bé ène cé",
+      "HD-SDI": "hache dé èss di aï",
+      "3G-SDI": "trois gé èss di aï",
+      "12G-SDI": "douze gé èss di aï",
+      "broadcast": "brodcaste",
+      "75 Ω": "soixante-quinze ohms"
+    },
+    "words_per_second": 3.3,
+    "target_seconds": [
+      55,
+      65
+    ]
+  },
+  "scenes": [
+    {
+      "id": "accroche",
+      "captions": [
+        "Ta box et ta télé ? Reliées en HDMI.",
+        "Et chez les pros de la vidéo ?"
+      ],
+      "spoken": "Ta box et ta télé ? Reliées en hache dé èm i. Et chez les pros de la vidéo ?",
+      "displayed": [
+        "À la maison",
+        "Chez les pros ?"
+      ],
+      "visual": "Salon : box, câble HDMI et télé branchés, en grand ; puis le salon se range à gauche « À la maison » et la caméra de plateau entre à droite « Chez les pros ? ».",
+      "duration_s": 4.6,
+      "audio_s": 4.1
+    },
+    {
+      "id": "definition",
+      "captions": [
+        "Du SDI : Serial Digital Interface.",
+        "Interface numérique série :",
+        "des bits, un par un."
+      ],
+      "spoken": "Du èss di aï : sirieul didjiteul innteurfeïss. Interface numérique série : des bits, un par un.",
+      "displayed": [
+        "SDI",
+        "Serial Digital Interface",
+        "un bit après l'autre"
+      ],
+      "visual": "Titre « SDI », « Serial Digital Interface », « interface numérique série », puis des bits qui passent sur un fil, un après l'autre.",
+      "duration_s": 6.2,
+      "audio_s": 5.7
+    },
+    {
+      "id": "broadcast",
+      "captions": [
+        "Le standard du broadcast :",
+        "production et diffusion pro.",
+        "Comme le HDMI : de la vidéo numérique…",
+        "… mais câbles longs et prises verrouillées."
+      ],
+      "spoken": "Le standard du brodcaste : production et diffusion pro ! Comme le hache dé èm i : de la vidéo numérique, mais câbles longs, et prises verrouillées.",
+      "displayed": [
+        "Broadcast",
+        "Pas les mêmes prises !"
+      ],
+      "visual": "« Broadcast » et « production + diffusion pro » ; plateau télé, car régie et direct apparaissent ; puis HDMI et SDI comparés, « Pas les mêmes prises ! ».",
+      "duration_s": 8.0,
+      "audio_s": 7.4
+    },
+    {
+      "id": "chaine",
+      "captions": [
+        "Caméra, grille de routage, moniteur, enregistreur…",
+        "… mélangeur, qui choisit les sources…",
+        "… ou convertisseur, pour finir en HDMI."
+      ],
+      "spoken": "Caméra, grille de routage, moniteur, enregistreur, mélangeur, qui choisit les sources, ou convertisseur, pour finir en hache dé èm i.",
+      "displayed": [
+        "Exemple de chaîne (indicative)"
+      ],
+      "visual": "Chaque appareil apparaît sur son mot, relié par une flèche : caméra, grille de routage, moniteur, enregistreur, mélangeur, convertisseur vers HDMI.",
+      "duration_s": 8.1,
+      "audio_s": 7.6
+    },
+    {
+      "id": "audio",
+      "captions": [
+        "Ce même signal peut aussi intégrer le son."
+      ],
+      "spoken": "Ce même signal peut aussi intégrer le son.",
+      "displayed": [
+        "Vidéo + son intégré"
+      ],
+      "visual": "Icônes vidéo et audio qui rejoignent le même câble ; « possible, pas obligatoire ».",
+      "duration_s": 3.1,
+      "audio_s": 2.7
+    },
+    {
+      "id": "couches",
+      "captions": [
+        "Le SDI, c'est le signal.",
+        "Ici, il passe dans un coaxial…",
+        "… branché en BNC, verrouillé d'un quart de tour."
+      ],
+      "spoken": "Le èss di aï, c'est le signal. Ici, il passe dans un coaxial, branché en bé ène cé, verrouillé d'un quart de tour.",
+      "displayed": [
+        "SDI = le signal",
+        "BNC = le connecteur"
+      ],
+      "visual": "Signal numérique « SDI = le signal » ; coaxial en quatre couches ; fiche BNC insérée dans l'embase, quart de tour, clic.",
+      "duration_s": 7.4,
+      "audio_s": 6.8
+    },
+    {
+      "id": "ohms",
+      "captions": [
+        "Pas n'importe quel coaxial : du 75 ohms.",
+        "Pas une résistance : son impédance caractéristique,",
+        "fixée par ses diamètres et son isolant."
+      ],
+      "spoken": "Pas n'importe quel coaxial : du soixante-quinze ohms. Pas une résistance : son impédance caractéristique, fixée par ses diamètres et son isolant.",
+      "displayed": [
+        "impédance caractéristique"
+      ],
+      "visual": "Coupe du coaxial avec cotes d et D, « d, D et isolant → 75 Ω », « pas une résistance », « impédance caractéristique ».",
+      "duration_s": 8.2,
+      "audio_s": 7.8
+    },
+    {
+      "id": "debits",
+      "captions": [
+        "HD-SDI, 3G-SDI, 12G-SDI :",
+        "des débits, pas des résolutions.",
+        "Plus ça monte, plus câble et connecteurs doivent suivre."
+      ],
+      "spoken": "hache dé èss di aï, trois gé èss di aï, douze gé èss di aï : des débits, pas des résolutions. Plus ça monte, plus câble et connecteurs doivent suivre.",
+      "displayed": [
+        "Des débits, pas des résolutions"
+      ],
+      "visual": "Barres proportionnelles aux débits ; « Des débits, pas des résolutions » ; « 75 Ω seul ne suffit pas ».",
+      "duration_s": 9.3,
+      "audio_s": 8.7
+    },
+    {
+      "id": "conclusion",
+      "captions": [
+        "Bref : le SDI, le signal de la vidéo pro.",
+        "Dans un coaxial 75 ohms, branché en BNC…",
+        "… et l'image arrive !"
+      ],
+      "spoken": "Bref : le èss di aï, le signal de la vidéo pro. Dans un coaxial soixante-quinze ohms, branché en bé ène cé, et l'image arrive !",
+      "displayed": [
+        "① signal SDI",
+        "② coaxial 75 Ω",
+        "③ BNC"
+      ],
+      "visual": "Caméra reliée au moniteur par un câble continu, fiches BNC montées ; ① signal SDI ② coaxial 75 Ω ③ BNC ; la mire apparaît sur l'écran.",
+      "duration_s": 9.0,
+      "audio_s": 7.5
+    }
+  ]
+}

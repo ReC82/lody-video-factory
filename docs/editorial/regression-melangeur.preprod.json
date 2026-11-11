@@ -1,0 +1,84 @@
+{
+  "schema": "lody.preprod/1",
+  "brief": {
+    "title": "Régression — Voltix « Le mélangeur vidéo » (script du ticket #142)",
+    "objective": "Comprendre à quoi sert un mélangeur vidéo en direct.",
+    "audience": "novice",
+    "assumed_knowledge": [
+      "caméra",
+      "émission",
+      "câble",
+      "réalisateur",
+      "antenne",
+      "bouton",
+      "image"
+    ],
+    "new_terms": [
+      {
+        "term": "mélangeur vidéo",
+        "explanation": "l'appareil qui choisit quelle caméra passe à l'antenne",
+        "aliases": [
+          "mélangeur"
+        ]
+      }
+    ],
+    "examples": [
+      "Voltix qui prépare la caméra deux puis appuie sur le bouton"
+    ],
+    "words_per_second": 3.1,
+    "target_seconds": [
+      45,
+      65
+    ]
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "spoken": "Comment une émission passe d'une caméra à l'autre sans que quelqu'un débranche les câbles ?",
+      "visual": "Voltix tente de débrancher plusieurs câbles de caméra ; signal rouge d'interdiction.",
+      "duration_s": 6
+    },
+    {
+      "id": "regie",
+      "spoken": "Dans une régie, plusieurs caméras envoient leur image vers un appareil : le mélangeur vidéo.",
+      "visual": "Trois caméras reliées par des câbles à un mélangeur, avec des chemins distincts.",
+      "duration_s": 7
+    },
+    {
+      "id": "sources",
+      "spoken": "Le réalisateur peut voir les sources et choisir laquelle passe à l'antenne.",
+      "visual": "Une grille multiview avec toutes les caméras, cases 1 2 3 et deux grandes fenêtres étiquetées.",
+      "duration_s": 7
+    },
+    {
+      "id": "vocabulaire",
+      "spoken": "Sur un mélangeur, on parle souvent de prévisualisation, et de programme. La prévisualisation montre ce qu'on prépare. Le programme, c'est l'image réellement diffusée.",
+      "visual": "Écran PREVIEW avec la caméra 2, écran PROGRAM avec la caméra 1, étiquettes très distinctes.",
+      "duration_s": 7
+    },
+    {
+      "id": "transition",
+      "spoken": "Regardez : Voltix prépare la caméra deux, puis appuie sur le bouton de transition. Et hop ! La caméra deux passe au programme.",
+      "visual": "La main de Voltix presse CUT ou AUTO ; PREVIEW devient PROGRAM.",
+      "duration_s": 7
+    },
+    {
+      "id": "fonctions",
+      "spoken": "Le mélangeur peut aussi créer des fondus, ajouter des titres ou afficher plusieurs images, selon ses fonctions.",
+      "visual": "Fondu et incrustation simple illustrés, sans effets décoratifs.",
+      "duration_s": 7
+    },
+    {
+      "id": "limite",
+      "spoken": "Attention : ce n'est pas lui qui fabrique toutes les images : il sélectionne et combine les sources qu'on lui donne.",
+      "visual": "Schéma de la sortie programme allant vers un moniteur de contrôle.",
+      "duration_s": 7
+    },
+    {
+      "id": "chute",
+      "spoken": "Voilà pourquoi le mélangeur, c'est un peu le chef d'orchestre de la vidéo en direct !",
+      "visual": "Voltix en chef d'orchestre devant les trois flux caméra, chute finale.",
+      "duration_s": 9
+    }
+  ]
+}
