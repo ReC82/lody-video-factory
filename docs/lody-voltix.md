@@ -2,6 +2,14 @@
 
 > Ticket #136. **Statut : concept / rig prêt à importer** — rien n'est créé dans une instance Lody.
 > Aucun identifiant de production n'existe tant que le propriétaire n'a pas importé le catalogue.
+>
+> **Décision du propriétaire (11/11/2026) : GO artistique provisoire** pour utiliser Voltix v1 dans un premier
+> test d'animation / vidéo broadcast (#150, puis #137). Pas de refonte du design à ce stade : priorité au test
+> de production bout en bout. Ce GO **n'est ni une validation artistique définitive de la série, ni
+> l'approbation d'un coût API ou d'un déploiement**. Le style reste jugé assez enfantin pour le broadcast :
+> d'autres personnages ou un style plus mature pourront venir ensuite, en **nouvelles versions ou nouveaux
+> assets**, sans casser les vidéos qui ont figé la v1. À vérifier pendant le pilote : prononciation, mouvement
+> articulé, qualité des schémas SDI/BNC.
 
 ![Planche de contrôle du rig Voltix v1](animation/voltix/planche-voltix.png)
 
@@ -13,7 +21,8 @@ description écrite** du ticket : petite créature ronde jaune-or, mèches point
 foncés, grands yeux expressifs, large sourire avec petites dents, sacoche/ceinture d'outils gris charbon sur
 la gauche, câble coaxial noir enroulé tenu dans les mains, jambes ressort métalliques noires, grosses
 chaussures grises. C'est un **concept approchant**, pas une reproduction fidèle : la ressemblance reste à
-valider contre l'image source (le propriétaire peut déposer la capture dans le ticket pour une v2).
+valider contre l'image source (le propriétaire peut déposer la capture dans le ticket pour une v2). Le
+propriétaire a accepté ce concept tel quel pour le pilote (voir la décision ci-dessus) : la v1 est conservée.
 
 Choix faits en l'absence de l'image (à corriger en v2 si la référence diffère) : bras et mains de la couleur
 du corps (moufles à quatre doigts) ; sacoche à **gauche de l'image** (hanche droite du personnage) ; mèches
