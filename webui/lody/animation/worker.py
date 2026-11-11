@@ -7,6 +7,8 @@ Protocole (tout est dans ``<données>/animation/<projet>/<tâche>/``, rien n'est
     scenes/NN.mp4   rendu de chaque scène + ``NN.json`` (trace : statut, durée réelle, empreinte, durée de rendu)
     state.json      état courant (queued | running | interrupted | done | failed | cancelled), avancement, battement
     subtitles.srt   sous-titres tirés des repères de parole du storyboard (aucun appel, aucun coût)
+    voice.wav       voix ElevenLabs déjà synthétisée par le fournisseur (#164), avec ``voice-timing.json`` : repères
+                    recalés sur la parole réelle (bouche et sous-titres). Le worker n'appelle JAMAIS ElevenLabs.
     out.mp4         vidéo finale (H.264 yuv420p) ; ``manifest.json`` la décrit (empreinte, durée, scènes, replis)
     cancel          drapeau d'arrêt demandé : le worker s'arrête entre deux scènes (état ``cancelled``)
     worker.log      journal NETTOYÉ (aucun secret : voir ``lody.generation.safety.sanitize``)
@@ -54,7 +56,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from lody.animation import audio, modes
+from lody.animation import audio, modes, voiceover
 from lody.animation.contract import (
     AnimationValidationError,
     canonical_json,
@@ -347,7 +349,9 @@ def scene_input(ctx: _Context, index: int, scene: dict[str, Any]) -> Path:
         used.add(f"{fallback['asset']['id']}@{fallback['asset']['version']}")
     assets = {key: {role: str(ctx.directory / entry["path"]) for role, entry in ctx.job["assets"][key].items()}
               for key in sorted(used) if key in (ctx.job.get("assets") or {})}
-    data = {"schema": SCENE_SCHEMA, "canvas": ctx.job["storyboard"]["canvas"], "index": index, "scene": scene,
+    # #164 : repères recalés sur la voix ElevenLabs réelle (bouche et sous-titres), sinon ceux du storyboard.
+    timed = voiceover.scene_with_timing(scene, voiceover.timed_cues(voiceover.read_timing(ctx.directory), index))
+    data = {"schema": SCENE_SCHEMA, "canvas": ctx.job["storyboard"]["canvas"], "index": index, "scene": timed,
             "assets": assets}
     info = ctx.job.get("asset_info") or {}
     if info:  # #150 : type, dimensions et ancrage du manifeste (placement exact par le moteur de scène)
@@ -406,16 +410,19 @@ def _fallback(ctx: _Context, index: int, scene: dict[str, Any], input_path: Path
     return "carton neutre"
 
 
-def _voice_digest(ctx: _Context) -> str:
+def _voice_digest(ctx: _Context, index: int) -> str:
     voice = ctx.directory / audio.VOICE_FILE
-    return sha256_file(voice) if voice.is_file() else ""
+    if not voice.is_file():
+        return ""
+    cues = voiceover.timed_cues(voiceover.read_timing(ctx.directory), index)  # #164 : repères recalés aussi
+    return sha256_file(voice) + (canonical_json(cues) if cues else "")
 
 
 def _render_scene(ctx: _Context, index: int, scene: dict[str, Any]) -> dict[str, Any]:
     scenes_dir = ctx.directory / "scenes"
     output = scenes_dir / f"{index:02d}.mp4"
     trace_path = scenes_dir / f"{index:02d}.json"
-    expected = canonical_json(scene) + _voice_digest(ctx)  # une voix changée rend la scène à refaire (bouche)
+    expected = canonical_json(scene) + _voice_digest(ctx, index)  # une voix changée rend la scène à refaire (bouche)
     cached = read_json(trace_path)
     if (cached and cached.get("scene_sha256") == hashlib.sha256(expected.encode()).hexdigest()
             and output.is_file() and sha256_file(output) == cached.get("sha256")):
@@ -472,13 +479,18 @@ def _concat(ctx: _Context, outputs: list[Path], target: Path) -> None:
 
 
 def write_subtitles(directory: Path, storyboard: dict[str, Any]) -> int:
-    """SRT tiré des repères de parole (``render.speech.cues``), décalés par scène. Renvoie le nombre de repères."""
+    """SRT tiré des repères de parole (``render.speech.cues``), décalés par scène. Renvoie le nombre de repères.
+
+    #164 : une scène dite par une voix ElevenLabs prend ses repères recalés (``voice-timing.json``) : même texte
+    éditorial, minutage de la parole réelle."""
     from lody.generation import subtitles
 
     fps = storyboard["canvas"]["fps"]
+    timing = voiceover.read_timing(directory)
     cues, offset = [], 0
-    for scene in storyboard["scenes"]:
-        for cue in ((scene["render"].get("speech") or {}).get("cues") or []):
+    for index, scene in enumerate(storyboard["scenes"], 1):
+        scene_cues = voiceover.timed_cues(timing, index) or ((scene["render"].get("speech") or {}).get("cues") or [])
+        for cue in scene_cues:
             cues.append(subtitles.Cue(len(cues) + 1, round((offset + cue["start"]) * 1000 / fps),
                                       round((offset + cue["end"]) * 1000 / fps), cue["text"]))
         offset += scene["duration_frames"]

@@ -29,12 +29,15 @@ def build_service() -> ProductionService:
     La reprise ne fait que *demander l'état* au moteur : aucun appel payant, aucun relancement.
     """
     repo = ProductionRepository(settings.db_path())
+    engine = mpt_connector.build_from_environment()
     providers = {
-        mpt_connector.PROVIDER_ID: mpt_connector.build_from_environment(),
+        mpt_connector.PROVIDER_ID: engine,
         demo.PROVIDER_ID: demo.DemoConnector(),
         # #120 : rendu 2D (modes Animation 2D / Hybride du projet), à côté du moteur historique inchangé.
+        # #164 : voix ElevenLabs des fiches, synthétisée par le moteur (seul détenteur de la clé).
         animation_connector.PROVIDER_ID: animation_connector.AnimationConnector(
-            asset_repo=AnimationAssetRepository(settings.db_path())),
+            asset_repo=AnimationAssetRepository(settings.db_path()),
+            character_repo=CharacterRepository(settings.db_path()), synthesize=engine.generate_voice_preview),
     }
     # character_repo/location_repo (#35) : sans écran de sélection encore (#34), rien ne les utilise ; ils
     # rendent prepare() capable de résoudre une sélection dès que cet écran existera, sans nouveau branchement.
