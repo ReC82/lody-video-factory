@@ -1,0 +1,6 @@
+{
+ "ast_666bab603c91@1": {"kind": "character", "width": 600, "height": 900, "anchor": {"x": 0.5, "y": 0.98}, "slug": "voltix"},
+ "ast_84b6f18dae26@1": {"kind": "prop", "width": 900, "height": 300, "anchor": {"x": 0.5, "y": 0.5}, "slug": "coax-coupe"},
+ "ast_fd71e6d20dca@1": {"kind": "prop", "width": 420, "height": 180, "anchor": {"x": 0.5, "y": 0.5}, "slug": "bnc-male"},
+ "ast_23f447be304e@1": {"kind": "prop", "width": 300, "height": 200, "anchor": {"x": 0.5, "y": 0.5}, "slug": "bnc-femelle"}
+}

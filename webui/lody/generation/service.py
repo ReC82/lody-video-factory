@@ -835,6 +835,13 @@ class ProductionService:
         return self.provider(production.provider).resolve_asset(
             ExternalTask(production.provider, production.external_task_id), ref)
 
+    def resolve_report(self, production: Production, ref: str):
+        """Chemin local validé d'un rapport HTML de CETTE production (contrôle qualité #166), sinon ``ValueError``."""
+        if not production.external_task_id:
+            raise ValueError("aucune tâche")
+        return self.provider(production.provider).resolve_asset(
+            ExternalTask(production.provider, production.external_task_id), ref, suffixes=(".html",))
+
     def resolve_video(self, production: Production):
         """Chemin local validé de la vidéo finale de CETTE production, sinon ``ValueError``."""
         if production.status is not ProductionStatus.TERMINEE or not production.external_task_id or not production.video_ref:
