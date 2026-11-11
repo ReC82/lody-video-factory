@@ -1,0 +1,142 @@
+{
+ "schema": "lody.animation-render/1",
+ "mode": "animation_2d",
+ "frames": 1935,
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "expected_seconds": 64.5,
+ "duration_seconds": 64.5,
+ "sha256": "30c94d16dff4d628ac3616b4e096f3ac0ba696db743491ab434dea44d15ef94c",
+ "size_bytes": 5490008,
+ "storyboard_sha256": "2168992e8ad5f37814d3a7c3635dec890245ae05491bde92616f4b8ee6388c73",
+ "render_ms": 386880,
+ "subtitle_cues": 20,
+ "audio": {
+  "voice": {
+   "provisional": true,
+   "source": "Piper fr_FR-upmc-medium (locuteur pierre), synthèse locale",
+   "license": "CC BY-SA 4.0 (modèle)",
+   "note": "Aucune voix choisie dans la fiche Voltix : voix de test provisoire, à remplacer."
+  },
+  "music": {
+   "provisional": true,
+   "source": "scripts/animation/musique_test.py (générée)",
+   "license": "aucune piste tierce"
+  },
+  "music_level": 0.2,
+  "mixed": true
+ },
+ "scenes": [
+  {
+   "index": 1,
+   "id": "accroche",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 165,
+   "expected_seconds": 5.5,
+   "duration_seconds": 5.5,
+   "render_ms": 35386,
+   "sha256": "bf2df42b42f79da887bc4b200bc31d3458eead89ffe523e6ef40f9f86a21e26f"
+  },
+  {
+   "index": 2,
+   "id": "liaison",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 136,
+   "expected_seconds": 4.533,
+   "duration_seconds": 4.53,
+   "render_ms": 27196,
+   "sha256": "f2439c29ddfe8d7605fbbaf56226c3f0dd31c580edf0067d975c9ebe50133227"
+  },
+  {
+   "index": 3,
+   "id": "coupe",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 252,
+   "expected_seconds": 8.4,
+   "duration_seconds": 8.4,
+   "render_ms": 42935,
+   "sha256": "ed273614e5abfcaebb209c087b58227f006bb10ea90bfe75a42a1003366c0472"
+  },
+  {
+   "index": 4,
+   "id": "bnc",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 222,
+   "expected_seconds": 7.4,
+   "duration_seconds": 7.4,
+   "render_ms": 38412,
+   "sha256": "f8b2d562dd986eeaeb705c1038643dd9f59d827d5024483d79e73d3c50b7d0df"
+  },
+  {
+   "index": 5,
+   "id": "distinction",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 184,
+   "expected_seconds": 6.133,
+   "duration_seconds": 6.13,
+   "render_ms": 28328,
+   "sha256": "817c7121b1f9d93052aca77cdad420d59c5849cfba1fcc63b337a72cfb75bb16"
+  },
+  {
+   "index": 6,
+   "id": "audio",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 89,
+   "expected_seconds": 2.967,
+   "duration_seconds": 2.97,
+   "render_ms": 15077,
+   "sha256": "e14d8385c01e5150a1a1409e4e6876e639c04b750f276838ab5e8cbd0d35e077"
+  },
+  {
+   "index": 7,
+   "id": "debits",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 419,
+   "expected_seconds": 13.967,
+   "duration_seconds": 13.97,
+   "render_ms": 65041,
+   "sha256": "e68d68f1ef43dfbb3beb127ce45601a066733f749c6c2a9f8864d1e668352f8f"
+  },
+  {
+   "index": 8,
+   "id": "limites",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 243,
+   "expected_seconds": 8.1,
+   "duration_seconds": 8.1,
+   "render_ms": 35247,
+   "sha256": "71412b68db1a23d9381edbd719d554d2900d759fba0229f0a48a9aecc91fad3c"
+  },
+  {
+   "index": 9,
+   "id": "conclusion",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 225,
+   "expected_seconds": 7.5,
+   "duration_seconds": 7.5,
+   "render_ms": 39259,
+   "sha256": "6adddd65ef294950d95d80382a6f087d5e1c3e8030384580a72ff443ea2d1548"
+  }
+ ],
+ "fallback_scenes": [],
+ "warnings": []
+}
