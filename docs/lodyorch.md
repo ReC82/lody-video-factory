@@ -24,6 +24,17 @@ temps) :
   (`yield_grace_seconds`) elle est arrêtée. Le ticket reste en cours, sans pénalité, et il est
   **repris en premier** ensuite. Claude, dans la console, en est informé par une ligne de contexte ;
 - la ligne d'état de la console (`lodyorch statusline`) affiche la file : ticket, phase, PR en revue.
+- **une simple consultation ne prend pas la main** (#139) : le crochet lit le message ; s'il n'est
+  qu'une demande d'état (`lodyorch status`, `queue`, `log`, `sessions`, `notifications`, « où en
+  est-on ? », « quel est l'état de la file ? », « quoi de neuf ? »…), il ne déclare **aucune**
+  priorité humaine, ne relance pas le délai de calme et ne fait pas ranger la session de file, qui
+  continue avec toutes ses permissions. Claude reçoit une ligne de contexte « consultation en lecture
+  seule ». Tout autre message, ou une consultation mêlée à une demande (« où en est-on ? et mets #120
+  en pause »), reste une vraie prise de main : c'est le choix prudent par défaut.
+
+Limite réelle de l'interface : le message est toujours transmis à Claude dans la console (un crochet
+ne peut pas le lui cacher) ; c'est seulement son effet sur la file qui change. Pour une consultation
+hors de Claude, `lodyorch status` dans un terminal reste strictement en lecture seule.
 
 Compromis assumé : la console et la file sont deux processus Claude distincts (l'un interactif,
 l'autre non). Une même session Claude ne peut pas à la fois recevoir les messages du propriétaire
@@ -71,6 +82,18 @@ Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgque
 
 Le propriétaire reprend un ticket bloqué en **répondant dans le ticket** ou en **retirant
 `agent:blocked`**.
+
+**GitHub est la file** (#139) : un ticket ouvert portant `agent:auto` (sans label d'exclusion, dépendances
+levées) est pris à la synchronisation suivante, **sans `lodyorch add`**. La synchronisation tourne
+aussi pendant une longue session (toutes les 10 min) : nouveaux tickets, priorités et labels sont vus
+sans attendre la fin du travail en cours. Un blocage purement local (`lodyorch skip`, ancien état) est
+reporté sur GitHub par `agent:blocked` : il est donc visible, et le retirer suffit à reprendre.
+`lodyorch add N` reste une commande facultative de déblocage ou de repriorisation : sans `--prio`,
+elle garde la priorité GitHub, et elle retire le label de blocage.
+
+Un commentaire du propriétaire qui ne demande rien (remerciement, « ok », « bien reçu », 👍,
+« où en est-on ? ») ne relance **aucune** session Claude : il est seulement journalisé
+(`reply_ignored`). Toute autre réponse relance le ticket comme avant.
 
 ## Protocole de traitement (ticket #117)
 
@@ -131,6 +154,13 @@ branches partent toujours de `main`.
 Une PR n'est jamais annoncée prête tant que sa CI n'a pas été constatée verte ; une PR empilée ne
 l'est pas tant que la PR de sa base n'est pas verte elle aussi. Fusion ou fermeture de la PR : fin
 du suivi. Les sessions font lint et tests ciblés avant de pousser ; la suite complète tourne en CI.
+
+CI GitHub (#127) : une PR **purement documentaire** (fichiers `.md` à la racine ou sous `docs/`) ne
+relance pas la matrice complète (Python 3.11 / 3.13, Windows) ; seul le job `Documentation checks`
+tourne, avec les tests qui lisent la documentation (index, liens, espace de noms). Les jobs complets
+sont alors « skipped », ce que GitHub compte comme réussi pour les vérifications requises. Tout autre
+fichier — code, tests, `deploy/`, workflows, `.md` ailleurs, fichiers non Markdown de `docs/` —
+déclenche le pipeline complet, et un push sur `main` aussi.
 
 ## Rapport permanent par tentative (ticket #123)
 
@@ -225,7 +255,9 @@ lodyorch reports | report N     rapports de tentative (#123)
 lodyorch queue | log [N] | sessions
 lodyorch pause | resume         ne plus démarrer de session / reprendre (resume réarme le disjoncteur)
 lodyorch stop [--now]           arrêter après la session en cours, ou tout de suite
-lodyorch skip N [raison] | add N [--prio 10] | set N champ valeur
+lodyorch skip N [raison]        mettre de côté (pose agent:blocked ; le retirer sur GitHub reprend)
+lodyorch add N [--prio 10]      facultatif : débloquer / reprioriser (agent:auto suffit pour entrer en file)
+lodyorch set N champ valeur
 lodyorch config [set NOM VALEUR | unset NOM]
 lodyorch reload                 appliquer le code et lodyorch.env mis à jour, entre deux sessions
 journalctl -u lodyorch -f
@@ -249,5 +281,7 @@ dépendances, verrou visible, PR exclues, verrou d'exclusion, reprise après cra
 temporisation et abandon, disjoncteur, refus sans authentification ni garde, masquage des
 journaux, `status`/`pulse`/`phase`/`check`, crochet de garde, unité systemd, console unique
 (crochets fusionnés sans écrasement, `lodyorch console` sans renommage, priorité humaine, rangement
-puis reprise de la session de file), rapports de tentative (faux SMTP, panne SMTP, panne GitHub,
+puis reprise de la session de file ; consultations sans préemption, file GitHub sans `add`,
+commentaires sans réveil inutile — `test_consultation.py`), classement documentaire de la CI
+(`test/lody/test_ci_workflow.py`), rapports de tentative (faux SMTP, panne SMTP, panne GitHub,
 idempotence, masquage) et installation à blanc. Faux `gh` et faux `claude` : aucun réseau, aucun appel au modèle.
