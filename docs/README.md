@@ -28,6 +28,8 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Audit du rendu 2D](lody-animation-audit.md) — durées par étape, cache, empreintes, dépenses connues
+  vs estimées, invalidations inutiles, nettoyage des intermédiaires ; audit de #150 et de l'épisode SDI.
 
 ## Voix
 
