@@ -29,6 +29,14 @@ def preset_key(project: Project) -> str:
     return f"animation_preset_{project.id}"
 
 
+def preset_label_key(project: Project) -> str:
+    """Origine lisible du storyboard en attente (#189 : démo #150 ou fichier restauré d'un brouillon)."""
+    return f"animation_preset_label_{project.id}"
+
+
+DEMO_LABEL = "démo Voltix #150"
+
+
 def _repo() -> AnimationAssetRepository:
     return AnimationAssetRepository(settings.db_path())
 
@@ -64,6 +72,7 @@ def _install_demo(project: Project, notice: str) -> None:
         st.session_state[notice] = ("error", [f"Démo #150 impossible à installer : {error}"])
         return
     st.session_state[preset_key(project)] = storyboard
+    st.session_state[preset_label_key(project)] = DEMO_LABEL
     st.session_state[notice] = ("success", ["Démo Voltix #150 prête : elle sert de storyboard tant qu'aucun "
                                             "fichier n'est importé ci-dessus.", *notes])
 
@@ -86,7 +95,9 @@ def render(project: Project) -> None:
             st.button("Vérifier le worker 2D", key=f"{p}_preflight", icon=":material/fact_check:",
                       on_click=_run_preflight, args=(notice,))
         if st.session_state.get(preset_key(project)) is not None:
-            st.caption("Storyboard en attente : démo Voltix #150 (remplacé par un fichier importé ci-dessus).")
+            label = st.session_state.get(preset_label_key(project)) or DEMO_LABEL
+            st.caption(f"Storyboard en attente : {label} (remplacé par un fichier importé ci-dessus). "
+                       "Conservé dans le brouillon du projet : inutile de réinstaller la démo.")
         kind, payload = st.session_state.get(notice) or (None, None)
         if kind == "checks":
             for check in payload:

@@ -8,18 +8,27 @@ qui ne propose que les éléments actifs du projet courant (voir ``_active_chara
 Rien n'est imposé automatiquement — le personnage ou lieu « principal » n'est qu'indiqué visuellement
 dans la liste — et la sélection ne change strictement rien tant qu'elle reste vide (voir #35 pour le
 snapshot immuable qui la porte au lancement).
+
+Brouillon persistant (#189) : la saisie (sujet, script, personnages, lieu, mode démo, storyboard animé en attente)
+est enregistrée par projet à chaque modification (``autosave``) et restaurée automatiquement après un aller-retour
+de page, un rechargement du navigateur ou une nouvelle session (``restore``). L'enregistrement n'est jamais une
+préparation ni une génération : aucun fournisseur n'est appelé et les consentements restent à donner à l'écran.
 """
 
 from __future__ import annotations
 
 import json
+import logging
+import sqlite3
 
 import streamlit as st
 
 from lody import brief as brief_lib
-from lody import nav, view_animation_pilot, view_estimate
+from lody import nav, settings, view_animation_pilot, view_estimate
 from lody.animation import modes as render_modes
 from lody.characters import Character, CharacterRepository
+from lody.components import format_datetime
+from lody.compose_drafts import ComposeDraft, ComposeDraftRepository, DraftValidationError, validate_storyboard
 from lody.generation.models import PreflightReport
 from lody.generation.runtime import ANIMATION_PROVIDER, DEFAULT_PROVIDER, DEMO_PROVIDER
 from lody.generation.service import (
@@ -39,6 +48,11 @@ MIN_REQUEST_LENGTH = 8
 _GENERIC_EXAMPLE = "Explique simplement un sujet de ton domaine en moins d’une minute."
 LABEL_PREPARE = "Préparer la génération"
 LABEL_CONFIRM = "Confirmer et générer la vidéo"
+LABEL_CLEAR = "Recommencer / Effacer le brouillon"
+LABEL_CLEAR_CONFIRM = "Oui, effacer le brouillon"
+LABEL_CLEAR_CANCEL = "Non, garder le brouillon"
+
+logger = logging.getLogger("lody.view_production")
 
 
 def _keys(project: Project) -> dict[str, str]:
@@ -54,7 +68,196 @@ def _keys(project: Project) -> dict[str, str]:
         "characters": f"chars_sel_{project.id}",
         "location": f"loc_sel_{project.id}",
         "animation": f"animation_storyboard_{project.id}",
+        # #189 : brouillon persistant (marqueur de restauration, message d'état, confirmation d'effacement).
+        "restored": f"compose_restored_{project.id}",
+        "notice": f"compose_notice_{project.id}",
+        "saved_at": f"compose_saved_at_{project.id}",
+        "confirm_clear": f"compose_confirm_clear_{project.id}",
     }
+
+
+@st.cache_resource(show_spinner=False)
+def _draft_repository(db_path: str) -> ComposeDraftRepository:
+    return ComposeDraftRepository(db_path)
+
+
+def _drafts() -> ComposeDraftRepository:
+    return _draft_repository(str(settings.db_path()))
+
+
+def _storyboard_state(project: Project) -> dict | None:
+    """Storyboard animé à conserver : fichier importé, sinon storyboard en attente (démo #150 ou restauré)."""
+    keys = _keys(project)
+    uploaded = st.session_state.get(keys["animation"])
+    try:
+        if uploaded is not None:
+            document = json.loads(uploaded.getvalue().decode("utf-8"))
+            return validate_storyboard({"source": "upload", "label": f"fichier « {uploaded.name} »",
+                                        "document": document})
+        preset = st.session_state.get(view_animation_pilot.preset_key(project))
+        if preset is None:
+            return None
+        label = st.session_state.get(view_animation_pilot.preset_label_key(project)) or view_animation_pilot.DEMO_LABEL
+        return validate_storyboard({"source": "demo150" if label == view_animation_pilot.DEMO_LABEL else "upload",
+                                    "label": label, "document": preset})
+    except (UnicodeDecodeError, ValueError):
+        return None  # fichier illisible : la préparation l'expliquera, rien d'invalide n'est enregistré
+
+
+def current_draft(project: Project) -> ComposeDraft:
+    """Ce qui est à l'écran pour CE projet, sous forme de brouillon (aucune lecture d'un autre projet)."""
+    keys = _keys(project)
+    state = st.session_state
+    return ComposeDraft(
+        request=str(state.get(keys["request"]) or ""), script=str(state.get(keys["script"]) or ""),
+        character_ids=[str(cid) for cid in state.get(keys["characters"]) or []],
+        location_id=state.get(keys["location"]) or None, demo=bool(state.get(keys["demo"])),
+        storyboard=_storyboard_state(project), prepared_id=state.get(keys["draft"]) or None,
+    )
+
+
+def autosave(project: Project) -> None:
+    """Enregistre la saisie du projet si elle a changé (``on_change`` des champs et fin d'affichage).
+
+    Jamais avant la restauration de cette session (une page vide n'écrase pas le brouillon enregistré) ;
+    jamais d'appel à un fournisseur ; une erreur d'enregistrement s'affiche sans bloquer la page.
+    """
+    keys = _keys(project)
+    if keys["restored"] not in st.session_state:
+        return
+    draft = current_draft(project)
+    repo = _drafts()
+    try:
+        if draft.is_empty() and repo.get(project.id) is None:
+            return
+        saved = repo.save(project.id, draft)
+    except DraftValidationError as error:
+        st.session_state[keys["notice"]] = ("warning", f"Brouillon non enregistré : {error}")
+        return
+    except (LookupError, sqlite3.Error) as error:
+        logger.warning("brouillon du projet %s non enregistré : %s", project.id, error)
+        st.session_state[keys["notice"]] = ("warning", "Brouillon momentanément non enregistré : réessaie dans un instant.")
+        return
+    st.session_state[keys["saved_at"]] = saved.updated_at
+
+
+def _prepared_still_pending(service: ProductionService, project: Project, production_id: str | None) -> bool:
+    if not production_id:
+        return False
+    try:
+        production = service.repo.get(production_id)
+    except LookupError:
+        return False
+    return production.project_id == project.id and production.status.value == "EN_ATTENTE_CONFIRMATION"
+
+
+def restore(project: Project, service: ProductionService, character_repo: CharacterRepository,
+            location_repo: LocationRepository) -> None:
+    """Remet à l'écran le brouillon enregistré de CE projet pour toute valeur absente de la session.
+
+    Streamlit oublie les champs d'une page quittée : au retour (ou après F5 / nouvelle session), chaque clé
+    manquante reprend la valeur enregistrée. Les personnages/lieux supprimés ou désactivés depuis sont retirés
+    et signalés ; une estimation qui n'est plus en attente n'est pas reprise.
+    """
+    keys = _keys(project)
+    state = st.session_state
+    first_visit = keys["restored"] not in state
+    state[keys["restored"]] = True
+    try:
+        stored = _drafts().get(project.id)
+    except sqlite3.Error as error:
+        logger.warning("brouillon du projet %s illisible : %s", project.id, error)
+        return
+    if stored is None:
+        return
+    restored, removed = False, []
+    for key, value in (("request", stored.request), ("script", stored.script), ("demo", stored.demo)):
+        if keys[key] not in state:
+            state[keys[key]] = value
+            restored = restored or bool(value)
+    if keys["characters"] not in state:
+        active = {character.id for character in _active_characters(character_repo, project)}
+        kept = [cid for cid in stored.character_ids if cid in active]
+        removed += ["personnage"] * (len(stored.character_ids) - len(kept))
+        state[keys["characters"]] = kept
+        restored = restored or bool(kept)
+    if keys["location"] not in state:
+        active_locations = {location.id for location in _active_locations(location_repo, project)}
+        location = stored.location_id if stored.location_id in active_locations else None
+        if stored.location_id and location is None:
+            removed.append("lieu")
+        state[keys["location"]] = location
+        restored = restored or bool(location)
+    preset = view_animation_pilot.preset_key(project)
+    if first_visit and stored.storyboard and preset not in state:
+        state[preset] = stored.storyboard["document"]
+        state[view_animation_pilot.preset_label_key(project)] = stored.storyboard["label"]
+        restored = True
+    if first_visit and keys["draft"] not in state and _prepared_still_pending(service, project, stored.prepared_id):
+        state[keys["draft"]] = stored.prepared_id
+    if restored or removed:
+        state[keys["notice"]] = ("restored", stored.updated_at, removed)
+    state[keys["saved_at"]] = stored.updated_at
+
+
+def _ask_clear(project: Project) -> None:
+    st.session_state[_keys(project)["confirm_clear"]] = True
+
+
+def _cancel_clear(project: Project) -> None:
+    st.session_state.pop(_keys(project)["confirm_clear"], None)
+
+
+def clear_draft(project: Project) -> None:
+    """Efface le brouillon de CE projet (après confirmation explicite) et vide le formulaire."""
+    keys = _keys(project)
+    _drafts().delete(project.id)
+    for name in ("request", "script", "characters", "location", "demo", "draft", "error", "accept", "running",
+                 "saved_at", "confirm_clear"):
+        st.session_state.pop(keys[name], None)
+    st.session_state.pop(view_animation_pilot.preset_key(project), None)
+    st.session_state.pop(view_animation_pilot.preset_label_key(project), None)
+    try:
+        del st.session_state[keys["animation"]]
+    except Exception:  # fichier déjà retiré, ou widget non réinitialisable : sans conséquence
+        pass
+    st.session_state[keys["notice"]] = ("cleared",)
+
+
+def _render_draft_status(project: Project) -> None:
+    keys = _keys(project)
+    notice = st.session_state.pop(keys["notice"], None)
+    saved_at = st.session_state.get(keys["saved_at"])
+    if notice and notice[0] == "restored":
+        _, updated_at, removed = notice
+        message = f"Brouillon restauré · enregistré le {format_datetime(updated_at)}"
+        if removed:
+            message += (f" — {len(removed)} élément(s) retiré(s) car supprimé(s) ou désactivé(s) depuis : "
+                        + ", ".join(sorted(set(removed))) + ".")
+        st.markdown(f'<p class="muted-note" role="status">{esc(message)}</p>', unsafe_allow_html=True)
+    elif notice and notice[0] == "warning":
+        st.markdown(f'<p class="field-error" role="alert">{esc(notice[1])}</p>', unsafe_allow_html=True)
+    elif notice and notice[0] == "cleared":
+        st.markdown('<p class="muted-note" role="status">Brouillon effacé : nouvelle saisie.</p>', unsafe_allow_html=True)
+    elif saved_at:
+        st.markdown(f'<p class="muted-note" role="status">Enregistré automatiquement · {esc(format_datetime(saved_at))}</p>',
+                    unsafe_allow_html=True)
+
+
+def _render_clear_control(project: Project) -> None:
+    keys = _keys(project)
+    if not st.session_state.get(keys["confirm_clear"]):
+        if not current_draft(project).is_empty():
+            st.button(LABEL_CLEAR, type="tertiary", icon=":material/restart_alt:", key=f"clear_{project.id}",
+                      on_click=_ask_clear, args=(project,))
+        return
+    st.markdown('<p class="field-error" role="alert">Effacer définitivement le brouillon de ce projet '
+                "(sujet, script, sélection, storyboard en attente) ? Les productions déjà préparées ou lancées "
+                "ne sont pas touchées.</p>", unsafe_allow_html=True)
+    with st.container(horizontal=True):
+        st.button(LABEL_CLEAR_CONFIRM, type="primary", key=f"clear_yes_{project.id}", on_click=clear_draft,
+                  args=(project,))
+        st.button(LABEL_CLEAR_CANCEL, key=f"clear_no_{project.id}", on_click=_cancel_clear, args=(project,))
 
 
 def _active_characters(repo: CharacterRepository, project: Project) -> list[Character]:
@@ -116,14 +319,14 @@ def _render_narrative_section(project: Project, character_repo: CharacterReposit
             st.multiselect(
                 "Personnages actifs de ce projet", character_ids,
                 format_func=lambda cid: _character_label(by_id[cid]),
-                key=keys["characters"],
+                key=keys["characters"], on_change=autosave, args=(project,),
             )
         if locations:
             by_loc_id = {location.id: location for location in locations}
             st.selectbox(
                 "Lieu actif de ce projet", [None, *location_ids],
                 format_func=lambda lid: "Aucun lieu" if lid is None else _location_label(by_loc_id[lid]),
-                key=keys["location"],
+                key=keys["location"], on_change=autosave, args=(project,),
             )
 
 
@@ -136,6 +339,7 @@ def _use_example(project: Project) -> None:
     keys = _keys(project)
     st.session_state[keys["request"]] = example_for(project)
     st.session_state[keys["error"]] = ""
+    autosave(project)
 
 
 def _provider_id(project: Project) -> str:
@@ -149,8 +353,10 @@ def _uploaded_storyboard(project: Project) -> object | None:
     """Storyboard animé importé (JSON lody.animation/1), ``None`` sans fichier. Lève ``InvalidInput`` si illisible."""
     uploaded = st.session_state.get(_keys(project)["animation"])
     if uploaded is None:
-        # #154 : storyboard de la démo installée depuis l'atelier 2D (déjà adapté aux assets du projet).
-        return st.session_state.get(view_animation_pilot.preset_key(project))
+        # #154 : storyboard de la démo installée depuis l'atelier 2D (déjà adapté aux assets du projet) ;
+        # #189 : ou storyboard restauré du brouillon (adapté aux assets de CE projet, gel vérifié à la préparation).
+        preset = st.session_state.get(view_animation_pilot.preset_key(project))
+        return None if preset is None else view_animation_pilot.adopt(project, preset)
     try:
         document = json.loads(uploaded.getvalue().decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
@@ -161,6 +367,7 @@ def _uploaded_storyboard(project: Project) -> object | None:
 
 def _forget_draft(project: Project) -> None:
     st.session_state.pop(_keys(project)["draft"], None)
+    autosave(project)
 
 
 def _draft_narrative(draft: Production) -> tuple[list[str], str | None]:
@@ -221,10 +428,13 @@ def _primary(project: Project, service: ProductionService) -> None:
                                        character_ids=character_ids, location_id=location_id,
                                        animation=_uploaded_storyboard(project) if provider_id == ANIMATION_PROVIDER else None)
             st.session_state[keys["draft"]] = prepared.id
+            autosave(project)
             return
         launched = service.confirm(draft.id, accept_partial=bool(st.session_state.get(keys["accept"])))
         st.session_state.pop(keys["draft"], None)
         st.session_state.pop(keys["retry"], None)
+        # #189 : le lancement n'efface jamais la saisie ; seul l'identifiant d'estimation (consommé) est oublié.
+        autosave(project)
         nav.go(nav.VIEW_TRACK, project.id, launched.id)
     except AlreadyRunning as error:
         st.session_state[keys["error"]] = error.message
@@ -313,6 +523,7 @@ def render(project: Project, service: ProductionService, character_repo: Charact
         service.refresh(running.id)
     active = service.repo.active_for_project(project.id)
 
+    restore(project, service, character_repo, location_repo)
     retry_id = st.session_state.get(keys["retry"])
     if retry_id:
         _render_retry_notice(service, keys, retry_id)
@@ -323,9 +534,11 @@ def render(project: Project, service: ProductionService, character_repo: Charact
 
     with st.container(key="composer"):
         st.markdown('<h2 class="composer-title">Que veux-tu créer ?</h2>', unsafe_allow_html=True)
+        draft_status = st.empty()
         st.text_area(
             "Que veux-tu créer ?",
             key=keys["request"],
+            on_change=autosave, args=(project,),
             placeholder="Décris la vidéo que tu veux…",
             height=132,
             max_chars=2000,
@@ -338,6 +551,7 @@ def render(project: Project, service: ProductionService, character_repo: Charact
             )
         with st.expander("J’ai déjà mon script (optionnel)", expanded=bool(st.session_state.get(keys["script"]))):
             st.text_area("Script à utiliser", key=keys["script"], height=150, max_chars=8000,
+                         on_change=autosave, args=(project,),
                          placeholder="Colle ici ton texte : aucun script ne sera écrit par un fournisseur.")
         _render_narrative_section(project, character_repo, location_repo)
         mode = render_modes.project_render_mode(project.settings)
@@ -348,7 +562,8 @@ def render(project: Project, service: ProductionService, character_repo: Charact
                 help=render_modes.DESCRIPTIONS[mode] + " Les assets doivent exister dans le catalogue du projet ; "
                      "leurs versions sont figées à la préparation.")
             view_animation_pilot.render(project)
-        st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"])
+        st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"],
+                  on_change=autosave, args=(project,))
         with st.container(horizontal=True, vertical_alignment="center", key="composer_actions"):
             st.markdown(
                 f'<p class="example"><span>Exemple</span> {esc(example_for(project))}</p>',
@@ -359,6 +574,10 @@ def render(project: Project, service: ProductionService, character_repo: Charact
             st.button(LABEL_PREPARE if draft is None else LABEL_CONFIRM, type="primary",
                       icon=":material/auto_awesome:" if draft is None else ":material/rocket_launch:",
                       key="generate", on_click=_primary, args=(project, service), disabled=blocked)
+        _render_clear_control(project)
+        autosave(project)  # filet de sécurité : démo installée, estimation préparée… (n'écrit que si ça change)
+        with draft_status.container():
+            _render_draft_status(project)
 
     for running in active:
         st.markdown(

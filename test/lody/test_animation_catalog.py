@@ -99,7 +99,7 @@ def test_upgrade_from_schema_v8_is_additive_and_idempotent(tmp_path):
     assert old.animation == {} and not old.is_animated and old.script == "Un script déjà produit."
     AnimationAssetRepository(path)  # rejouer la migration est sans effet
     upgraded = sqlite3.connect(path)
-    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 9
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 10
     tables = {row[0] for row in upgraded.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"animation_assets", "animation_asset_versions"} <= tables
     db._animation(upgraded)  # idempotente même rejouée à la main

@@ -267,6 +267,21 @@ def _animation(connection: sqlite3.Connection) -> None:
     _add_columns(connection, "productions", {"animation": "TEXT NOT NULL DEFAULT '{}'"})
 
 
+# Brouillon de saisie de « Nouvelle production » (#189) : UNE ligne par projet, réécrite à chaque modification.
+# Ce n'est PAS une production (aucune estimation, aucun coût, aucun appel) : seulement ce qui est à l'écran avant
+# « Préparer la génération » (sujet, script, IDs de personnages/lieu, mode démo, storyboard animé choisi), en JSON
+# versionné et validé par ``lody.compose_drafts``. Aucun asset ni fichier n'y est recopié.
+COMPOSE_DRAFTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS production_compose_drafts (
+    project_id  TEXT PRIMARY KEY REFERENCES projects (id),
+    version     INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    payload     TEXT NOT NULL DEFAULT '{}',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+"""
+
+
 MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
@@ -277,6 +292,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (7, _voice_direction),
     (8, _production_templates),
     (9, _animation),
+    (10, COMPOSE_DRAFTS_SCHEMA),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
