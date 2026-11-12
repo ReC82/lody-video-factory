@@ -302,3 +302,6 @@ class SceneUnits:
     music_tracks: int
     audio_seconds: tuple[int, int]
     thumbnails: int = 0  # fonds de miniature dédiés (payants) inclus dans l'estimation initiale
+    # #164 : fournisseur RÉELLEMENT utilisé pour la voix quand il diffère de celui du projet (ex. rendu 2D : voix
+    # ElevenLabs des fiches personnages). Vide : ``request.voice.provider``, comme avant.
+    voice_provider: str = ""

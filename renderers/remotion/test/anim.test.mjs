@@ -91,6 +91,14 @@ test('visèmes français et bouche pilotée par l’enveloppe de la voix', () =>
   assert.notEqual(puppetPose(RIG, obj, 14, {cues, envelope: env}).select['mouth-visemes'], 'sourire');
 });
 
+test('#164 : les visèmes suivent le texte PARLÉ du repère quand il est fourni', () => {
+  const written = [{text: 'SDI', start: 0, end: 10}];
+  const spoken = [{text: 'SDI', spoken: 'èss dé i', start: 0, end: 10}];
+  const seq = (cues) => Array.from({length: 10}, (_, f) => mouthAt(cues, null, f));
+  assert.deepEqual(seq(spoken).filter((v, i, all) => v !== all[i - 1]), visemesOf('èss dé i'));
+  assert.notDeepEqual(seq(spoken), seq(written));
+});
+
 function wav(samples, rate = 8000) {
   const data = Buffer.alloc(44 + samples.length * 2);
   data.write('RIFF', 0);

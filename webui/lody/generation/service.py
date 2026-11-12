@@ -160,8 +160,11 @@ def request_of(production: Production) -> GenerationRequest:
     request = GenerationRequest.from_dict(production.params.get("request", {}))
     if production.animation:
         # #120 : liaison au storyboard animé FIGÉ de cette production (sa propre colonne, jamais ``params``).
-        request = request.with_updates(animation={"project_id": production.project_id,
-                                                  "storyboard": production.animation})
+        animation = {"project_id": production.project_id, "storyboard": production.animation}
+        lexicon = (production.snapshot or {}).get("pronunciation")
+        if isinstance(lexicon, dict) and lexicon.get("entries"):
+            animation["pronunciation"] = lexicon  # #164 : lexique figé par #162/#163, lu par la voix 2D
+        request = request.with_updates(animation=animation)
     return request
 
 

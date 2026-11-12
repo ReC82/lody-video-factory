@@ -32,6 +32,8 @@ ainsi que l'existence des fichiers liés.
   compose DEV isolé, préflight (licence Remotion comprise), atelier 2D, mesures CPU/RAM.
 - [Réédition ciblée et contrôle qualité du rendu 2D](lody-animation-reedit.md) — cache de scène par
   empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4 ; écran « Nouvelle version » scène par scène (#159).
+- [Voix ElevenLabs du rendu 2D](lody-animation-voix.md) — voix de la fiche personnage, lexique de
+  prononciation, cache, piste calée et repères recalés pour la bouche et les sous-titres (#164).
 
 ## Voix
 

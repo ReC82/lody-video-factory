@@ -23,6 +23,7 @@ from lody.animation import worker as w
 from lody.animation.assets import AnimationAssetRepository
 from lody.generation.animation_connector import AnimationConnector
 from lody.animation.freeze import freeze_document
+from lody.characters import CharacterRepository
 from lody.generation.models import Capability, CapabilityState
 from lody.generation.service import build_request
 from lody.projects import ProjectRepository
@@ -50,7 +51,8 @@ def test_full_2d_render_from_the_dev_pilot(tmp_path, monkeypatch):
     storyboard, _ = pilot.install_voltix_demo(assets, project.id, data)
     storyboard = {**storyboard, "scenes": storyboard["scenes"][:1]}
     frozen = freeze_document(assets, project.id, storyboard)
-    connector = AnimationConnector(root=data, asset_repo=assets,
+    # Base de test pour les fiches personnages aussi (#164) : jamais settings.db_path(), illisible dans l'image.
+    connector = AnimationConnector(root=data, asset_repo=assets, character_repo=CharacterRepository(db),
                                    launcher=lambda directory: w.run_job(directory, w.CommandRenderer(w.renderer_command())))
     request = build_request(project, "Voltix dit bonjour").with_updates(
         render_mode=modes.ANIMATION, animation={"project_id": project.id, "storyboard": frozen})

@@ -9,6 +9,10 @@ clé = SHA-256 de ses **dépendances**, et seulement d'elles :
 - l'empreinte des fichiers d'assets que la scène utilise, et leurs informations de placement ;
 - la **tranche de voix** jouée pendant la scène (échantillons PCM de sa fenêtre) : retoucher la voix d'une
   autre scène, ou déplacer la scène, ne l'invalide pas ;
+- les **repères de parole recalés** sur la voix réellement jouée (``speech_cues``, #185) quand il y en a :
+  la bouche (visèmes) et les sous-titres de la scène en dépendent. Mêmes textes mais nouveaux repères, ou
+  nouvelle voix, = scène à refaire ; une scène réutilisée n'affiche jamais une bouche calée sur l'ancienne voix.
+  Sans repères recalés (rendu V1, voix du storyboard), l'entrée est absente : les clés existantes ne changent pas ;
 - l'identité du moteur de scène (commande, révision déclarée, version annoncée par le moteur).
 
 Une modification n'invalide donc que les sorties qui en dépendent. Seule une scène **réellement animée** entre
@@ -85,16 +89,34 @@ def voice_slice_digest(voice: Path, fps: int, offset_frames: int, frames: int) -
         return {"window": [offset_frames, frames], "file_sha256": digest.hexdigest()}
 
 
+def normalized_speech_cues(cues: Any) -> list[dict[str, Any]] | None:
+    """Repères de parole d'UNE scène, réduits à ce que le moteur de scène lit (début, fin, texte, visèmes).
+
+    ``None`` ou liste vide = aucun repère recalé (la scène garde ceux du storyboard, déjà dans ``scene``).
+    Les champs inconnus sont conservés (prudence : un champ nouveau lu par le moteur doit invalider le cache).
+    """
+    if not cues:
+        return None
+    if not isinstance(cues, list) or not all(isinstance(cue, dict) for cue in cues):
+        raise ValueError("repères de parole invalides : liste d'objets attendue")
+    return [dict(cue) for cue in cues]
+
+
 def scene_dependencies(job: dict[str, Any], index: int, scene: dict[str, Any], voice: Path | None,
-                       renderer_identity: str, scale: float = 1.0) -> dict[str, Any]:
-    """Tout ce dont dépend l'image rendue d'une scène — et rien d'autre (voir l'en-tête du module)."""
+                       renderer_identity: str, scale: float = 1.0, *,
+                       speech_cues: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Tout ce dont dépend l'image rendue d'une scène — et rien d'autre (voir l'en-tête du module).
+
+    ``speech_cues`` (#185) : repères recalés sur la voix réelle de CETTE scène (``voiceover.timed_cues`` de la
+    PR #169), tels que transmis au moteur de scène. Absents ou vides : la clé est identique à celle d'avant #185.
+    """
     storyboard = job["storyboard"]
     fps = storyboard["canvas"]["fps"]
     offset = sum(s["duration_frames"] for s in storyboard["scenes"][: index - 1])
     assets = job.get("assets") or {}
     info = job.get("asset_info") or {}
     used = used_asset_keys(scene)
-    return {
+    dependencies = {
         "schema": CACHE_SCHEMA,
         "canvas": storyboard["canvas"],
         "scale": round(float(scale), 3),
@@ -104,6 +126,10 @@ def scene_dependencies(job: dict[str, Any], index: int, scene: dict[str, Any], v
         "voice": voice_slice_digest(voice, fps, offset, scene["duration_frames"]) if voice is not None else None,
         "renderer": renderer_identity,
     }
+    timed = normalized_speech_cues(speech_cues)
+    if timed is not None:  # absente sinon : aucune clé existante (V1, cache déjà rempli) n'est invalidée
+        dependencies["speech_timing"] = timed
+    return dependencies
 
 
 def dependency_key(dependencies: dict[str, Any]) -> str:
