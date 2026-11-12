@@ -1,0 +1,285 @@
+{
+  "schema": "lody.decor/1",
+  "decor": "decor-bureau",
+  "version": 1,
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "layers": [
+    {
+      "id": "fond",
+      "file": "decor-bureau-fond.svg"
+    },
+    {
+      "id": "objets",
+      "file": "decor-bureau-objets.svg"
+    },
+    {
+      "id": "avant",
+      "file": "decor-bureau-avant.svg"
+    }
+  ],
+  "order": [
+    "fond",
+    "objets",
+    "personnages",
+    "avant"
+  ],
+  "zones": {
+    "subtitles": {
+      "x": 40,
+      "y": 1500,
+      "width": 1000,
+      "height": 360
+    },
+    "title": {
+      "x": 60,
+      "y": 60,
+      "width": 960,
+      "height": 170
+    },
+    "action": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 1500
+    }
+  },
+  "floor_y": 1240,
+  "places": [
+    {
+      "id": "gauche",
+      "x": 180,
+      "y": 1480,
+      "height": 820,
+      "note": "À gauche, devant l'écran DisplayPort"
+    },
+    {
+      "id": "centre",
+      "x": 540,
+      "y": 1480,
+      "height": 820,
+      "note": "Au centre, devant le bureau"
+    },
+    {
+      "id": "droite",
+      "x": 860,
+      "y": 1480,
+      "height": 820,
+      "note": "À droite, près de la tour PC"
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "plan-de-travail",
+      "label": "Bureau",
+      "layer": "objets",
+      "bbox": [
+        38,
+        1038,
+        1004,
+        294
+      ],
+      "point": [
+        540,
+        1185
+      ]
+    },
+    {
+      "id": "ecran-displayport",
+      "label": "Écran DisplayPort",
+      "layer": "objets",
+      "bbox": [
+        78,
+        598,
+        444,
+        444
+      ],
+      "point": [
+        300,
+        820
+      ]
+    },
+    {
+      "id": "ecran-vga",
+      "label": "Ancien écran VGA",
+      "layer": "objets",
+      "bbox": [
+        548,
+        678,
+        274,
+        364
+      ],
+      "point": [
+        685,
+        860
+      ]
+    },
+    {
+      "id": "tour-pc",
+      "label": "Tour PC (vue de dos)",
+      "layer": "objets",
+      "bbox": [
+        848,
+        618,
+        194,
+        424
+      ],
+      "point": [
+        945,
+        830
+      ]
+    },
+    {
+      "id": "cable-displayport",
+      "label": "Câble DisplayPort",
+      "layer": "objets",
+      "bbox": [
+        407,
+        864,
+        509,
+        170
+      ],
+      "point": [
+        661,
+        949
+      ]
+    },
+    {
+      "id": "cable-vga",
+      "label": "Câble VGA",
+      "layer": "objets",
+      "bbox": [
+        743,
+        890,
+        164,
+        48
+      ],
+      "point": [
+        825,
+        914
+      ]
+    },
+    {
+      "id": "prise-dp-ecran",
+      "label": "Entrée DisplayPort de l'écran",
+      "layer": "objets",
+      "bbox": [
+        402,
+        852,
+        36,
+        16
+      ],
+      "point": [
+        420,
+        860
+      ]
+    },
+    {
+      "id": "prise-vga-ecran",
+      "label": "Entrée VGA de l'écran",
+      "layer": "objets",
+      "bbox": [
+        725,
+        902,
+        70,
+        32
+      ],
+      "point": [
+        760,
+        918
+      ]
+    },
+    {
+      "id": "sortie-vga-pc",
+      "label": "Sortie VGA du PC",
+      "layer": "objets",
+      "bbox": [
+        862,
+        863,
+        78,
+        34
+      ],
+      "point": [
+        901,
+        880
+      ]
+    },
+    {
+      "id": "sortie-dp-pc",
+      "label": "Sorties DisplayPort de la carte graphique",
+      "layer": "objets",
+      "bbox": [
+        893,
+        967,
+        104,
+        16
+      ],
+      "point": [
+        945,
+        975
+      ]
+    },
+    {
+      "id": "ports-usb-pc",
+      "label": "Ports USB",
+      "layer": "objets",
+      "bbox": [
+        885,
+        775,
+        32,
+        58
+      ],
+      "point": [
+        901,
+        804
+      ]
+    },
+    {
+      "id": "clavier",
+      "label": "Clavier",
+      "layer": "objets",
+      "bbox": [
+        258,
+        1010,
+        304,
+        32
+      ],
+      "point": [
+        410,
+        1026
+      ]
+    },
+    {
+      "id": "souris",
+      "label": "Souris",
+      "layer": "objets",
+      "bbox": [
+        588,
+        1010,
+        44,
+        32
+      ],
+      "point": [
+        610,
+        1026
+      ]
+    },
+    {
+      "id": "dossier-chaise",
+      "label": "Dossier de chaise (avant-plan)",
+      "layer": "avant",
+      "bbox": [
+        928,
+        1148,
+        152,
+        332
+      ],
+      "point": [
+        1004,
+        1314
+      ]
+    }
+  ]
+}

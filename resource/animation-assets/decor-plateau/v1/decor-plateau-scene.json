@@ -1,0 +1,240 @@
+{
+  "schema": "lody.decor/1",
+  "decor": "decor-plateau",
+  "version": 1,
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "layers": [
+    {
+      "id": "fond",
+      "file": "decor-plateau-fond.svg"
+    },
+    {
+      "id": "objets",
+      "file": "decor-plateau-objets.svg"
+    },
+    {
+      "id": "avant",
+      "file": "decor-plateau-avant.svg"
+    }
+  ],
+  "order": [
+    "fond",
+    "objets",
+    "personnages",
+    "avant"
+  ],
+  "zones": {
+    "subtitles": {
+      "x": 40,
+      "y": 1500,
+      "width": 1000,
+      "height": 360
+    },
+    "title": {
+      "x": 60,
+      "y": 60,
+      "width": 960,
+      "height": 170
+    },
+    "action": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 1500
+    }
+  },
+  "floor_y": 1240,
+  "places": [
+    {
+      "id": "presentateur",
+      "x": 850,
+      "y": 1480,
+      "height": 820,
+      "note": "Derrière le bureau du présentateur (jambes masquées par l'avant-plan)"
+    },
+    {
+      "id": "centre",
+      "x": 540,
+      "y": 1480,
+      "height": 820,
+      "note": "Au centre, entre la caméra et le bureau"
+    },
+    {
+      "id": "cadreur",
+      "x": 110,
+      "y": 1480,
+      "height": 820,
+      "note": "À gauche, derrière la caméra (cadreur)"
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "projecteur-gauche",
+      "label": "Projecteur gauche",
+      "layer": "objets",
+      "bbox": [
+        238,
+        116,
+        124,
+        188
+      ],
+      "point": [
+        300,
+        210
+      ]
+    },
+    {
+      "id": "projecteur-droit",
+      "label": "Projecteur droit",
+      "layer": "objets",
+      "bbox": [
+        738,
+        116,
+        124,
+        188
+      ],
+      "point": [
+        800,
+        210
+      ]
+    },
+    {
+      "id": "cable-camera",
+      "label": "Câble de la caméra",
+      "layer": "objets",
+      "bbox": [
+        0,
+        875,
+        177,
+        580
+      ],
+      "point": [
+        88,
+        1165
+      ]
+    },
+    {
+      "id": "trepied",
+      "label": "Trépied à roulettes",
+      "layer": "objets",
+      "bbox": [
+        142,
+        943,
+        296,
+        489
+      ],
+      "point": [
+        290,
+        1187
+      ]
+    },
+    {
+      "id": "tete-trepied",
+      "label": "Tête et bras de panoramique",
+      "layer": "objets",
+      "bbox": [
+        73,
+        908,
+        269,
+        109
+      ],
+      "point": [
+        207,
+        962
+      ]
+    },
+    {
+      "id": "camera",
+      "label": "Caméra de studio",
+      "layer": "objets",
+      "bbox": [
+        148,
+        688,
+        514,
+        232
+      ],
+      "point": [
+        405,
+        804
+      ]
+    },
+    {
+      "id": "tally",
+      "label": "Voyant tally",
+      "layer": "objets",
+      "bbox": [
+        389,
+        726,
+        32,
+        32
+      ],
+      "point": [
+        405,
+        742
+      ]
+    },
+    {
+      "id": "sortie-sdi-camera",
+      "label": "Sortie SDI (BNC)",
+      "layer": "objets",
+      "bbox": [
+        159,
+        867,
+        26,
+        26
+      ],
+      "point": [
+        172,
+        880
+      ]
+    },
+    {
+      "id": "moniteur-retour",
+      "label": "Moniteur de retour",
+      "layer": "objets",
+      "bbox": [
+        598,
+        1258,
+        224,
+        172
+      ],
+      "point": [
+        710,
+        1344
+      ]
+    },
+    {
+      "id": "marque-sol",
+      "label": "Marque au sol",
+      "layer": "objets",
+      "bbox": [
+        855,
+        1415,
+        90,
+        50
+      ],
+      "point": [
+        900,
+        1440
+      ]
+    },
+    {
+      "id": "bureau-presentateur",
+      "label": "Bureau du présentateur (avant-plan)",
+      "layer": "avant",
+      "bbox": [
+        638,
+        1058,
+        424,
+        184
+      ],
+      "point": [
+        850,
+        1150
+      ]
+    }
+  ]
+}

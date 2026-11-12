@@ -1,0 +1,225 @@
+{
+  "schema": "lody.decor/1",
+  "decor": "decor-regie",
+  "version": 1,
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "layers": [
+    {
+      "id": "fond",
+      "file": "decor-regie-fond.svg"
+    },
+    {
+      "id": "objets",
+      "file": "decor-regie-objets.svg"
+    },
+    {
+      "id": "avant",
+      "file": "decor-regie-avant.svg"
+    }
+  ],
+  "order": [
+    "fond",
+    "objets",
+    "personnages",
+    "avant"
+  ],
+  "zones": {
+    "subtitles": {
+      "x": 40,
+      "y": 1500,
+      "width": 1000,
+      "height": 360
+    },
+    "title": {
+      "x": 60,
+      "y": 60,
+      "width": 960,
+      "height": 170
+    },
+    "action": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 1500
+    }
+  },
+  "floor_y": 1240,
+  "places": [
+    {
+      "id": "gauche",
+      "x": 170,
+      "y": 1480,
+      "height": 820,
+      "note": "À gauche, devant le pupitre"
+    },
+    {
+      "id": "centre",
+      "x": 540,
+      "y": 1480,
+      "height": 820,
+      "note": "Au centre, face au mur de moniteurs"
+    },
+    {
+      "id": "droite",
+      "x": 900,
+      "y": 1480,
+      "height": 820,
+      "note": "À droite, près de la baie BNC"
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "mur-moniteurs",
+      "label": "Mur de moniteurs",
+      "layer": "objets",
+      "bbox": [
+        68,
+        228,
+        944,
+        564
+      ],
+      "point": [
+        540,
+        510
+      ]
+    },
+    {
+      "id": "apercu-pvw",
+      "label": "Aperçu (PVW)",
+      "layer": "objets",
+      "bbox": [
+        95,
+        255,
+        440,
+        280
+      ],
+      "point": [
+        315,
+        395
+      ]
+    },
+    {
+      "id": "programme-pgm",
+      "label": "Programme (PGM)",
+      "layer": "objets",
+      "bbox": [
+        545,
+        255,
+        440,
+        280
+      ],
+      "point": [
+        765,
+        395
+      ]
+    },
+    {
+      "id": "pupitre",
+      "label": "Pupitre de régie",
+      "layer": "objets",
+      "bbox": [
+        38,
+        1058,
+        1004,
+        260
+      ],
+      "point": [
+        540,
+        1188
+      ]
+    },
+    {
+      "id": "melangeur",
+      "label": "Mélangeur vidéo",
+      "layer": "objets",
+      "bbox": [
+        228,
+        908,
+        624,
+        154
+      ],
+      "point": [
+        540,
+        985
+      ]
+    },
+    {
+      "id": "levier-t-bar",
+      "label": "Levier T-bar",
+      "layer": "objets",
+      "bbox": [
+        738,
+        928,
+        68,
+        114
+      ],
+      "point": [
+        772,
+        985
+      ]
+    },
+    {
+      "id": "rangee-programme",
+      "label": "Rangée programme",
+      "layer": "objets",
+      "bbox": [
+        290,
+        932,
+        426,
+        46
+      ],
+      "point": [
+        503,
+        955
+      ]
+    },
+    {
+      "id": "rangee-apercu",
+      "label": "Rangée aperçu",
+      "layer": "objets",
+      "bbox": [
+        290,
+        982,
+        426,
+        46
+      ],
+      "point": [
+        503,
+        1005
+      ]
+    },
+    {
+      "id": "baie-bnc",
+      "label": "Baie de connecteurs BNC",
+      "layer": "objets",
+      "bbox": [
+        888,
+        898,
+        134,
+        164
+      ],
+      "point": [
+        955,
+        980
+      ]
+    },
+    {
+      "id": "dossier-fauteuil",
+      "label": "Dossier de fauteuil (avant-plan)",
+      "layer": "avant",
+      "bbox": [
+        0,
+        1168,
+        152,
+        312
+      ],
+      "point": [
+        76,
+        1324
+      ]
+    }
+  ]
+}
