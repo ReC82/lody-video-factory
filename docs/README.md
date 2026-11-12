@@ -28,6 +28,8 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Labo — de la caméra à l'écran](episodes/labo-camera-moniteur.md) — projet expérimental (#174) : dialogue
+  Nora / Sam de 43 s, storyboard, preset importable, assets SVG réutilisables et animatic local muet.
 
 ## Voix
 

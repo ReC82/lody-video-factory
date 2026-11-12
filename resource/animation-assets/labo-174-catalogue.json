@@ -1,0 +1,193 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_174000000001",
+      "name": "Caméra vidéo",
+      "kind": "prop",
+      "description": "Caméra de profil, objectif à gauche, prise de sortie à droite (#174).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 320,
+            "height": 220,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "corps",
+              "viseur",
+              "objectif",
+              "voyant",
+              "sortie",
+              "poignee"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/labo-camera/v1/labo-camera.svg",
+                "sha256": "9a0f233eddc2265a6a383d09f54af84abc57c08eb5d40da799188bcdc848d576"
+              }
+            ]
+          },
+          "sha256": "f633782df36e4d606bc36dbf23bb075814dad046adf137a620be658cf18d9ae6",
+          "notes": "Version 1 (laboratoire #174)."
+        }
+      ]
+    },
+    {
+      "id": "ast_174000000002",
+      "name": "Câble vidéo",
+      "kind": "prop",
+      "description": "Câble vidéo générique, une fiche à chaque bout, sans norme précise (#174).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 400,
+            "height": 80,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "gaine",
+              "fiche-gauche",
+              "fiche-droite"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/labo-cable/v1/labo-cable.svg",
+                "sha256": "78c327e54ece852872928a1d92d717d10c3da19f42df2290ca5213441705e048"
+              }
+            ]
+          },
+          "sha256": "547a64d02deada038a757854f1a1e94ec07fddb8b6cf3106643b2d6de0a1779d",
+          "notes": "Version 1 (laboratoire #174)."
+        }
+      ]
+    },
+    {
+      "id": "ast_174000000003",
+      "name": "Moniteur vidéo",
+      "kind": "prop",
+      "description": "Moniteur éteint sur pied ; superposer « Plante en pot » pour l'image affichée (centre de l'écran 30 px au-dessus de l'ancrage, à l'échelle 1) (#174).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 340,
+            "height": 300,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "pied",
+              "cadre",
+              "ecran",
+              "entree"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/labo-moniteur/v1/labo-moniteur.svg",
+                "sha256": "8c5f53d1721c9559dc1bfd2e8afeff59cbdfc42c761f17078aed0587e62682d6"
+              }
+            ]
+          },
+          "sha256": "6e4ef835a1034d54c77d3e027badfc7887aae84addc8b192b9c4f8f077f212a5",
+          "notes": "Version 1 (laboratoire #174)."
+        }
+      ]
+    },
+    {
+      "id": "ast_174000000004",
+      "name": "Plante en pot",
+      "kind": "prop",
+      "description": "Sujet filmé, réutilisé en petit comme image sur l'écran (#174).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 200,
+            "height": 260,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "feuilles",
+              "fleur",
+              "pot"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/labo-sujet/v1/labo-sujet.svg",
+                "sha256": "4aa6f6b254bfd4a7a6e75a19ad7bb6f78a9c667632eb60211e9ab53b341287f3"
+              }
+            ]
+          },
+          "sha256": "099a53a94bc4aa0ed1d356d41defcd82c8a28267c9cbb2304a223aa7cbaa7530",
+          "notes": "Version 1 (laboratoire #174)."
+        }
+      ]
+    },
+    {
+      "id": "ast_174000000005",
+      "name": "Signal électrique",
+      "kind": "overlay",
+      "description": "Onde avec flèche de sens, à faire glisser le long du câble (#174).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 160,
+            "height": 80,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "onde",
+              "fleche"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/labo-signal/v1/labo-signal.svg",
+                "sha256": "6c79621f69e2b6b8169bf5c2f879b1cfb7bf96b6a1944174b8595e613dfdb9cf"
+              }
+            ]
+          },
+          "sha256": "600e6b5233118d7bf438c6655e096214a061d2392fe2432e2f40bae2965fa4d8",
+          "notes": "Version 1 (laboratoire #174)."
+        }
+      ]
+    }
+  ]
+}
