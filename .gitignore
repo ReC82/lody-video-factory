@@ -60,3 +60,6 @@ htmlcov/
 
 # Planche Voltix générée (scripts/animation/rig_pose.py) : seul le PNG est versionné (#136).
 /docs/animation/voltix/planche-voltix.svg
+# Planches Nora et Sam générées (scripts/animation/planche_personnages.py) : seul le PNG est versionné (#173).
+/docs/animation/nora/planche-nora.svg
+/docs/animation/sam/planche-sam.svg

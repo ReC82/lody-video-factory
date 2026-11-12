@@ -1,0 +1,511 @@
+{
+  "schema": "lody.rig/1",
+  "asset": "sam",
+  "version": 1,
+  "convention": "left/right = côté du personnage (son bras gauche est à droite de l'image). Rotations en degrés, sens horaire positif (repère SVG). Pivots : attribut data-pivot des groupes du SVG. Personnage humain : pas de ressorts, ni lift ni air dans les gestes.",
+  "parts": [
+    "puppet",
+    "shadow",
+    "upper",
+    "body",
+    "neck",
+    "head",
+    "hair",
+    "hair-front",
+    "face",
+    "eyes",
+    "pupils",
+    "lids",
+    "eyebrows",
+    "nose",
+    "mouth-visemes",
+    "arm-left",
+    "arm-right",
+    "forearm-left",
+    "forearm-right",
+    "hand-left",
+    "hand-right",
+    "legs-left",
+    "legs-right",
+    "shoes",
+    "accessories",
+    "beard",
+    "vest"
+  ],
+  "variants": {
+    "eyebrows": [
+      "neutre",
+      "joie",
+      "surprise",
+      "confusion",
+      "concentration"
+    ],
+    "lids": [
+      "ouverts",
+      "mi-clos",
+      "fermes"
+    ],
+    "mouth-visemes": [
+      "mbp",
+      "a",
+      "e",
+      "i",
+      "o",
+      "ou",
+      "fv",
+      "repos",
+      "sourire",
+      "grimace"
+    ],
+    "hand-left": [
+      "ouverte",
+      "poing",
+      "index"
+    ],
+    "hand-right": [
+      "ouverte",
+      "poing",
+      "index"
+    ]
+  },
+  "slots": [
+    "slot-chest",
+    "slot-belt",
+    "hand-left-slot",
+    "hand-right-slot"
+  ],
+  "rest": {
+    "select": {
+      "eyebrows": "neutre",
+      "lids": "ouverts",
+      "mouth-visemes": "repos",
+      "hand-left": "ouverte",
+      "hand-right": "ouverte"
+    },
+    "rotate": {
+      "head": 0,
+      "arm-left": 0,
+      "arm-right": 0,
+      "forearm-left": 0,
+      "forearm-right": 0,
+      "hand-left": 0,
+      "hand-right": 0
+    },
+    "pupils": [
+      0,
+      0
+    ],
+    "lift": 0,
+    "squash": 0,
+    "air": 0
+  },
+  "expressions": {
+    "neutre": {
+      "select": {
+        "eyebrows": "neutre",
+        "lids": "ouverts",
+        "mouth-visemes": "repos"
+      },
+      "pupils": [
+        0,
+        0
+      ]
+    },
+    "sourire": {
+      "select": {
+        "eyebrows": "joie",
+        "lids": "ouverts",
+        "mouth-visemes": "sourire"
+      },
+      "pupils": [
+        0,
+        0
+      ]
+    },
+    "surprise": {
+      "select": {
+        "eyebrows": "surprise",
+        "lids": "ouverts",
+        "mouth-visemes": "o"
+      },
+      "pupils": [
+        0,
+        -2
+      ]
+    },
+    "confusion": {
+      "select": {
+        "eyebrows": "confusion",
+        "lids": "ouverts",
+        "mouth-visemes": "grimace"
+      },
+      "pupils": [
+        3,
+        -3
+      ],
+      "rotate": {
+        "head": 5
+      }
+    },
+    "concentration": {
+      "select": {
+        "eyebrows": "concentration",
+        "lids": "mi-clos",
+        "mouth-visemes": "mbp"
+      },
+      "pupils": [
+        0,
+        3
+      ]
+    }
+  },
+  "visemes": {
+    "mbp": {
+      "phonemes": [
+        "m",
+        "b",
+        "p"
+      ],
+      "exemple": "maman, bonjour, pomme"
+    },
+    "a": {
+      "phonemes": [
+        "a",
+        "â"
+      ],
+      "exemple": "câble, ça va"
+    },
+    "e": {
+      "phonemes": [
+        "é",
+        "è",
+        "ê",
+        "e",
+        "eu"
+      ],
+      "exemple": "vidéo, fête, le"
+    },
+    "i": {
+      "phonemes": [
+        "i",
+        "y",
+        "s",
+        "z",
+        "t",
+        "d",
+        "n",
+        "l",
+        "k",
+        "g",
+        "r"
+      ],
+      "exemple": "signal, si, tension"
+    },
+    "o": {
+      "phonemes": [
+        "o",
+        "au",
+        "on",
+        "an",
+        "en"
+      ],
+      "exemple": "vidéo, son, an"
+    },
+    "ou": {
+      "phonemes": [
+        "ou",
+        "u",
+        "w",
+        "ch",
+        "j"
+      ],
+      "exemple": "pour, tu, oui, chou"
+    },
+    "fv": {
+      "phonemes": [
+        "f",
+        "v"
+      ],
+      "exemple": "fil, vingt"
+    },
+    "silence": {
+      "phonemes": [],
+      "mouth": "repos"
+    }
+  },
+  "gestures": {
+    "cligner": {
+      "frames": 6,
+      "sheet_key": 2,
+      "keys": [
+        {
+          "frame": 0,
+          "pose": {
+            "select": {
+              "lids": "ouverts"
+            }
+          }
+        },
+        {
+          "frame": 1,
+          "pose": {
+            "select": {
+              "lids": "mi-clos"
+            }
+          }
+        },
+        {
+          "frame": 2,
+          "pose": {
+            "select": {
+              "lids": "fermes"
+            }
+          }
+        },
+        {
+          "frame": 4,
+          "pose": {
+            "select": {
+              "lids": "mi-clos"
+            }
+          }
+        },
+        {
+          "frame": 6,
+          "pose": {
+            "select": {
+              "lids": "ouverts"
+            }
+          }
+        }
+      ]
+    },
+    "saluer": {
+      "frames": 30,
+      "sheet_key": 2,
+      "keys": [
+        {
+          "frame": 0,
+          "pose": {}
+        },
+        {
+          "frame": 6,
+          "pose": {
+            "rotate": {
+              "arm-left": -150,
+              "forearm-left": -20,
+              "head": 4
+            },
+            "select": {
+              "hand-left": "ouverte"
+            }
+          }
+        },
+        {
+          "frame": 11,
+          "pose": {
+            "rotate": {
+              "arm-left": -150,
+              "forearm-left": -45
+            }
+          }
+        },
+        {
+          "frame": 16,
+          "pose": {
+            "rotate": {
+              "arm-left": -150,
+              "forearm-left": -15
+            }
+          }
+        },
+        {
+          "frame": 21,
+          "pose": {
+            "rotate": {
+              "arm-left": -150,
+              "forearm-left": -45
+            }
+          }
+        },
+        {
+          "frame": 30,
+          "pose": {
+            "rotate": {
+              "arm-left": 0,
+              "forearm-left": 0,
+              "head": 0
+            }
+          }
+        }
+      ]
+    },
+    "montrer": {
+      "frames": 24,
+      "sheet_key": 1,
+      "keys": [
+        {
+          "frame": 0,
+          "pose": {}
+        },
+        {
+          "frame": 8,
+          "pose": {
+            "rotate": {
+              "arm-right": 100,
+              "forearm-right": 6,
+              "head": -4
+            },
+            "select": {
+              "hand-right": "index"
+            },
+            "pupils": [
+              -4,
+              0
+            ]
+          }
+        },
+        {
+          "frame": 24,
+          "pose": {
+            "rotate": {
+              "arm-right": 100,
+              "forearm-right": 6,
+              "head": -4
+            },
+            "select": {
+              "hand-right": "index"
+            },
+            "pupils": [
+              -4,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "tenir-cable": {
+      "frames": 12,
+      "sheet_key": 1,
+      "keys": [
+        {
+          "frame": 0,
+          "pose": {}
+        },
+        {
+          "frame": 12,
+          "pose": {
+            "rotate": {
+              "arm-right": 8,
+              "forearm-right": -70,
+              "arm-left": -8,
+              "forearm-left": 70
+            },
+            "select": {
+              "hand-right": "poing",
+              "hand-left": "poing"
+            },
+            "pupils": [
+              0,
+              4
+            ],
+            "accessories": [
+              {
+                "asset": "cable-sdi",
+                "slot": "slot-chest",
+                "scale": 0.5
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "expliquer": {
+      "frames": 30,
+      "sheet_key": 1,
+      "keys": [
+        {
+          "frame": 0,
+          "pose": {}
+        },
+        {
+          "frame": 8,
+          "pose": {
+            "rotate": {
+              "arm-right": 24,
+              "forearm-right": -96,
+              "hand-right": -10
+            },
+            "select": {
+              "hand-right": "ouverte"
+            }
+          }
+        },
+        {
+          "frame": 16,
+          "pose": {
+            "rotate": {
+              "arm-right": 30,
+              "forearm-right": -84,
+              "hand-right": 6
+            }
+          }
+        },
+        {
+          "frame": 24,
+          "pose": {
+            "rotate": {
+              "arm-right": 24,
+              "forearm-right": -96,
+              "hand-right": -10
+            }
+          }
+        },
+        {
+          "frame": 30,
+          "pose": {
+            "rotate": {
+              "arm-right": 0,
+              "forearm-right": 0,
+              "hand-right": 0
+            }
+          }
+        }
+      ]
+    },
+    "pencher-tete": {
+      "frames": 20,
+      "sheet_key": 1,
+      "keys": [
+        {
+          "frame": 0,
+          "pose": {}
+        },
+        {
+          "frame": 8,
+          "pose": {
+            "rotate": {
+              "head": 8
+            },
+            "pupils": [
+              2,
+              -2
+            ]
+          }
+        },
+        {
+          "frame": 20,
+          "pose": {
+            "rotate": {
+              "head": 8
+            },
+            "pupils": [
+              2,
+              -2
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
