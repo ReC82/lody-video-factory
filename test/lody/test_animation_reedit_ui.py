@@ -77,6 +77,13 @@ class Studio(World):
 HERO = "perso/heros"
 
 
+@pytest.fixture(autouse=True)
+def _remotion_evaluation(monkeypatch):
+    """#154/#156 : licence Remotion non décidée → rendu permis seulement en évaluation DEV explicite."""
+    monkeypatch.delenv("LODY_REMOTION_LICENSE", raising=False)
+    monkeypatch.setenv("LODY_REMOTION_EVALUATION", "1")
+
+
 # -- module pur : résumé et modifications -------------------------------------------------------------------------
 def _frozen(tmp_path) -> tuple[Studio, dict]:
     studio = Studio(tmp_path / "data", tmp_path / "lody.sqlite3")
@@ -222,6 +229,42 @@ def test_prepare_animation_v2_refuses_launched_versions_and_invalid_documents(tm
     assert studio.service.repo.get(draft.id).animation == v1.animation
     with pytest.raises(LaunchError, match="nouvelle version en préparation"):
         reedit_v2.start_preview(studio.service, v1)
+
+
+@needs_ffmpeg
+def test_v2_preview_and_launch_respect_the_remotion_licence_gate(tmp_path, monkeypatch):
+    """#184 : la réédition V2 (aperçu ½ comme génération) ne contourne pas la garde de licence du worker #156."""
+    studio = Studio(tmp_path / "data", tmp_path / "lody.sqlite3")
+    _, v1 = studio.finished_v1()
+    v1_bytes = studio.service.resolve_video(v1).read_bytes()
+    draft = studio.service.create_v2(v1.id)
+    ready = studio.service.prepare_animation_v2(
+        draft.id, scene_edit.edit_scene(draft.animation, "suite", {"gestures": {(HERO, 0): "pointer"}}))
+    studio.renderer.rendered.clear()
+    monkeypatch.delenv("LODY_REMOTION_EVALUATION")
+    with pytest.raises(LaunchError, match="Licence Remotion"):
+        reedit_v2.start_preview(studio.service, ready)
+    with pytest.raises(LaunchError, match="configuration de production est incomplète"):
+        studio.service.confirm(ready.id)
+    assert studio.renderer.rendered == [] and reedit_v2.preview_state(studio.service, ready).state == "none"
+    assert studio.service.repo.get(ready.id).status is S.EN_ATTENTE_CONFIRMATION
+    assert studio.service.resolve_video(v1).read_bytes() == v1_bytes
+    monkeypatch.setenv("LODY_REMOTION_LICENSE", "company:PO-TEST")  # décision écrite → l'aperçu repart
+    assert reedit_v2.preview_state(studio.service, ready).state == "none"
+    reedit_v2.start_preview(studio.service, ready)
+    assert reedit_v2.preview_state(studio.service, ready).state == "done"
+
+
+def test_modified_line_is_never_presented_as_revoiced_before_169():
+    """#184 : tant que la voix réelle du worker (#169) n'est pas fusionnée, aucune réplique n'est dite re-voisée."""
+    assert reedit_v2.VOICE_REGENERATION_AVAILABLE is False
+    quiet = {"summary": {"voice_to_regenerate": []}}
+    changed = {"summary": {"voice_to_regenerate": ["suite"]}}
+    assert reedit_v2.voice_notice(quiet, True) == ("Coût : 0 € — rendu 2D local, aucun appel externe.", False)
+    for has_voice in (False, True):
+        message, consent = reedit_v2.voice_notice(changed, has_voice)
+        assert not consent and "aucun coût" in message and "Voix à régénérer" not in message
+    assert "PAS re-voisées" in reedit_v2.voice_notice(changed, True)[0]
 
 
 # -- interface (AppTest) ------------------------------------------------------------------------------------------

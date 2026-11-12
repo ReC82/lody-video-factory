@@ -79,6 +79,8 @@ def run(out: Path, model: Path, tts: list[str], renderer: str, preview: bool, ke
     config = work / "lody-demo-vide.toml"  # configuration vide : aucun fichier réel n'est lu
     config.write_text("", encoding="utf-8")
     os.environ.update({"LODY_DATA_DIR": str(data_dir), "LODY_CONFIG_PATH": str(config)})
+    # Démo DEV d'évaluation (#154/#156) : la licence Remotion n'est pas décidée, rien n'est publié.
+    os.environ.setdefault("LODY_REMOTION_EVALUATION", "1")
     shutil.copytree(ROOT / "resource" / "animation-assets", data_dir / "animation-assets", dirs_exist_ok=True)
 
     projects, assets = ProjectRepository(db), AnimationAssetRepository(db)

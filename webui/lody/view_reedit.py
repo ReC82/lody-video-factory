@@ -237,7 +237,7 @@ def _editor(service: ProductionService, production: Production, summary: scene_e
                     unsafe_allow_html=True)
 
 
-def _plan_panel(plan: dict[str, Any], needs_consent: bool, production: Production) -> None:
+def _plan_panel(plan: dict[str, Any], cost: str, needs_consent: bool, production: Production) -> None:
     summary = plan["summary"]
     st.markdown('<h2 class="composer-title">Plan de réédition — avant toute dépense</h2>', unsafe_allow_html=True)
     cols = st.columns(4)
@@ -257,10 +257,6 @@ def _plan_panel(plan: dict[str, Any], needs_consent: bool, production: Productio
     for entry in plan["removed"]:
         rows.append(f"<li>− Ancienne scène {entry['index']} retirée</li>")
     st.markdown(f'<ul class="scene-lines">{"".join(rows)}</ul>', unsafe_allow_html=True)
-    cost = ("Coût : 0 € — rendu 2D local, aucun appel externe." if not summary["voice_to_regenerate"] else
-            "Répliques modifiées : la voix off n’est pas encore produite par le rendu 2D (sous-titres mis à jour, "
-            "aucune synthèse, aucun coût)." if not needs_consent else
-            "Voix à régénérer : synthèse payante — jamais lancée sans ton accord ci-dessous.")
     st.markdown(f'<div class="banner banner-info" role="note">{esc(cost)}</div>', unsafe_allow_html=True)
     if needs_consent:
         st.checkbox("J’accepte que la voix des répliques modifiées soit régénérée (coût de synthèse vocale)",
@@ -335,8 +331,8 @@ def render_editor(service: ProductionService, project: Project, production: Prod
         st.markdown('<p class="muted-note">Aucune scène modifiée pour l’instant : choisis « Modifier cette scène ».</p>',
                     unsafe_allow_html=True)
     else:
-        needs_consent = bool(plan["summary"]["voice_to_regenerate"]) and reedit_v2.has_voice(service, parent)
-        _plan_panel(plan, needs_consent, production)
+        cost, needs_consent = reedit_v2.voice_notice(plan, reedit_v2.has_voice(service, parent))
+        _plan_panel(plan, cost, needs_consent, production)
         _preview_panel(service, production)
         report = service.preflight(production)
         consent = not needs_consent or bool(st.session_state.get(keys["consent"]))

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from lody.animation import audio, reedit
+from lody.animation import preflight as animation_preflight
 from lody.animation import worker as animation_worker
 from lody.generation.animation_connector import AnimationConnector
 from lody.generation.models import ExternalTask, ProductionStatus, ProviderError, RemoteState
@@ -30,6 +31,9 @@ from lody.generation.service import EDITABLE_STATUSES, LaunchError, ProductionSe
 from lody.generation.store import Production
 
 PREVIEW_SCALE = 0.5
+# #184 : la V2 ne re-voise PAS encore une réplique modifiée (voix réelle ElevenLabs du worker : #169, non fusionnée).
+# Tant que ce drapeau est faux, l'interface ne présente jamais une réplique modifiée comme réellement re-voisée.
+VOICE_REGENERATION_AVAILABLE = False
 THUMBS_DIR = ".thumbs"
 
 
@@ -84,6 +88,19 @@ def plan_for(service: ProductionService, draft: Production) -> dict[str, Any] | 
                        has_voice=has_voice(service, parent))
 
 
+def voice_notice(plan: dict[str, Any], has_parent_voice: bool) -> tuple[str, bool]:
+    """(message de coût/voix du plan, accord de synthèse requis ?) — jamais de « re-voisée » sans re-voisage réel."""
+    if not plan["summary"]["voice_to_regenerate"]:
+        return "Coût : 0 € — rendu 2D local, aucun appel externe.", False
+    if not has_parent_voice:
+        return ("Répliques modifiées : la voix off n’est pas encore produite par le rendu 2D (sous-titres mis à jour, "
+                "aucune synthèse, aucun coût)."), False
+    if not VOICE_REGENERATION_AVAILABLE:
+        return ("Répliques modifiées : elles ne sont PAS re-voisées dans cette version — la régénération de la voix "
+                "réelle n’est pas encore branchée (#169). Seuls les sous-titres changent ; aucune synthèse, aucun coût."), False
+    return "Voix à régénérer : synthèse payante — jamais lancée sans ton accord ci-dessous.", True
+
+
 # -- aperçu rapide --------------------------------------------------------------------------------------------
 def preview_key(draft: Production) -> str:
     sha = str((draft.animation.get("frozen") or {}).get("sha256") or "")[:16]
@@ -104,6 +121,10 @@ def start_preview(service: ProductionService, draft: Production) -> ExternalTask
     connector = connector_of(service, draft)
     if connector is None:
         raise LaunchError("L'aperçu rapide n'existe que pour le rendu 2D.")
+    # #156 : l'aperçu passe par le même moteur que la génération — même garde de licence Remotion, jamais contournée.
+    allowed, message = animation_preflight.license_allows_render()
+    if not allowed:
+        raise LaunchError(f"Aperçu impossible : {message}")
     request = request_of(draft)
     request = request.with_updates(animation={**(request.animation or {}), "preview_scale": PREVIEW_SCALE})
     try:

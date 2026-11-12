@@ -109,10 +109,13 @@ Pour une vidéo **animée** terminée (fournisseur Animation 2D) :
    expressions déclarés, versions existantes) ; « Annuler » ne change rien.
 4. **Plan de réédition avant dépense** : scènes réutilisées / à recalculer et pourquoi, temps de rendu estimé,
    temps évité (mesuré sur la V1), coût. Le rendu 2D est local : coût 0 €. Une réplique modifiée met à jour les
-   sous-titres ; si la V1 avait une voix enregistrée, une case d'accord explicite est exigée avant de générer
-   (la synthèse vocale est payante — elle n'est pas encore branchée au rendu 2D, voir #164).
+   **sous-titres seulement** : tant que la voix réelle du worker (#169) n'est pas fusionnée, l'écran l'annonce
+   explicitement comme **non re-voisée** (aucune synthèse, aucun coût, aucune case d'accord). Le drapeau
+   `reedit_v2.VOICE_REGENERATION_AVAILABLE` ne passera à vrai qu'avec #169 ; l'accord de coût sera alors exigé.
 5. **« Aperçu rapide »** : rendu ½ résolution du brouillon, sans créer de version ni rien confirmer (tâche
-   déterministe : relancé sans changement, il ne refait rien). Puis **« Générer la V2 »**.
+   déterministe : relancé sans changement, il ne refait rien). Puis **« Générer la V2 »**. L'aperçu et la
+   génération respectent la même garde de licence Remotion que le worker Docker #156 : sans
+   `LODY_REMOTION_LICENSE` ni `LODY_REMOTION_EVALUATION=1` (pilote DEV), ni l'un ni l'autre ne part (#184).
 6. Dans le suivi de la V2 : bloc **« Réédition et contrôle qualité »** — scènes réutilisées / recalculées, temps
    de rendu évité, contrôles qualité (`qa.json`), lecture **V1 et V2 côte à côte**, bouton « Revenir à la V1 ».
 
