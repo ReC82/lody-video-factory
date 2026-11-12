@@ -23,7 +23,7 @@ from typing import Any, Protocol
 
 from lody import brief as brief_lib
 from lody import catalog
-from lody import reference_images
+from lody import pronunciation, reference_images
 from lody.characters import CharacterRepository
 from lody.generation import kit_files, publication, thumbnail, typography
 from lody.animation import modes as render_modes
@@ -31,6 +31,7 @@ from lody.animation.assets import AnimationAssetRepository
 from lody.animation.contract import AnimationValidationError
 from lody.animation.freeze import freeze_document
 from lody.generation.costing import CostEstimate, PriceBook, estimate_cost, load_price_book
+from lody.pronunciation import PronunciationRepository
 from lody.generation.models import (
     ACTIVE_STATUSES,
     Capability,
@@ -120,7 +121,7 @@ def build_request(project: Project, subject: str, script: str = "") -> Generatio
     )
 
 
-_PER_RUN_FIELDS = ("subject", "script", "visual_prompts")  # propres à la production, pas au projet
+_PER_RUN_FIELDS = ("subject", "script", "visual_prompts", "spoken_script", "subtitle_script")  # propres à la production, pas au projet
 _PROJECT_ORIGIN = "projet"
 _ORIGIN_OF_RUN_FIELD = {"subject": "saisi par l’utilisateur", "script": "écrit par le moteur, ou fourni par l’utilisateur",
                         "visual_prompts": "dérivés du script par Lody"}
@@ -132,7 +133,8 @@ def project_part(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def make_snapshot(project: Project, request: GenerationRequest, captured_at: str, inherited_from: str | None = None,
-                   narrative_context: dict[str, Any] | None = None) -> dict[str, Any]:
+                   narrative_context: dict[str, Any] | None = None,
+                   pronunciation_lexicon: dict[str, Any] | None = None) -> dict[str, Any]:
     """Instantané IMMUABLE des paramètres du projet au moment de la préparation.
 
     Copie profonde (JSON) : aucun objet n'est partagé avec le projet ni avec une autre production. ``origins``
@@ -152,7 +154,10 @@ def make_snapshot(project: Project, request: GenerationRequest, captured_at: str
     origins.update({key: origin for key, origin in _ORIGIN_OF_RUN_FIELD.items() if key in data})
     return {"version": version, "captured_at": captured_at, "inherited_from": inherited_from,
             "project": {"id": project.id, "name": project.name, "updated_at": project.updated_at},
-            "request": data, "origins": origins, "narrative_context": copy.deepcopy(narrative_context) or {}}
+            "request": data, "origins": origins, "narrative_context": copy.deepcopy(narrative_context) or {},
+            # #162 : lexique de prononciation figé (entrées validées + formes encore à écouter) ; clé absente
+            # sans lexique applicable, pour un instantané identique à avant ce ticket.
+            **({"pronunciation": copy.deepcopy(pronunciation_lexicon)} if pronunciation_lexicon else {})}
 
 
 def request_of(production: Production) -> GenerationRequest:
@@ -198,7 +203,8 @@ class ProductionService:
                  executor: Executor, price_book: Callable[[], PriceBook] = load_price_book,
                  clock: Callable[[], str] = _now, character_repo: CharacterRepository | None = None,
                  location_repo: LocationRepository | None = None,
-                 animation_asset_repo: AnimationAssetRepository | None = None):
+                 animation_asset_repo: AnimationAssetRepository | None = None,
+                 pronunciation_repo: PronunciationRepository | None = None):
         self.repo = repo
         self._providers = providers
         self._executor = executor
@@ -210,6 +216,9 @@ class ProductionService:
         self._location_repo = location_repo
         # #120 : catalogue d'assets 2D, pour figer le storyboard animé d'une production (mode Animation 2D/Hybride).
         self._animation_asset_repo = animation_asset_repo
+        # #162 : lexique de prononciation du projet, figé dans l'instantané à la préparation. Sans lui : aucune
+        # substitution, aucun contrôle (comportement d'avant #162).
+        self._pronunciation_repo = pronunciation_repo
         self._inflight: set[str] = set()
         self._lock = threading.Lock()
 
@@ -337,7 +346,9 @@ class ProductionService:
             "storyboard": [], "visual_prompts": [], "current_step": "En attente de confirmation",
             "error_code": "", "error_message": "", "trace": {},
             "snapshot": make_snapshot(project, request, self._clock(), inherited_from=retry_of,
-                                      narrative_context=narrative_context), **cost,
+                                      narrative_context=narrative_context,
+                                      pronunciation_lexicon=self._freeze_pronunciation(
+                                          project.id, request.language, narrative_context)), **cost,
         }
         if frozen_animation:
             fields["animation"] = frozen_animation
@@ -353,6 +364,24 @@ class ProductionService:
         return self.repo.create(project_id=project.id, subject=text, provider=provider_id,
                                 status=ProductionStatus.EN_ATTENTE_CONFIRMATION,
                                 parent_production_id=retry_of, **fields)
+
+    def _freeze_pronunciation(self, project_id: str, language: str,
+                              narrative_context: dict[str, Any] | None) -> dict[str, Any]:
+        """Entrées du lexique applicables à CETTE production (langue + personnage de référence, même règle que
+        la voix #70), figées : une validation ou une modification ultérieure ne change jamais une production
+        déjà préparée. ``{}`` sans dépôt ou sans entrée applicable."""
+        if self._pronunciation_repo is None:
+            return {}
+        character = reference_character(narrative_context) or {}
+        frozen = pronunciation.snapshot(self._pronunciation_repo.list_for_project(project_id), language,
+                                        str(character.get("id") or ""))
+        return frozen if frozen["entries"] or frozen["pending"] else {}
+
+    @staticmethod
+    def pronunciation_audit(production: Production, script: str | None = None) -> pronunciation.EditorialAudit:
+        """Contrôle éditorial (#162) du script de cette production, sur son lexique FIGÉ — sans appel réseau."""
+        text = production.script if script is None else script
+        return pronunciation.audit_snapshot(text, production.snapshot.get("pronunciation"))
 
     def _freeze_animation(self, project_id: str, raw: Any) -> dict[str, Any]:
         """Fige un storyboard animé dans le catalogue du projet (#119/#120), ou lève ``InvalidInput`` lisible."""
@@ -400,7 +429,16 @@ class ProductionService:
         scenes = build_storyboard(text, self._scene_count(provider, request), visual_style=request.visual_style,
                                   aspect=request.aspect, narration_pace=request.narration_pace,
                                   visual_rules=request.visual_rules, visual_avoid=request.visual_avoid)
+        # #162 : une V2 reprend le lexique de prononciation ACTUEL du projet (corriger une prononciation après
+        # écoute est justement une raison de faire une V2) ; le reste de l'instantané hérité est inchangé.
+        snapshot = dict(draft.snapshot)
+        frozen_pronunciation = self._freeze_pronunciation(draft.project_id, request.language,
+                                                          draft.snapshot.get("narrative_context"))
+        snapshot.pop("pronunciation", None)
+        if frozen_pronunciation:
+            snapshot["pronunciation"] = frozen_pronunciation
         fields = {
+            "snapshot": snapshot,
             "script": text, "script_source": "previous" if text == parent.script.strip() else "manual",
             "params": {"request": stored_request(request), "engine": provider.describe_params(request)},
             "storyboard": [scene.to_dict() for scene in scenes],
@@ -455,6 +493,12 @@ class ProductionService:
         if not report.ready:  # rien n'est enregistré ni lancé : la production reste en attente de confirmation
             raise LaunchError("La génération ne peut pas partir : la configuration de production est incomplète.",
                               report.to_issues())
+        # #162 : aucun MP4 tant qu'une expression du script n'a pas été écoutée et validée.
+        if production.script:
+            audit = self.pronunciation_audit(production)
+            if audit.blocking:
+                raise LaunchError(audit.messages()[0][0], [ReadinessIssue("pronunciation_pending", text, blocking)
+                                                           for text, blocking in audit.messages()])
         for other in self.repo.active_for_project(production.project_id):
             if other.id != production.id:
                 raise AlreadyRunning("Une génération est déjà en cours pour ce projet : attends sa fin avant d’en lancer une autre.", other.id)
@@ -564,6 +608,18 @@ class ProductionService:
             if clean_script != request.script:
                 request = request.with_updates(script=clean_script)
                 self.repo.update(production_id, script=clean_script)
+            # #162 : même frontière qu'à la confirmation, sur le script FINAL (il peut avoir été écrit par le
+            # moteur après la confirmation) ; puis la voix reçoit la lecture validée, l'écran la forme exacte.
+            frozen_pronunciation = production.snapshot.get("pronunciation")
+            if frozen_pronunciation:
+                audit = pronunciation.audit_snapshot(request.script, frozen_pronunciation)
+                if audit.blocking:
+                    raise ProviderError(ErrorKind.REJECTED, audit.messages()[0][0], stage="script")
+                rendering = pronunciation.render_snapshot(request.script, frozen_pronunciation)
+                if rendering.applied:
+                    request = request.with_updates(
+                        spoken_script=rendering.spoken,
+                        subtitle_script=rendering.subtitle if rendering.subtitle != request.script else "")
             # #37 : enrichit les prompts d'image des scènes déjà construites (mêmes scènes, même narration,
             # même nombre — donc même estimation de coût) avec la continuité visuelle du snapshot. "" sans
             # sélection ou snapshot antérieur à #35 : storyboard/prompts strictement inchangés (voir docstring).
@@ -700,7 +756,11 @@ class ProductionService:
             {"item": "Langue, format, durée", "origin": "projet"},
         ]
         ref_character_info = reference_character(production.snapshot.get("narrative_context")) or {}
-        return {"recorded_at": self._clock(), "project": production.snapshot.get("project", {}),
+        # #162 : texte RÉELLEMENT envoyé à la voix quand le lexique validé s'applique (diagnostic d'écoute).
+        spoken_detail = ({"pronunciation": {"spoken_script": request.spoken_script,
+                                            "subtitle_script": request.subtitle_script or request.script}}
+                         if request.spoken_script else {})
+        return {**spoken_detail, "recorded_at": self._clock(), "project": production.snapshot.get("project", {}),
                 "snapshot_version": production.snapshot.get("version", ""), "script_request": script_request,
                 "scenes": detail.get("scenes", []), "image_template": engine_template,
                 # #92 : modèle d'images réellement utilisé (ex. "gpt-image-2"), pour l'export #91 — jamais

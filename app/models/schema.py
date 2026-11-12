@@ -105,6 +105,9 @@ class VideoParams(BaseModel):
 
     video_subject: str
     video_script: str = ""  # Script used to generate the video
+    # Lody #162: optional text read by the voice only (validated pronunciation lexicon, e.g. "SDI" read as
+    # "èss-dé-i"); subtitles keep ``video_script``. Empty (default) = historical behaviour, unchanged.
+    video_script_spoken: str = ""
     video_terms: Optional[str | list] = None  # Keywords used to generate the video
     video_aspect: Optional[VideoAspect] = VideoAspect.portrait.value
     video_fit_mode: VideoFitMode = VideoFitMode.cover

@@ -15,6 +15,7 @@ from lody.generation.service import ProductionService
 from lody.generation.store import ProductionRepository
 from lody.locations import LocationRepository
 from lody.projects import ProjectRepository
+from lody.pronunciation import PronunciationRepository
 
 logger = logging.getLogger("lody.runtime")
 
@@ -41,7 +42,8 @@ def build_service() -> ProductionService:
     service = ProductionService(repo, providers, ThreadPoolExecutor(max_workers=2, thread_name_prefix="lody-production"),
                                 character_repo=CharacterRepository(settings.db_path()),
                                 location_repo=LocationRepository(settings.db_path()),
-                                animation_asset_repo=AnimationAssetRepository(settings.db_path()))
+                                animation_asset_repo=AnimationAssetRepository(settings.db_path()),
+                                pronunciation_repo=PronunciationRepository(settings.db_path()))
     try:
         service.resume_active()
     except Exception as error:  # le démarrage de l'interface ne doit jamais dépendre du moteur

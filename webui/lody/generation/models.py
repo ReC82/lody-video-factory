@@ -124,6 +124,11 @@ class GenerationRequest:
     # production classique a EXACTEMENT la même demande, le même instantané et la même empreinte qu'avant #120.
     render_mode: str = "classique"
     animation: dict[str, Any] = field(default_factory=dict)
+    # #162 : rendu du script par le lexique de prononciation VALIDÉ du projet (voir ``lody.pronunciation``) —
+    # ``spoken_script`` part à la voix, ``subtitle_script`` à l'écran. Vides (et absents de ``to_dict``) tant
+    # qu'aucune entrée validée ne s'applique : demande, instantané et payload strictement inchangés sinon.
+    spoken_script: str = ""
+    subtitle_script: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -131,6 +136,9 @@ class GenerationRequest:
             data.pop("render_mode")
         if not data.get("animation"):
             data.pop("animation")
+        for key in ("spoken_script", "subtitle_script"):
+            if not data.get(key):
+                data.pop(key)
         data["structure"] = list(self.structure)
         data["visual_prompts"] = list(self.visual_prompts)
         data["visual_avoid"] = list(self.visual_avoid)

@@ -7,7 +7,7 @@ import logging
 import streamlit as st
 
 from lody import nav, settings
-from lody import view_characters, view_form, view_home, view_locations, view_production, view_project, view_settings, \
+from lody import view_characters, view_form, view_home, view_locations, view_production, view_project, view_pronunciation, view_settings, \
     view_system_settings, view_tracking, view_v2
 from lody.characters import CharacterRepository
 from lody.generation.kit_service import KitService
@@ -16,6 +16,7 @@ from lody.generation.service import ProductionService
 from lody.components import accent_for, render_flash, render_footer, render_header
 from lody.locations import LocationRepository
 from lody.projects import ProjectNotFound, ProjectRepository
+from lody.pronunciation import PronunciationRepository
 from lody.seeds import SEED_PROJECTS
 from lody.theme import DEFAULT_ACCENT, inject_theme
 
@@ -53,6 +54,12 @@ def get_character_repository() -> CharacterRepository:
 def get_location_repository() -> LocationRepository:
     """Lieux récurrents (#31/#33) : facultatifs, jamais lus par le pipeline de génération."""
     return LocationRepository(settings.db_path())
+
+
+@st.cache_resource(show_spinner=False)
+def get_pronunciation_repository() -> PronunciationRepository:
+    """Lexique de prononciation des projets (#162), figé dans chaque production à sa préparation."""
+    return PronunciationRepository(settings.db_path())
 
 
 def _render_storage_error() -> None:
@@ -107,6 +114,8 @@ def render() -> None:
     elif route.view == nav.VIEW_SETTINGS and project:
         view_settings.render(repo, project, service.option_states(project, DEFAULT_PROVIDER),
                              get_character_repository(), get_location_repository())
+        view_pronunciation.render(get_pronunciation_repository(), service, project,
+                                  get_character_repository().list_for_project(project.id, include_inactive=False))
     elif route.view == nav.VIEW_PRODUCTION and project:
         view_production.render(project, service, get_character_repository(), get_location_repository())
     elif route.view == nav.VIEW_TRACK and project and route.production_id:

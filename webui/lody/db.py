@@ -267,6 +267,30 @@ def _animation(connection: sqlite3.Connection) -> None:
     _add_columns(connection, "productions", {"animation": "TEXT NOT NULL DEFAULT '{}'"})
 
 
+# Lexique de prononciation (#162) : comment la VOIX lit une expression (SDI, HDMI, 3G-SDI), sans jamais changer
+# les sous-titres. Portée par projet (langue et personnage facultatifs, '' = tous). ``validated_at`` vide = pas
+# encore écoutée : jamais appliquée en production (voir ``lody.pronunciation``). Table nouvelle : aucune donnée
+# existante n'est touchée.
+PRONUNCIATION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS pronunciation_lexicon (
+    id             TEXT PRIMARY KEY,
+    project_id     TEXT NOT NULL REFERENCES projects (id),
+    written        TEXT NOT NULL,
+    spoken         TEXT NOT NULL,
+    phonetic       TEXT NOT NULL DEFAULT '',
+    subtitle       TEXT NOT NULL DEFAULT '',
+    language       TEXT NOT NULL DEFAULT '',
+    character_id   TEXT NOT NULL DEFAULT '',
+    notes          TEXT NOT NULL DEFAULT '',
+    validated_at   TEXT NOT NULL DEFAULT '',
+    validated_with TEXT NOT NULL DEFAULT '',
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pronunciation_project ON pronunciation_lexicon (project_id, written);
+"""
+
+
 MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (1, PROJECTS_SCHEMA),
     (2, PRODUCTIONS_SCHEMA),
@@ -277,6 +301,7 @@ MIGRATIONS: tuple[tuple[int, Any], ...] = (
     (7, _voice_direction),
     (8, _production_templates),
     (9, _animation),
+    (10, PRONUNCIATION_SCHEMA),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 
