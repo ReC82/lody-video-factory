@@ -1,94 +1,70 @@
 name: CI
 
+# #198 : CI ciblée par PR. Résumé (détail et tableau « quel changement déclenche quoi » :
+# docs/ci-tests-cibles.md) :
+# - le job « Detect code changes » classe les fichiers de la PR avec scripts/ci/select_tests.py
+#   (testé par test/lody/test_ci_workflow.py) : docs / ciblé (interface Lody, orchestrateur) / complet ;
+#   tout fichier non reconnu, un diff illisible ou vide donne la suite COMPLÈTE ;
+# - sur PR, un seul job de tests en Python 3.12, version de production (Dockerfile.lody) ;
+# - push sur main, programmation hebdomadaire et lancement manuel : suite complète en 3.11, 3.12 et 3.13 ;
+# - le job « CI result » agrège tout : c'est LE check à exiger pour fusionner (#193). Il échoue si un job
+#   nécessaire échoue ou est annulé, et ne peut pas être vert si la classification a échoué.
+# Retour arrière : restaurer ce fichier depuis l'historique (git checkout <sha> -- .github/workflows/ci.yml).
+
 on:
   pull_request:
   push:
     branches:
       - main
+  schedule:
+    # Suite complète hebdomadaire (lundi 03:17 UTC) sur main, même sans nouveau commit.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  # Un nouveau push sur une PR annule le run précédent devenu inutile ; jamais sur main.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  # #127 : une PR purement documentaire (fichiers .md hors deploy/, .github/, app/, webui/, test/) ne
-  # relance pas la matrice complète : seul le job « docs-checks » tourne, avec les tests qui lisent la
-  # documentation (index, liens, espace de noms…). Les jobs complets sont alors « skipped », ce que
-  # GitHub compte comme réussi pour les vérifications requises. Tout autre fichier déclenche le
-  # pipeline complet, comme avant ; un push sur main le déclenche toujours.
   changes:
     name: Detect code changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      code: ${{ steps.diff.outputs.code }}
+      mode: ${{ steps.select.outputs.mode }}
+      tests: ${{ steps.select.outputs.tests }}
+      pythons: ${{ steps.select.outputs.pythons }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Classify changed files
-        id: diff
+      - name: Select tests from changed files
+        id: select
         env:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "$EVENT" != "pull_request" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          if ! files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA"); then
-            echo "Diff impossible : pipeline complet."; echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          echo "$files"
-          code=$(printf '%s\n' "$files" | grep -Ev '^([^/]+\.md|docs/.*\.md)$' | grep -c . || true)
-          if [ -z "$files" ] || [ "$code" != "0" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Modification purement documentaire : tests non relancés."
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  docs-checks:
-    name: Documentation checks
-    needs: changes
-    if: needs.changes.outputs.code == 'false'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --frozen --python 3.11
-
-      - name: Run tests that read the documentation
-        run: |
-          tests=$(grep -rlE 'docs/|README|\.md\b|"docs"' test --include='test_*.py' | sort)
-          echo "$tests"
-          uv run --no-sync python -X utf8 -m pytest -q $tests
+          python3 scripts/ci/select_tests.py --event "$EVENT" --base "$BASE_SHA" --head "$HEAD_SHA" \
+            --github-output "$GITHUB_OUTPUT" | tee selection.txt
+          { echo '### Sélection des tests (#198)'; echo '```'; cat selection.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   tests:
     name: Python ${{ matrix.python-version }} tests
     needs: changes
-    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.13"]
+        python-version: ${{ fromJSON(needs.changes.outputs.pythons) }}
 
     services:
       redis:
@@ -105,6 +81,8 @@ jobs:
       MPT_TEST_REDIS_HOST: 127.0.0.1
       MPT_TEST_REDIS_PORT: 6379
       MPT_TEST_REDIS_DB: 15
+      MODE: ${{ needs.changes.outputs.mode }}
+      TESTS: ${{ needs.changes.outputs.tests }}
 
     steps:
       - name: Check out repository
@@ -123,25 +101,37 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --python ${{ matrix.python-version }}
 
+      # Compilation et lint portent TOUJOURS sur tout le dépôt (≈ 1 s) : une PR ciblée ne peut pas casser
+      # la syntaxe ou le style d'un autre module sans être vue.
       - name: Compile Python sources
-        run: uv run --no-sync python -m compileall app cli.py main.py webui test
+        run: uv run --no-sync python -m compileall -q app cli.py main.py webui test scripts/ci
 
       - name: Lint Python sources
-        if: matrix.python-version == '3.11'
-        run: uv run --no-sync ruff check app cli.py main.py webui test
+        if: matrix.python-version == '3.12'
+        run: uv run --no-sync ruff check app cli.py main.py webui test scripts/ci
 
-      - name: Run unit tests with coverage
-        # pytest 兼容现有 unittest.TestCase，同时会收集仓库中的 pytest 风格
-        # 测试，避免测试文件已存在但 CI 没有真正执行。
-        run: uv run --no-sync python -X utf8 -m coverage run -m pytest -q test
+      # Suites ciblées en parallèle borné (pytest-xdist, au plus 4 processus = vCPU d'un runner standard) :
+      # test/lody et test/lodyorch ont été vérifiés sans conflit sous xdist (#198, docs/ci-tests-cibles.md).
+      - name: Run selected tests (${{ needs.changes.outputs.mode }})
+        if: needs.changes.outputs.mode != 'full'
+        run: uv run --no-sync python -X utf8 -m pytest -q -n auto --maxprocesses 4 --durations=15 $TESTS
+
+      # Suite complète : en série, couverture et seuil fail_under (pyproject.toml) conservés. Pas de xdist ici :
+      # test/services partage une base Redis de test et n'a pas été vérifié en parallèle.
+      - name: Run full test suite with coverage
+        if: needs.changes.outputs.mode == 'full'
+        run: uv run --no-sync python -X utf8 -m coverage run -m pytest -q --durations=15 test
 
       - name: Report test coverage
+        if: needs.changes.outputs.mode == 'full'
         run: uv run --no-sync python -m coverage report
 
       - name: Export coverage report
+        if: needs.changes.outputs.mode == 'full'
         run: uv run --no-sync python -m coverage xml
 
       - name: Upload coverage report
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-python-${{ matrix.python-version }}
@@ -151,7 +141,7 @@ jobs:
   windows-smoke:
     name: Windows smoke tests
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.mode == 'full'
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -162,7 +152,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -170,10 +160,10 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen --python 3.11
+        run: uv sync --frozen --python 3.12
 
       - name: Compile Python sources
-        run: uv run --no-sync python -m compileall app cli.py main.py webui test
+        run: uv run --no-sync python -m compileall -q app cli.py main.py webui test
 
       - name: Run core service smoke tests
         run: >-
@@ -187,3 +177,31 @@ jobs:
           test/services/test_webui_task.py
           test/services/test_audio_assets.py
           test/services/test_controller_audio_assets.py
+
+  # Check unique à rendre obligatoire (protection de branche, fusion automatique #193). Il tourne même si
+  # un job a échoué ou a été sauté, et n'est vert que si : la classification a réussi, les tests ont
+  # réussi, et le smoke Windows a réussi (ou a été sauté parce que la PR est ciblée).
+  ci-result:
+    name: CI result
+    needs: [changes, tests, windows-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check required jobs
+        env:
+          MODE: ${{ needs.changes.outputs.mode }}
+          CHANGES: ${{ needs.changes.result }}
+          TESTS: ${{ needs.tests.result }}
+          WINDOWS: ${{ needs.windows-smoke.result }}
+        run: |
+          echo "mode=$MODE changes=$CHANGES tests=$TESTS windows-smoke=$WINDOWS"
+          case "$MODE" in docs|targeted|full) ;; *) echo "Classification absente ou invalide."; exit 1 ;; esac
+          [ "$CHANGES" = success ] || { echo "Classification en échec."; exit 1; }
+          [ "$TESTS" = success ] || { echo "Tests en échec ou non lancés."; exit 1; }
+          if [ "$MODE" = full ]; then
+            [ "$WINDOWS" = success ] || { echo "Smoke Windows en échec ou non lancé."; exit 1; }
+          else
+            [ "$WINDOWS" = skipped ] || { echo "Smoke Windows inattendu : $WINDOWS."; exit 1; }
+          fi
+          echo "CI verte pour le mode $MODE."
