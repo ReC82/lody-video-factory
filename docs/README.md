@@ -51,6 +51,11 @@ ainsi que l'existence des fichiers liés.
 - [Authentification administrateur](lody-auth.md) — authentification qui protège la page
   « Paramètres système » et le remplacement des clés d'API depuis l'interface.
 
+## Intégration continue
+
+- [CI ciblée par PR](lody-ci.md) — quel changement déclenche quels tests, Python 3.12, check
+  obligatoire « CI result », parallélisme borné, mesures avant/après et recette (#198).
+
 ## Orchestrateur
 
 - [LODYORCH](lodyorch.md) — orchestrateur autonome qui traite un ticket GitHub à la fois et
