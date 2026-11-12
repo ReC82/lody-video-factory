@@ -60,7 +60,7 @@ uv run --no-sync python -m pytest -q test/lody/test_animation_soundtrack.py test
 ## Limites
 
 - **Licence Remotion** à trancher par le propriétaire avant tout usage en production (voir #118).
-- Pas encore d'image Docker du worker (Node 22, Chrome headless, polices figées) : le moteur n'est pas déployé.
+- Image Docker du worker et pilote DEV : [lody-animation-worker-docker.md](lody-animation-worker-docker.md) (#154) ; non déployée.
 - Voix et musique de la démo strictement provisoires ; rig Voltix v1 non validé visuellement.
 - La TTS n'est pas encore branchée dans le fournisseur : la démo dépose `voice.wav` elle-même.
 

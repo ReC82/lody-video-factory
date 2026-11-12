@@ -1,0 +1,66 @@
+name: Worker 2D
+
+# #154 : construit l'image DEV du worker 2D Remotion (au-dessus de l'image Lody), vérifie son préflight sous les
+# plafonds du pilote (1,5 CPU, 1,8 Go, système de fichiers en lecture seule) puis lance UN rendu 2D complet
+# (une scène de la démo Voltix #150) par la vraie chaîne. Rien n'est publié : aucune connexion à un registre,
+# aucun secret, aucune licence Remotion supposée (évaluation explicite, LODY_REMOTION_EVALUATION=1).
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile.lody
+      - Dockerfile.lody.dockerignore
+      - Dockerfile.lody-2d
+      - Dockerfile.lody-2d.dockerignore
+      - docker-compose.lody-dev-2d.yml
+      - requirements.lody.txt
+      - renderers/remotion/**
+      - webui/lody/animation/**
+      - webui/lody/generation/animation_connector.py
+      - test/lody/test_animation_2d_render.py
+      - .github/workflows/worker-2d.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-2d:
+    name: Build worker 2D image and render
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Lody base image (unchanged production Dockerfile)
+        run: docker build -f Dockerfile.lody -t lody-video-factory:local .
+
+      - name: Build worker 2D image
+        run: docker build -f Dockerfile.lody-2d -t lody-video-factory-2d:local .
+
+      - name: Preflight under pilot limits (read-only, 1.5 CPU, 1.8 GB)
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:size=1g --tmpfs /home/lody:size=64m,uid=10001,gid=10001 \
+            --cpus 1.5 --memory 1800m --memory-swap 1800m --pids-limit 256 \
+            --cap-drop ALL --security-opt no-new-privileges:true --network none \
+            -e PYTHONPATH=/MoneyPrinterTurbo:/MoneyPrinterTurbo/webui -e LODY_REMOTION_EVALUATION=1 \
+            -e LODY_DATA_DIR=/tmp/data \
+            lody-video-factory-2d:local python -m lody.animation.preflight
+
+      - name: Renderer unit tests (node --test)
+        run: |
+          docker run --rm --network none -w /MoneyPrinterTurbo/renderers/remotion lody-video-factory-2d:local \
+            sh -c "node --test test/*.test.mjs"
+
+      - name: Full 2D render through provider, worker and Remotion (no network)
+        run: |
+          # pytest n'est pas dans l'image : installé dans un conteneur jetable dérivé, réseau coupé au rendu.
+          printf 'FROM lody-video-factory-2d:local\nUSER root\nRUN pip install --no-cache-dir pytest==9.1.1\nUSER lody\n' \
+            | docker build -t lody-2d-test:local -
+          docker run --rm --read-only --tmpfs /tmp:size=1g --tmpfs /home/lody:size=64m,uid=10001,gid=10001 \
+            --cpus 1.5 --memory 1800m --memory-swap 1800m --pids-limit 256 \
+            --cap-drop ALL --security-opt no-new-privileges:true --network none \
+            -e PYTHONPATH=/MoneyPrinterTurbo:/MoneyPrinterTurbo/webui -e PYTHONDONTWRITEBYTECODE=1 \
+            -e LODY_CONFIG_PATH=/tmp/absent.toml -e LODY_REQUIRE_2D_RENDER=1 \
+            lody-2d-test:local python -X utf8 -m pytest -q -p no:cacheprovider test/lody/test_animation_2d_render.py

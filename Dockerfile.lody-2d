@@ -1,0 +1,58 @@
+# Worker 2D Remotion de Lody (#154) — image de DEV, construite AU-DESSUS de l'image Lody, jamais publiée.
+#
+#   docker build -f Dockerfile.lody -t lody-video-factory:local .
+#   docker build -f Dockerfile.lody-2d -t lody-video-factory-2d:local .
+#
+# L'image Lody de production (Dockerfile.lody) n'est pas modifiée : cette image ajoute seulement Node, le moteur
+# de scène renderers/remotion (#150), Chrome headless et ses bibliothèques. Usage et limites :
+# docs/lody-animation-worker-docker.md. Licence Remotion : à décider par le propriétaire avant tout usage hors
+# évaluation (voir LODY_REMOTION_LICENSE ci-dessous) — l'image ne la suppose jamais gratuite.
+#
+# Reproductibilité :
+#   - Node : image officielle épinglée par version ET empreinte ;
+#   - dépendances npm : `npm ci` depuis renderers/remotion/package-lock.json (versions exactes + intégrité) ;
+#   - Chrome headless shell : version fixée par @remotion/renderer (TESTED_VERSION), téléchargée au build ;
+#   - bundle webpack préconstruit : aucun téléchargement ni écriture dans l'image au moment du rendu.
+ARG LODY_BASE_IMAGE=lody-video-factory:local
+ARG NODE_IMAGE=node:22.23.0-trixie-slim@sha256:cfd8f2a5bc50526aee08e88970979f92722828e7dcc6d8983607fb8bff4bdb82
+
+FROM ${NODE_IMAGE} AS node
+
+FROM ${LODY_BASE_IMAGE}
+
+USER root
+# Bibliothèques demandées par Chrome headless shell (liste Remotion « Linux dependencies », noms Debian 13)
+# + polices : Noto pour les accents et symboles (Ω), emoji absents volontairement.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libnss3 libdbus-1-3 libatk1.0-0t64 libatk-bridge2.0-0t64 libgbm1 libasound2t64 libxrandr2 \
+        libxkbcommon0 libxfixes3 libxcomposite1 libxdamage1 libpango-1.0-0 libcairo2 libcups2t64 \
+        fonts-noto-core ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && node --version && npm --version
+
+WORKDIR /MoneyPrinterTurbo/renderers/remotion
+COPY renderers/remotion/package.json renderers/remotion/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund \
+    && npm cache clean --force
+COPY renderers/remotion/bin ./bin
+COPY renderers/remotion/lib ./lib
+COPY renderers/remotion/src ./src
+COPY renderers/remotion/test ./test
+# Chrome headless (dans node_modules/.remotion) et bundle (.bundle/<empreinte>) préparés ici, une fois pour
+# toutes : à l'exécution le moteur ne télécharge rien et n'écrit que dans le dossier de la tâche.
+RUN node bin/lody-remotion.mjs --prepare \
+    && chmod -R a+rX /MoneyPrinterTurbo/renderers/remotion
+
+WORKDIR /MoneyPrinterTurbo
+# Storyboard de la démo Voltix #150, proposé par l'atelier 2D (assets : resource/animation-assets, déjà copiés).
+COPY docs/animation/voltix-150/storyboard.json ./docs/animation/voltix-150/storyboard.json
+ENV LODY_ANIMATION_RENDERER="node /MoneyPrinterTurbo/renderers/remotion/bin/lody-remotion.mjs" \
+    LODY_REMOTION_LICENSE="" \
+    LODY_2D_WORKER_IMAGE="1"
+USER lody

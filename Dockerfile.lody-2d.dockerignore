@@ -1,0 +1,24 @@
+# Contexte de build de Dockerfile.lody-2d (#154) : celui de Dockerfile.lody, plus le moteur Remotion sans ses
+# modules locaux, et le seul storyboard de la démo #150 (atelier 2D). Jamais de secret ni de données.
+.git
+.github
+.gitignore
+config.toml
+config.toml.rollback
+secrets
+storage
+data
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+docs
+README*.md
+uv.lock
+webui.bat
+webui.sh
+engine-report
+!docs/animation/voltix-150/storyboard.json
+renderers/remotion/node_modules
+renderers/remotion/.bundle
+renderers/remotion/out

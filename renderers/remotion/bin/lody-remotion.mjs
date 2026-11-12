@@ -3,6 +3,7 @@
 //
 //   lody-remotion --input scenes/NN-input.json --output scenes/NN.render.mp4
 //   lody-remotion --input scenes/NN-input.json --still <image> --output scenes/NN-still.png
+//   lody-remotion --prepare      (image Docker #154 : télécharge Chrome headless et préconstruit le bundle)
 //
 // Rendu sobre pour un hôte partagé : une page Chrome à la fois (concurrence 1), bundle webpack construit une
 // seule fois et réutilisé (`.bundle/<empreinte des sources>`), H.264 yuv420p sans audio (le worker assemble
@@ -18,6 +19,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const COMPOSITION = 'LodyScene';
 
 function parseArgs(argv) {
+  if (argv.length === 1 && argv[0] === '--prepare') return {prepare: true};
   const args = {};
   for (let i = 0; i < argv.length; i += 2) {
     const key = argv[i];
@@ -67,15 +69,25 @@ async function ensureBundle() {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args) {
-    console.error('usage : lody-remotion --input <scène.json> [--still <image>] --output <fichier>');
+    console.error('usage : lody-remotion --input <scène.json> [--still <image>] --output <fichier> | --prepare');
     return 2;
   }
-  const props = buildProps(path.resolve(args.input));
+  // Chemins résolus AVANT de changer de dossier : le worker lance le moteur depuis le dossier de la tâche.
+  const input = args.prepare ? null : path.resolve(args.input);
+  const output = args.prepare ? null : path.resolve(args.output);
+  // Remotion range Chrome headless dans `node_modules/.remotion` du package.json le plus proche du dossier
+  // COURANT : depuis le dossier d'une tâche, il le retéléchargerait (~100 Mo) à chaque rendu (#154).
+  process.chdir(ROOT);
   const {ensureBrowser, renderMedia, renderStill, selectComposition} = await import('@remotion/renderer');
+  if (args.prepare) {
+    await ensureBrowser();
+    console.log(`moteur prêt : bundle ${path.relative(ROOT, await ensureBundle())}`);
+    return 0;
+  }
+  const props = buildProps(input);
   await ensureBrowser();
   const serveUrl = await ensureBundle();
   const composition = await selectComposition({serveUrl, id: COMPOSITION, inputProps: props, logLevel: 'error'});
-  const output = path.resolve(args.output);
   const started = Date.now();
   if (args.still !== undefined) {
     const frame = Math.min(Number(args.still), composition.durationInFrames - 1);
