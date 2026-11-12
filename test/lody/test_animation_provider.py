@@ -40,6 +40,13 @@ FAKE_VALUE = "FAKE-APP-VALUE-NOT-A-KEY"
 
 
 # -- fixtures ----------------------------------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _remotion_evaluation(monkeypatch):
+    """#154 : licence Remotion non décidée → rendu permis seulement en évaluation DEV explicite."""
+    monkeypatch.delenv("LODY_REMOTION_LICENSE", raising=False)
+    monkeypatch.setenv("LODY_REMOTION_EVALUATION", "1")
+
+
 def _file(root: Path, relative: str, content: bytes | None = None) -> dict:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -193,6 +200,20 @@ def test_preflight_explains_what_is_missing_with_the_setting_to_fix(world):
     ready = world.connector.preflight(world.request(project, storyboard))
     assert ready.ready, [(i.capability, i.message) for i in ready.blocking]
     assert ready.get(Capability.VOICE).state is CapabilityState.DISABLED  # annoncé : vidéo muette, pas caché
+
+
+def test_preflight_never_assumes_a_free_remotion_license(world, monkeypatch):
+    project = world.project("Licence")
+    request = world.request(project, world.storyboard(project.id, "lic"))
+    monkeypatch.delenv("LODY_REMOTION_EVALUATION")
+    engine = world.connector.preflight(request).get(Capability.ENGINE)
+    assert engine.state is CapabilityState.UNAVAILABLE and engine.fix == "platform"
+    assert "propriétaire" in engine.message and "LODY_REMOTION_LICENSE" in engine.admin
+    monkeypatch.setenv("LODY_REMOTION_LICENSE", "company:commande-2026-001")
+    engine = world.connector.preflight(request).get(Capability.ENGINE)
+    assert engine.state is CapabilityState.READY and "licence entreprise" in engine.message
+    monkeypatch.setenv("LODY_REMOTION_LICENSE", "gratuit")  # forme inconnue : jamais interprétée comme accord
+    assert world.connector.preflight(request).get(Capability.ENGINE).state is CapabilityState.UNAVAILABLE
 
 
 def test_preflight_detects_a_modified_asset_file(world):

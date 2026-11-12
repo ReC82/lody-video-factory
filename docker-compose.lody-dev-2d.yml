@@ -1,0 +1,81 @@
+# Lody — pilote DEV du rendu Animation 2D (#154). JAMAIS la production.
+#
+# Instance Lody séparée, dédiée à l'essai du worker 2D Remotion :
+#   - projet Compose, conteneur, image, volume et port distincts de docker-compose.lody.yml
+#     (la production n'est ni modifiée, ni arrêtée, ni redémarrée par ce fichier) ;
+#   - AUCUN config.toml, AUCUN secrets/, aucun storage/ du moteur, pas de réseau du moteur historique :
+#     ce pilote ne peut appeler aucun fournisseur payant et ne voit aucun autre projet ;
+#   - ressources plafonnées pour un petit hôte (1,5 CPU, 1,8 Go, 256 processus), système de fichiers en
+#     lecture seule sauf /data (volume du pilote) et /tmp (tmpfs) ;
+#   - journaux Docker tournants (3 × 10 Mo).
+#
+# Usage (voir docs/lody-animation-worker-docker.md) :
+#   docker build -f Dockerfile.lody -t lody-video-factory:local .
+#   docker compose -f docker-compose.lody-dev-2d.yml build
+#   docker compose -f docker-compose.lody-dev-2d.yml run --rm lody-dev-2d python -m lody.animation.preflight
+#   docker compose -f docker-compose.lody-dev-2d.yml up -d        # http://127.0.0.1:8611 (tunnel SSH)
+#   docker compose -f docker-compose.lody-dev-2d.yml down         # garde le volume du pilote
+
+name: lody-dev-2d
+
+services:
+  lody-dev-2d:
+    build:
+      context: .
+      dockerfile: Dockerfile.lody-2d
+      args:
+        LODY_BASE_IMAGE: lody-video-factory:${LODY_IMAGE_TAG:-local}
+    image: lody-video-factory-2d:${LODY_IMAGE_TAG:-local}
+    pull_policy: never
+    container_name: lody-dev-2d
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: /MoneyPrinterTurbo:/MoneyPrinterTurbo/webui
+      LODY_DATA_DIR: /data
+      LODY_INSTANCE: dev-2d
+      # Moteur de scène (#150) et délai maximal par scène (secondes).
+      LODY_ANIMATION_RENDERER: node /MoneyPrinterTurbo/renderers/remotion/bin/lody-remotion.mjs
+      LODY_ANIMATION_SCENE_TIMEOUT: "900"
+      # Licence Remotion : laisser VIDE tant que le propriétaire n'a pas tranché (voir la doc). Une valeur
+      # renseignée est une décision écrite du propriétaire (ex. « company:<référence> »), jamais une supposition.
+      LODY_REMOTION_LICENSE: ${LODY_REMOTION_LICENSE:-}
+      # Pilote d'évaluation : autorise le rendu tant que la licence n'est pas décidée (rien n'est publié).
+      LODY_REMOTION_EVALUATION: "1"
+      TMPDIR: /tmp
+    ports:
+      # Local uniquement ; port distinct de la production (8601) et de lody-auth (8602).
+      - "127.0.0.1:8611:8601"
+    volumes:
+      # Base SQLite, catalogue d'assets et dossiers de rendu DU PILOTE uniquement.
+      - lody_dev_2d_data:/data
+    tmpfs:
+      # Chrome et ffmpeg écrivent leurs fichiers temporaires ici ; /dev/shm agrandi pour Chrome.
+      - /tmp:size=1g,mode=1777
+      # Streamlit et Chrome écrivent quelques fichiers dans le dossier personnel.
+      - /home/lody:size=64m,uid=10001,gid=10001,mode=0700
+    shm_size: 256m
+    read_only: true
+    cpus: 1.5
+    mem_limit: 1800m
+    memswap_limit: 1800m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8601/_stcore/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  lody_dev_2d_data:
+    name: lody-dev-2d-data

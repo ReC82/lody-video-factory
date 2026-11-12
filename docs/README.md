@@ -28,6 +28,8 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Worker 2D Remotion en Docker — pilote DEV](lody-animation-worker-docker.md) — image reproductible,
+  compose DEV isolé, préflight (licence Remotion comprise), atelier 2D, mesures CPU/RAM.
 
 ## Voix
 
@@ -36,6 +38,8 @@ ainsi que l'existence des fichiers liés.
 - [Prononciation et règle éditoriale des sigles](lody-pronunciation.md) — lexique par projet
   (SDI, HDMI, 3G-SDI…) : lecture de la voix distincte des sous-titres, écoute puis validation, contrôle
   éditorial « un concept par Short ».
+- [Choisir la voix d'un personnage](lody-voix-personnage.md) — comparer 2 à 3 voix ElevenLabs
+  sur le même dialogue, budget visible avant tout appel, voix mémorisée pour tous les épisodes.
 
 ## Sécurité
 
