@@ -30,9 +30,10 @@ de la clé de cache de CETTE scène, et d'aucune autre.
   test d'intégration du worker qui **s'active tout seul** dès que `lody.animation.voiceover` (#169) est
   présent (`pytest.importorskip`) et sert de critère d'acceptation de la réconciliation.
 
-## Reste à faire dans la branche de #169 (après fusion de #176)
+## Réconciliation dans la branche de #169 — faite (#185)
 
-`git merge origin/main` dans `agent/164-elevenlabs-worker-remotion` (pas de rebase, pas de force), puis :
+`origin/main` (après #176) et la branche de #186 ont été fusionnés dans `agent/164-elevenlabs-worker-remotion`
+(pas de rebase, pas de force), avec la résolution suivante :
 
 1. **`webui/lody/animation/worker.py`** (conflit sémantique) :
    - supprimer `_voice_digest` (#169) : la voix est déjà dans la clé via `voice_slice_digest` (#157) ;
@@ -46,13 +47,13 @@ de la clé de cache de CETTE scène, et d'aucune autre.
    (#176) et la synthèse ElevenLabs au `submit` (#169) ; aucune synthèse dans le worker.
 3. **`docs/README.md`** : garder les quatre entrées (worker Docker, réédition, voix du rendu 2D, voix d'un
    personnage).
-4. Lancer `test/lody/test_animation_cache_voice.py` : le test d'intégration ne doit plus être `skipped`.
+4. `test/lody/test_animation_cache_voice.py` : le test d'intégration du worker n'est plus `skipped` et réussit.
 
 ## Divergences inventoriées (à traiter ou à reporter dans un ticket ciblé)
 
 - **Empreinte de voix en double** : `voiceover.fingerprint` (#169) recopie `voice_casting.fingerprint` (#155,
-  sur `main`). Recommandation : importer celle de `voice_casting` (même formule, même version) pour qu'un
-  aperçu de casting et une réplique du rendu partagent toujours le même cache d'échantillons.
+  sur `main`). Décision #185 : la copie est gardée (le worker n'importe ainsi ni `settings` ni le calcul de coût), mais
+  `test_fingerprint_is_the_voice_casting_formula` exige désormais l'égalité avec `voice_casting.fingerprint`.
 - **Lexique #163** : `lody.pronunciation` n'est pas sur `main` ; `voiceover.render_text` retombe sur le texte
   brut. Le gel du lexique par version est à vérifier quand #163 sera fusionnée (le texte parlé entre dans
   l'empreinte, donc dans la voix, donc dans `voice`).
