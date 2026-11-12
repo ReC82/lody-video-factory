@@ -29,7 +29,7 @@ if [ "$DRY" = 0 ] && [ "$(id -u)" != 0 ]; then
     exit 1
 fi
 [ -n "$SVC_HOME" ] || { echo "Compte $SVC_USER introuvable." >&2; exit 1; }
-for f in lodyorch.py guard.py session_prompt.md lodyorch.env claude-settings.json labels.json lodyorch \
+for f in lodyorch.py guard.py merge_policy.py session_prompt.md lodyorch.env claude-settings.json labels.json lodyorch \
          console-settings.json console_settings.py systemd/lodyorch.service \
          systemd/lodyorch-notify.service systemd/lodyorch-notify.timer; do
     [ -f "$SRC/$f" ] || { echo "Fichier manquant : $SRC/$f" >&2; exit 1; }
@@ -49,7 +49,7 @@ fi
 
 echo "2. Code et configuration dans $DEST (propriété root : non modifiables par les sessions)"
 run install -d -o root -g root -m 0755 "$DEST"
-for f in lodyorch.py guard.py console_settings.py; do
+for f in lodyorch.py guard.py merge_policy.py console_settings.py; do
     run install -o root -g root -m 0755 "$SRC/$f" "$DEST/$f"
 done
 for f in session_prompt.md lodyorch.env claude-settings.json labels.json console-settings.json; do

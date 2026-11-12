@@ -180,9 +180,11 @@ sont alors « skipped », ce que GitHub compte comme réussi pour les vérificat
 fichier — code, tests, `deploy/`, workflows, `.md` ailleurs, fichiers non Markdown de `docs/` —
 déclenche le pipeline complet, et un push sur `main` aussi.
 
-Fusion automatique (#193) : **non activée**. La politique proposée et l'évaluateur à blanc
-`deploy/lodyorch/merge_policy.py` (`evaluate <PR>`, `metrics`) sont décrits dans
-[lody-fusion-auto.md](lody-fusion-auto.md) ; ils ne fusionnent rien et ne lisent GitHub qu'en GET.
+Fusion automatique (#193, #200) : le superviseur évalue chaque PR à CI verte avec
+`deploy/lodyorch/merge_policy.py` et journalise son verdict (`lodyorch automerge`). Livrée **à blanc**
+(`LQ_AUTO_MERGE=dry-run`) : la fusion réelle exige le plafond `on` puis `lodyorch automerge on`, et
+`lodyorch automerge off` l'arrête immédiatement. Jamais de déploiement ; voir
+[lody-fusion-auto.md](lody-fusion-auto.md), section 8.
 
 ## Rapport permanent par tentative (ticket #123)
 

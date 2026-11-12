@@ -16,7 +16,8 @@ class Args:
 
 def test_protocol_lists_every_label_of_the_ticket():
     assert set(PROTOCOL) == {"agent:auto", "agent:human", "agent:blocked", "agent:in-progress", "priority:P0",
-                             "priority:P1", "priority:P2", "priority:P3", "status:needs-test"}
+                             "priority:P1", "priority:P2", "priority:P3", "status:needs-test",
+                             "merge:auto", "merge:manual"}  # #200 : autorisation et veto de fusion automatique
     for spec in PROTOCOL.values():
         assert len(spec["color"]) == 6 and spec["description"]
 
