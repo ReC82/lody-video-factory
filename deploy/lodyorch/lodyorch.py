@@ -134,6 +134,14 @@ CI_POLL_SECONDS = int(os.environ.get("LQ_CI_POLL", 300))
 CI_MAX_FIXES = int(os.environ.get("LQ_CI_MAX_FIXES", 2))
 CI_TIMEOUT_SECONDS = int(os.environ.get("LQ_CI_TIMEOUT", 3 * 3600))
 CI_FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
+# Fusion automatique sécurisée (#200) par le SUPERVISEUR, jamais par une session Claude.
+# Modes : off (aucun appel), dry-run (verdict journalisé, rien n'est fusionné), on (fusion des PR
+# éligibles). LQ_AUTO_MERGE est un PLAFOND posé dans lodyorch.env (fichier root, hors de portée des
+# sessions) ; le mode effectif est le plus bas entre ce plafond et `lodyorch automerge <mode>`.
+MERGE_MODES = ("off", "dry-run", "on")
+AUTO_MERGE_CEILING = os.environ.get("LQ_AUTO_MERGE", "off").strip().lower()
+if AUTO_MERGE_CEILING not in MERGE_MODES:
+    AUTO_MERGE_CEILING = "off"
 PRIORITY_RE = re.compile(r"(?i)^priority\s*:\s*(.*)$")
 TRUSTED_AUTHORS = {"OWNER", "MEMBER", "COLLABORATOR"}
 DEPS_RE = re.compile(r"(?:d[ée]pend(?:ance)?s?\s+(?:de|du|des|d'|on)|bloqu[ée]e?\s+par|blocked\s+by|"
@@ -286,7 +294,17 @@ def db():
             pass
     # #165 : clé de l'état des dépendances au moment de la dernière préparation (une seule
     # préparation par état) et mode de chaque session (« prepare » pour la file de préparation).
-    for table, col, decl in (("tasks", "prep_key", "TEXT DEFAULT ''"), ("sessions", "mode", "TEXT DEFAULT ''")):
+    # #200 : fusion automatique — journal d'audit des verdicts et des fusions (idempotent).
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS merge_audit(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, issue INTEGER, pr INTEGER, head_sha TEXT, mode TEXT,
+        eligible INTEGER, signature TEXT, refusals TEXT DEFAULT '[]', matrix TEXT DEFAULT '');
+    CREATE TABLE IF NOT EXISTS merge_ops(
+        pr INTEGER, head_sha TEXT, issue INTEGER, state TEXT, started_at TEXT, finished_at TEXT DEFAULT '',
+        merge_sha TEXT DEFAULT '', error TEXT DEFAULT '', PRIMARY KEY(pr, head_sha));
+    """)
+    for table, col, decl in (("tasks", "prep_key", "TEXT DEFAULT ''"), ("sessions", "mode", "TEXT DEFAULT ''"),
+                             ("tasks", "merge_checked_at", "TEXT DEFAULT ''")):
         try:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
@@ -1446,6 +1464,8 @@ def watch_ci(con):
             set_status_label(con, n, "WAITING_OWNER")
             after_outcome(con, n, t["last_session"], t["gh_since"] or iso(), {})
             finalize_pending_runs(con, n)
+            if auto_merge_mode(con)[0] != "off":
+                update_task(con, n, merge_checked_at="")  # évaluée tout de suite par watch_merges
         elif verdict == "failure":
             fixes = t["ci_fixes"] + 1
             if fixes <= CI_MAX_FIXES:
@@ -1477,6 +1497,223 @@ def watch_ci(con):
             finalize_pending_runs(con, n)
         else:
             update_task(con, n, ci_detail=detail)
+
+
+# ---------------------------------------------------------------- fusion automatique (#200)
+
+def auto_merge_mode(con):
+    """(mode effectif, explication). Plafond LQ_AUTO_MERGE ∧ choix `lodyorch automerge`. Le mode `on`
+    exige en plus un horodatage d'activation (les autorisations antérieures ne valent rien)."""
+    chosen = ctl_get(con, "automerge.mode", "") or "dry-run"
+    if chosen not in MERGE_MODES:
+        chosen = "off"
+    mode = MERGE_MODES[min(MERGE_MODES.index(chosen), MERGE_MODES.index(AUTO_MERGE_CEILING))]
+    if mode == "on" and not ctl_get(con, "automerge.enabled_at"):
+        mode = "dry-run"
+    why = f"choisi {chosen}, plafond LQ_AUTO_MERGE={AUTO_MERGE_CEILING}"
+    return mode, why
+
+
+def merge_policy():
+    """Module de politique installé à côté de lodyorch.py (import différé : son absence coupe la
+    fusion automatique sans arrêter la file)."""
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import merge_policy as mp  # noqa: PLC0415
+    return mp
+
+
+def merge_audit(con, issue, decision, mode):
+    """Journalise le verdict UNE fois par (PR, SHA, mode, critères refusés) : rien de neuf, rien d'écrit.
+    Rend True si le verdict est nouveau."""
+    refusals = [{"code": c.code, "detail": c.detail} for c in decision.refusals]
+    signature = hashlib.sha256(json.dumps([decision.pr, decision.head_sha, mode, sorted(r["code"] for r in refusals)])
+                               .encode()).hexdigest()[:20]
+    last = con.execute("SELECT signature FROM merge_audit WHERE pr=? ORDER BY id DESC LIMIT 1", (decision.pr,)).fetchone()
+    if last and last["signature"] == signature:
+        return False
+    mp = merge_policy()
+    con.execute("""INSERT INTO merge_audit(at,issue,pr,head_sha,mode,eligible,signature,refusals,matrix)
+                   VALUES(?,?,?,?,?,?,?,?,?)""",
+                (iso(), issue, decision.pr, decision.head_sha, mode, int(decision.eligible), signature,
+                 json.dumps(refusals, ensure_ascii=False), redact(mp.render(decision))))
+    con.commit()
+    reasons = "; ".join(f"{r['code']} ({r['detail']})" if r["detail"] else r["code"] for r in refusals)
+    verdict = ("éligible" + (" — simulation, rien fusionné" if mode == "dry-run" else "")) if decision.eligible \
+        else f"refusée — {reasons}"
+    event(con, issue, "merge", f"[{mode}] PR #{decision.pr} @ {decision.head_sha[:10]} : {verdict}")
+    return True
+
+
+def merge_comment(con, issue, decision, mode, headline):
+    """Commentaire de ticket (verdict lisible + matrice) — seulement si `merge:auto` est demandé."""
+    mp = merge_policy()
+    body = (f"{BOT_MARKER}\n{headline}\n\nMode `{mode}`, politique v{decision.policy_version}.\n\n"
+            f"<details><summary>Matrice de décision</summary>\n\n{mp.render(decision)}\n\n</details>")
+    gh_call("-X", "POST", f"repos/{REPO}/issues/{issue}/comments", "-f", f"body={redact(body)}")
+
+
+def recover_merges(con):
+    """Fusion interrompue (arrêt brutal entre l'intention et la réponse GitHub) : on CONSTATE l'état
+    réel de la PR au lieu de rejouer la requête — fusionnée → suites normales, sinon intention close."""
+    done = []
+    for op in con.execute("SELECT * FROM merge_ops WHERE state='intent'").fetchall():
+        pr = gh_json(f"repos/{REPO}/pulls/{op['pr']}")
+        if pr is None:
+            continue  # GitHub injoignable : on réessaiera au prochain tour, sans rien refaire
+        if pr.get("merged") and (pr.get("head") or {}).get("sha") == op["head_sha"]:
+            con.execute("UPDATE merge_ops SET state='merged', finished_at=?, merge_sha=? WHERE pr=? AND head_sha=?",
+                        (iso(), pr.get("merge_commit_sha") or "", op["pr"], op["head_sha"]))
+            con.commit()
+            event(con, op["issue"], "merge", f"Reprise : PR #{op['pr']} constatée fusionnée.")
+            done.append(after_auto_merge(con, op["issue"], op["pr"], op["head_sha"], pr.get("merge_commit_sha") or ""))
+        else:
+            con.execute("UPDATE merge_ops SET state='interrupted', finished_at=? WHERE pr=? AND head_sha=?",
+                        (iso(), op["pr"], op["head_sha"]))
+            con.commit()
+            event(con, op["issue"], "merge", f"Reprise : fusion de PR #{op['pr']} non effectuée, réévaluation.")
+    return [d for d in done if d]
+
+
+def after_auto_merge(con, issue, num, head_sha, merge_sha):
+    """Suites d'une fusion automatique : ticket gardé « à tester » (rouvert si `Closes #N` l'a fermé),
+    commentaire, rapport. Aucun déploiement. Rend la ligne de notification groupée."""
+    t = task(con, issue)
+    update_task(con, issue, ci_state="merged", status="WAITING_OWNER",
+                ci_detail=f"Fusionnée automatiquement (merge:auto), commit {merge_sha[:10]} — non déployée.",
+                next_action="Tester la fonctionnalité (fusionnée, non déployée) puis fermer le ticket.")
+    it = gh_json(f"repos/{REPO}/issues/{issue}")
+    if it and it.get("state") == "closed":
+        if gh_call("-X", "PATCH", f"repos/{REPO}/issues/{issue}", "-f", "state=open"):
+            event(con, issue, "merge", "Ticket rouvert après la fusion (fermé par « Closes ») : test humain requis.")
+        else:
+            event(con, issue, "gh_error", "Ticket fermé par la fusion et non rouvert : le rouvrir pour le test.")
+    set_status_label(con, issue, "WAITING_OWNER")
+    gh_call("-X", "POST", f"repos/{REPO}/issues/{issue}/comments", "-f",
+            f"body={BOT_MARKER}\n**PR #{num} fusionnée automatiquement** dans `main` (tête `{head_sha[:10]}`, "
+            f"fusion `{merge_sha[:10]}`) : CI verte, `merge:auto`, politique revalidée juste avant.\n\n"
+            "**Non déployée.** Le ticket reste `à tester` : la fermeture suit votre vérification.")
+    finalize_pending_runs(con, issue)
+    title = t["title"] if t else ""
+    return f"#{issue} — PR #{num} fusionnée ({merge_sha[:10]}) — {title} — test à faire"
+
+
+def try_auto_merge(con, t, mode):
+    """Évalue la PR d'un ticket (CI verte) ; en mode `on`, revalide puis fusionne avec le SHA attendu.
+    Rend une ligne de notification si une fusion a eu lieu."""
+    mp = merge_policy()
+    n, num = t["issue"], pr_number(t["pr"])
+    if not num:
+        return None
+    since = ctl_get(con, "automerge.enabled_at") if mode == "on" else ""
+    pr = gh_json(f"repos/{REPO}/pulls/{num}")
+    it = gh_json(f"repos/{REPO}/issues/{n}")
+    if not pr or not it:
+        return None  # GitHub injoignable : nouvel essai au prochain intervalle
+    if pr.get("merged"):
+        update_task(con, n, ci_state="merged", ci_detail="PR fusionnée par le propriétaire.")
+        event(con, n, "ci", "PR fusionnée : suivi terminé.")
+        finalize_pending_runs(con, n)
+        return None
+    if pr.get("state") != "open":
+        return None
+    asked = mp.AUTHORIZE_LABEL in mp._labels(it)
+    head = (pr.get("head") or {}).get("sha", "")
+    if not asked and con.execute("SELECT 1 FROM merge_audit WHERE pr=? AND head_sha=? AND mode=?",
+                                 (num, head, mode)).fetchone():
+        return None  # sans autorisation, un seul verdict complet par SHA : pas de collecte répétée
+    try:
+        facts = mp.collect(num)
+    except Exception as exc:  # noqa: BLE001 — erreur API : aucun verdict, nouvel essai plus tard
+        event(con, n, "merge_error", f"PR #{num} : collecte impossible ({type(exc).__name__}: {exc})"[:400])
+        return None
+    if since:
+        facts["authorized_after"] = since
+    decision = mp.evaluate(facts)
+    decision.dry_run = mode != "on"
+    new = merge_audit(con, n, decision, mode)
+    if not decision.eligible:
+        if new and asked:
+            reasons = "\n".join(f"- `{c.code}` : {c.detail or 'non satisfait'}" for c in decision.refusals)
+            merge_comment(con, n, decision, mode, f"**Fusion automatique refusée** pour la PR #{num} "
+                          f"(`{decision.head_sha[:10]}`) — revue manuelle :\n{reasons}")
+        return None
+    if mode != "on":
+        if new and asked:
+            merge_comment(con, n, decision, mode, f"**Simulation** : la PR #{num} (`{decision.head_sha[:10]}`) "
+                          "serait fusionnée automatiquement. Rien n'a été fusionné (mode à blanc).")
+        return None
+    # Revalidation immédiate : nouvelle collecte complète, même SHA, mode toujours `on`.
+    if auto_merge_mode(con)[0] != "on":
+        return None
+    try:
+        fresh = mp.collect(num)
+    except Exception as exc:  # noqa: BLE001
+        event(con, n, "merge_error", f"PR #{num} : revalidation impossible ({type(exc).__name__}) — pas de fusion.")
+        return None
+    fresh["authorized_after"] = since
+    again = mp.revalidate(decision, fresh)
+    again.dry_run = False
+    if not again.eligible:
+        merge_audit(con, n, again, mode)
+        return None
+    if con.execute("""SELECT 1 FROM merge_ops WHERE pr=? AND (state IN ('intent','merged')
+                      OR (head_sha=? AND state='failed'))""", (num, again.head_sha)).fetchone():
+        return None  # fusion engagée, faite, ou déjà refusée par GitHub pour ce SHA : jamais de nouvelle requête
+    # Intention écrite AVANT la requête : un arrêt brutal est repris par recover_merges, sans rejouer.
+    con.execute("INSERT OR REPLACE INTO merge_ops(pr,head_sha,issue,state,started_at) VALUES(?,?,?,?,?)",
+                (num, again.head_sha, n, "intent", iso()))
+    con.commit()
+    try:
+        merge_sha = mp.merge(again, title=f"Merge pull request #{num} (fusion automatique lodyorch, #{n})")
+    except mp.MergeError as exc:
+        con.execute("UPDATE merge_ops SET state='failed', finished_at=?, error=? WHERE pr=? AND head_sha=?",
+                    (iso(), redact(str(exc))[:300], num, again.head_sha))
+        con.commit()
+        why = {405: "PR non fusionnable", 409: "tête modifiée depuis l'évaluation (course de SHA)"}.get(exc.status, "erreur API")
+        event(con, n, "merge_error", f"PR #{num} : fusion refusée par GitHub ({why}) : {exc}"[:500])
+        return None
+    con.execute("UPDATE merge_ops SET state='merged', finished_at=?, merge_sha=? WHERE pr=? AND head_sha=?",
+                (iso(), merge_sha, num, again.head_sha))
+    con.commit()
+    event(con, n, "merge", f"PR #{num} fusionnée automatiquement ({again.head_sha[:10]} → {merge_sha[:10]}).")
+    return after_auto_merge(con, n, num, again.head_sha, merge_sha)
+
+
+def watch_merges(con):
+    """Évalue les PR « prêtes pour revue » (CI verte) à intervalle LQ_CI_POLL : un `merge:auto` posé après
+    la CI est pris en compte sans session Claude. Au plus UNE fusion par tour (main bouge ensuite)."""
+    mode, _ = auto_merge_mode(con)
+    if mode == "off":
+        return []
+    try:
+        merged = recover_merges(con)
+    except Exception as exc:  # noqa: BLE001
+        event(con, None, "merge_error", f"reprise des fusions : {type(exc).__name__}: {exc}"[:400])
+        return []
+    limit = iso(datetime.fromtimestamp(time.time() - CI_POLL_SECONDS, timezone.utc))
+    for t in con.execute("""SELECT * FROM tasks WHERE status='WAITING_OWNER' AND ci_state='success' AND pr != ''
+                            AND (merge_checked_at='' OR merge_checked_at <= ?) ORDER BY priority, issue""",
+                         (limit,)).fetchall():
+        update_task(con, t["issue"], merge_checked_at=iso())
+        line = try_auto_merge(con, t, mode)
+        if line:
+            merged.append(line)
+            break
+    if merged:
+        notify_merges(con, merged)
+    return merged
+
+
+def notify_merges(con, lines):
+    """Notification concise et groupée : ce qui a été fusionné, et le test humain qui reste à faire."""
+    key = "automerge:" + hashlib.sha256("\n".join(lines).encode()).hexdigest()[:16]
+    body = "\n".join(["Fusion automatique (non déployée) :", *[f"- {x}" for x in lines], "",
+                      "Chaque ticket reste « à tester » : vérifier puis fermer. Aucun déploiement n'a été fait.",
+                      f"Arrêt immédiat : {CLI_NAME} automerge off"])
+    queue_notification(con, key, None, "Fusion automatique", f"{NOTIFY_PREFIX} {len(lines)} PR fusionnée(s) — à tester",
+                       body)
 
 
 CI_TEXT = {"pending": "CI en attente", "success": "CI validée", "failed": "CI en échec", "merged": "fusionnée",
@@ -2036,6 +2273,10 @@ def supervise():
                 watch_ci(con)
             except Exception as exc:  # noqa: BLE001 — un suivi de CI raté ne doit jamais arrêter la file
                 event(con, None, "ci_error", f"{type(exc).__name__}: {exc}"[:500])
+            try:
+                watch_merges(con)
+            except Exception as exc:  # noqa: BLE001 — idem pour la fusion automatique
+                event(con, None, "merge_error", f"{type(exc).__name__}: {exc}"[:500])
         if RUN_REPORTS:
             flush_reports(con)
         if NOTIFY_SMTP_ENV:
@@ -3016,6 +3257,35 @@ def cmd_notify(con, args):
     return 1
 
 
+def cmd_automerge(con, args):
+    """Mode de la fusion automatique (#200) et derniers verdicts. `off` = arrêt immédiat (kill switch)."""
+    if args.mode:
+        previous = ctl_get(con, "automerge.mode", "") or "dry-run"
+        ctl_set(con, "automerge.mode", args.mode)
+        if args.mode == "on" and previous != "on":
+            # Toute autorisation `merge:auto` antérieure à cet instant est ignorée : rien de rétroactif.
+            ctl_set(con, "automerge.enabled_at", iso())
+        if args.mode != "on":
+            ctl_set(con, "automerge.enabled_at", "")
+        event(con, None, "control", f"automerge {args.mode}")
+    mode, why = auto_merge_mode(con)
+    print(f"Fusion automatique : {mode} ({why})")
+    if ctl_get(con, "automerge.enabled_at"):
+        print(f"Activée le {ctl_get(con, 'automerge.enabled_at')} : seules les autorisations `merge:auto` "
+              "posées après comptent.")
+    if args.mode == "on" and mode != "on":
+        print("Plafond LQ_AUTO_MERGE plus bas dans lodyorch.env : le mode reste limité (voir docs/lody-fusion-auto.md).")
+    rows = con.execute("SELECT * FROM merge_audit ORDER BY id DESC LIMIT ?", (args.limit,)).fetchall()
+    for r in rows:
+        refusals = [x["code"] for x in json.loads(r["refusals"] or "[]")]
+        print(f"  {local(r['at'])}  #{r['issue']:<4} PR #{r['pr']:<4} {r['head_sha'][:8]} [{r['mode']}] "
+              + ("éligible" if r["eligible"] else "refusée : " + ", ".join(refusals))[:160])
+    for op in con.execute("SELECT * FROM merge_ops ORDER BY started_at DESC LIMIT 5").fetchall():
+        print(f"  fusion PR #{op['pr']} {op['head_sha'][:8]} : {op['state']}"
+              + (f" → {op['merge_sha'][:10]}" if op["merge_sha"] else "") + (f" ({op['error'][:100]})" if op["error"] else ""))
+    return 0
+
+
 def cmd_labels(con, args):
     """Compare les labels du dépôt au référentiel (labels.json). Lecture seule, sauf --apply qui
     crée les labels manquants et aligne couleur/description (jamais de suppression)."""
@@ -3240,6 +3510,9 @@ def main():
     sub.add_parser("check")
     s = sub.add_parser("labels")
     s.add_argument("--apply", action="store_true")
+    s = sub.add_parser("automerge")
+    s.add_argument("mode", nargs="?", choices=MERGE_MODES)
+    s.add_argument("--limit", type=int, default=10)
     sub.add_parser("console")
     sub.add_parser("statusline")
     s = sub.add_parser("human")
@@ -3273,6 +3546,7 @@ def main():
             "skip": cmd_skip, "add": cmd_add, "set": cmd_set, "log": cmd_log, "sessions": cmd_sessions,
             "config": cmd_config, "reload": cmd_reload, "sync": cmd_sync,
             "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "labels": cmd_labels,
+            "automerge": cmd_automerge,
             "report": cmd_report, "reports": cmd_reports,
             "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
             "check": cmd_check}[args.cmd](con, args)

@@ -7,5 +7,7 @@
   "priority:P1": {"color": "e99695", "description": "Priorité 1"},
   "priority:P2": {"color": "f9d0c4", "description": "Priorité 2 (défaut)"},
   "priority:P3": {"color": "fef2c0", "description": "Priorité 3 (la plus basse)"},
-  "status:needs-test": {"color": "1d76db", "description": "Code livré (PR) : revue et validation fonctionnelle attendues"}
+  "status:needs-test": {"color": "1d76db", "description": "Code livré (PR) : revue et validation fonctionnelle attendues"},
+  "merge:auto": {"color": "0e8a16", "description": "Autorise la fusion automatique par lodyorch après CI verte (propriétaire seul)"},
+  "merge:manual": {"color": "b60205", "description": "Veto : fusion manuelle obligatoire, jamais automatique"}
 }

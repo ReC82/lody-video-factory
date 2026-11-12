@@ -1,9 +1,9 @@
-# Fusion automatique des PR — politique et évaluateur à blanc (ticket #193)
+# Fusion automatique des PR — politique (#193) et fusion sécurisée par le superviseur (#200)
 
-> **Statut : phase 1, rien n'est activé.** Ce document propose une politique ; l'outil livré
-> (`deploy/lodyorch/merge_policy.py`) **évalue** une PR et **mesure** l'attente, mais ne fusionne
-> rien, ne pose aucun label et ne déploie rien. L'activation (phase 2) attend une décision du
-> propriétaire sur les points de la section « Décisions à prendre ».
+> **Statut : phase 2 livrée en mode à blanc (`dry-run`).** Le superviseur évalue chaque PR à CI
+> verte et journalise son verdict ; il ne fusionne **réellement** qu'après deux gestes explicites du
+> propriétaire (plafond `LQ_AUTO_MERGE=on` puis `lodyorch automerge on`, section 8). Aucun déploiement.
+> Les sections 1 à 7 décrivent la politique de la phase 1 (#193), complétée par la section 8.
 
 **Fusion GitHub ≠ déploiement.** Fusionner une PR dans `main` et mettre une version en service sur
 AWS sont deux niveaux distincts, avec des garde-fous distincts. Aucune fusion n'entraîne de
@@ -106,7 +106,7 @@ Lecture seule (`gh api -X GET`). Essai à blanc sur #190 (déjà fusionnée) : r
 `DELETE FROM`, `DROP TABLE`) : sous cette politique, #190 aurait demandé une validation explicite.
 Tests : `test/lodyorch/test_merge_policy.py` (PR factices, chaque critère et chaque exclusion).
 
-## 7. Décisions à prendre avant la phase 2
+## 7. Décisions prises pour la phase 2 (voir section 8)
 
 1. Créer les labels `merge:auto` / `merge:manual` et confirmer qui peut poser `merge:auto`
    (recommandation : le propriétaire seul).
@@ -118,3 +118,74 @@ Tests : `test/lodyorch/test_merge_policy.py` (PR factices, chaque critère et ch
 4. Autoriser le superviseur (pas les sessions Claude) à fusionner avec SHA attendu : c'est une
    modification de `lodyorch.py` et du crochet de garde, donc une PR dédiée relue par le propriétaire.
 5. Niveau DEV automatique : périmètre et commande de déploiement à fixer avec l'audit infra #192.
+
+## 8. Phase 2 (#200) — fusion par le superviseur
+
+Décisions du propriétaire du 12/11/2026 (commentaire du #193) appliquées : labels `merge:auto` /
+`merge:manual`, autorisation par compte de confiance seulement, migrations même additives exclues,
+dry-run journalisé d'abord, fusion avec revalidation + SHA attendu, `status:needs-test` conservé,
+**aucun déploiement**, aucune fusion depuis une session Claude.
+
+### Fonctionnement
+
+- `watch_ci` constate la CI verte (sans session Claude), puis `watch_merges` évalue la PR avec
+  `merge_policy.py` ; les PR « prêtes pour revue » sont réévaluées toutes les `LQ_CI_POLL` s (un
+  `merge:auto` posé après la CI est donc pris en compte).
+- **Journal d'audit** (`merge_audit` dans `state.db`) : une ligne et un événement par changement de
+  verdict (PR, SHA, mode, critères refusés) — rien n'est réécrit tant que rien ne change. Sans
+  `merge:auto` sur le ticket, un seul verdict complet par SHA (pas de collecte répétée) et aucun
+  commentaire ; avec `merge:auto`, le verdict (simulation, refus motivé, ou fusion) est commenté
+  **une fois** dans le ticket, matrice complète repliée.
+- **Critères ajoutés (politique v2)** :
+  - `ci` : si l'agrégateur `CI result` de #198 est présent sur le SHA de tête, c'est lui (avec
+    `Detect code changes`) qui fait foi ; sinon, les jobs historiques. Rien n'est changé dans `ci.yml`.
+  - `base-sans-chevauchement` : base en retard tolérée seulement si `main` n'a touché **aucun**
+    fichier de la PR depuis la divergence, et au plus 30 commits de retard.
+  - `autorisation-apres-activation` (mode `on`) : le dernier ajout de `merge:auto` doit être
+    **postérieur** à `lodyorch automerge on` → aucune PR historique n'est fusionnée rétroactivement ;
+    pour autoriser une PR déjà labellisée, retirer puis reposer le label.
+- **Fusion (mode `on` seulement)** : nouvelle collecte complète et `revalidate()` (même SHA, mode
+  toujours `on`), intention écrite dans `merge_ops` **avant** la requête, puis
+  `PUT pulls/<n>/merge` avec `sha=<SHA évalué>`. 409 (tête modifiée) / 405 (non fusionnable) /
+  erreur API : consignés, **jamais retentés pour ce SHA**, la PR reste en revue manuelle. Au plus
+  une fusion par tour. Après un arrêt brutal, l'intention est résolue en **lisant** l'état réel de
+  la PR, jamais en rejouant la requête.
+- **Après fusion** : ticket gardé `status:needs-test` (rouvert si `Closes #N` l'a fermé),
+  commentaire « fusionnée, non déployée », rapport de tentative finalisé, notification groupée
+  « fusionnée — test à faire ». Aucun déploiement DEV/PROD.
+
+### Activer, vérifier, arrêter
+
+```bash
+lodyorch labels --apply             # crée merge:auto / merge:manual (référentiel labels.json)
+lodyorch automerge                  # mode effectif + derniers verdicts et fusions
+lodyorch automerge dry-run          # défaut : verdicts journalisés, rien n'est fusionné
+# Recette à blanc : PR factice sûre (ex. .md + test), poser merge:auto sur son ticket → commentaire
+# « Simulation : serait fusionnée » ; une PR touchant deploy/ ou une migration → « refusée » + motifs.
+# Activation réelle : LQ_AUTO_MERGE=on dans lodyorch.env (installé root, hors de portée des
+# sessions), réinstaller + lodyorch reload, PUIS :
+lodyorch automerge on               # horodate l'activation : seules les autorisations postérieures comptent
+lodyorch automerge off              # KILL SWITCH immédiat (pris en compte avant toute requête de fusion)
+```
+
+Rollback : `lodyorch automerge off` (immédiat), ou `LQ_AUTO_MERGE=off` dans l'env installé. Une
+fusion déjà faite se défait par un `git revert` du commit de fusion via une PR normale.
+
+Les sessions Claude ne peuvent ni piloter ce mode (`lodyorch automerge` refusé par le crochet de
+garde) ni fusionner (`pulls/<n>/merge`, `gh pr merge` refusés).
+
+### Protection de `main`
+
+`deploy/lodyorch/branch_protection.py` (à blanc par défaut, `--apply` par le propriétaire) exige
+uniquement un check **toujours présent** : l'agrégateur `CI result` de #198. Tant qu'il n'est pas
+sur `main`, le script refuse d'appliquer — exiger `Python 3.11 tests` ou `Documentation checks`
+bloquerait les PR où ces jobs n'existent plus. `enforce_admins` est activé car lodyorch utilise le
+compte administrateur du propriétaire ; `strict` est désactivé (la base en retard est contrôlée par
+la politique, sans boucle de mises à jour).
+
+### Limite connue
+
+lodyorch et le propriétaire partagent le même compte GitHub : le journal d'événements ne distingue
+pas un label posé par le propriétaire d'un label posé par l'outillage. Les sessions Claude ne
+peuvent pas poser de label (crochet de garde) et le superviseur ne pose jamais `merge:auto` ; un
+compte machine distinct lèverait cette ambiguïté.

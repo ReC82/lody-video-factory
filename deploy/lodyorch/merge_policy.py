@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Politique de fusion automatique des PR — évaluateur À BLANC (ticket #193, phase 1).
+"""Politique de fusion automatique des PR (ticket #193 phase 1, #200 phase 2).
 
-Ce module DÉCIDE si une PR serait fusionnable automatiquement selon la politique de
-`docs/lody-fusion-auto.md` ; il ne fusionne RIEN, ne pose aucun label, ne déploie rien. Il ne lit
-GitHub qu'en lecture seule (`gh api` en GET). L'activation réelle (fusion par le superviseur avec SHA
-attendu, puis niveau DEV séparé) attend une décision explicite du propriétaire.
+Ce module DÉCIDE si une PR est fusionnable automatiquement selon la politique de
+`docs/lody-fusion-auto.md`. En ligne de commande il ne lit GitHub qu'en lecture seule (`gh api` en
+GET) et ne fusionne rien. Seul le superviseur lodyorch (`watch_ci`, mode `on`) appelle `merge()`,
+après `revalidate()` et avec le SHA attendu ; jamais une session Claude (crochet de garde), jamais
+de déploiement.
 
     python3 deploy/lodyorch/merge_policy.py evaluate 190          # matrice de décision d'une PR
     python3 deploy/lodyorch/merge_policy.py evaluate 190 --json   # même chose, en JSON
@@ -26,7 +27,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 
-POLICY_VERSION = 1
+POLICY_VERSION = 2
 REPO = os.environ.get("LQ_REPO", "ReC82/lody-video-factory")
 DEFAULT_BRANCH = "main"
 
@@ -42,6 +43,9 @@ TRUSTED_ACTORS = tuple(a for a in os.environ.get("LQ_MERGE_TRUSTED", REPO.split(
 CHECK_DETECT = "Detect code changes"
 CHECKS_CODE = ("Python 3.11 tests", "Python 3.13 tests", "Windows smoke tests")
 CHECK_DOCS = "Documentation checks"
+# Agrégateur de #198 (PR #201) : quand il est présent sur le SHA de tête, c'est LUI le verdict CI
+# (jobs conditionnels résumés en un check toujours présent) ; sinon, jobs historiques ci-dessus.
+CHECK_AGGREGATE = "CI result"
 CHECK_OK = ("success",)
 CHECK_OK_IF_NOT_REQUIRED = ("success", "skipped", "neutral")
 # Même classement que ci.yml : seuls ces fichiers rendent une PR « purement documentaire ».
@@ -72,6 +76,7 @@ SECRET_LIKE = re.compile(r"(sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z
 MAX_FILES = 40           # au-delà : changement de périmètre, revue humaine
 MAX_CHANGED_LINES = 1500
 MAX_MAIN_MERGES = 3      # « boucle de conflits » : main ré-intégré trop souvent dans la branche
+MAX_BEHIND = 30          # base en retard tolérée (sans fichier commun) ; au-delà, mise à jour exigée
 CLOSES = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b", re.I)
 BRANCH_TICKET = re.compile(r"^agent/(\d+)-")
 
@@ -139,22 +144,50 @@ def added_lines(patch):
                      if line.startswith("+") and not line.startswith("+++"))
 
 
-def last_label_actor(events, label):
-    """Auteur du DERNIER ajout encore valable de `label` (un retrait ultérieur l'annule)."""
-    actor = None
+def last_label_event(events, label):
+    """DERNIER ajout encore valable de `label` (un retrait ultérieur l'annule), ou None."""
+    found = None
     for ev in events or []:
         if ((ev.get("label") or {}).get("name")) != label:
             continue
         if ev.get("event") == "labeled":
-            actor = (ev.get("actor") or {}).get("login")
+            found = ev
         elif ev.get("event") == "unlabeled":
-            actor = None
-    return actor
+            found = None
+    return found
 
 
-def required_checks(files):
+def last_label_actor(events, label):
+    """Auteur du DERNIER ajout encore valable de `label`."""
+    ev = last_label_event(events, label)
+    return ((ev or {}).get("actor") or {}).get("login")
+
+
+def required_checks(files, names=()):
+    if CHECK_AGGREGATE in names:
+        return (CHECK_DETECT, CHECK_AGGREGATE)
     docs_only = bool(files) and all(DOCS_ONLY.match(f.get("filename", "")) for f in files)
     return (CHECK_DETECT, CHECK_DOCS) if docs_only else (CHECK_DETECT, *CHECKS_CODE)
+
+
+def evaluate_base(compare, files):
+    """Base en retard : tolérée seulement si `main` n'a touché AUCUN fichier de la PR depuis le point
+    de divergence (pas de conflit sémantique possible sur ces fichiers) et dans une limite de commits.
+    `compare` = `GET compare/<tête>...main` (`ahead_by` = commits de main absents de la PR)."""
+    if not isinstance(compare, dict) or "ahead_by" not in compare:
+        return Check("base-sans-chevauchement", False, "comparaison avec main indisponible")
+    behind = int(compare.get("ahead_by") or 0)
+    if behind == 0:
+        return Check("base-sans-chevauchement", True, "branche à jour avec main")
+    main_files = {f.get("filename") for f in compare.get("files") or []}
+    if behind > MAX_BEHIND or len(main_files) >= 300:  # 300 : liste tronquée par GitHub
+        return Check("base-sans-chevauchement", False, f"{behind} commit(s) de retard sur main (max {MAX_BEHIND}) : "
+                                                       "intégrer main")
+    common = sorted(main_files & {f.get("filename") for f in files})
+    if common:
+        return Check("base-sans-chevauchement", False,
+                     f"{behind} commit(s) de retard ; main a modifié aussi : {', '.join(common[:5])}")
+    return Check("base-sans-chevauchement", True, f"{behind} commit(s) de retard, aucun fichier commun")
 
 
 def evaluate_ci(runs, files):
@@ -169,7 +202,7 @@ def evaluate_ci(runs, files):
     pending = sorted(n for n, r in latest.items() if r.get("status") != "completed")
     if pending:
         return Check("ci", False, f"en cours : {', '.join(pending)}")
-    required = required_checks(files)
+    required = required_checks(files, latest)
     missing = [n for n in required if n not in latest]
     bad_required = [f"{n}={latest[n].get('conclusion')}" for n in required
                     if n in latest and latest[n].get("conclusion") not in CHECK_OK]
@@ -182,7 +215,9 @@ def evaluate_ci(runs, files):
 
 
 def evaluate(facts):
-    """Décision cumulative. `facts` : pr, files, commits, reviews, check_runs, ticket, ticket_events.
+    """Décision cumulative. `facts` : pr, files, commits, reviews, check_runs, ticket, ticket_events,
+    et facultativement `base_compare` (base en retard) et `authorized_after` (horodatage ISO : une
+    autorisation antérieure ne vaut rien — pas de fusion rétroactive à l'activation).
     Chaque critère est évalué (pas d'arrêt au premier refus) pour une matrice complète et lisible."""
     pr = facts.get("pr") or {}
     files = facts.get("files") or []
@@ -210,15 +245,23 @@ def evaluate(facts):
     add("sans-conflit", pr.get("mergeable") is True and state not in ("dirty",),
         f"mergeable={pr.get('mergeable')} ({state})", info=True)
     add("base-a-jour", state == "clean", f"mergeable_state={state} (clean exigé : base à jour, rien de bloquant)", info=True)
+    if "base_compare" in facts:
+        out.append(evaluate_base(facts.get("base_compare"), facts.get("files") or []))
 
     # 2. Ticket et autorisation
     add("ticket-lie", n is not None, why_ticket or f"#{n}", info=True)
     t_labels = _labels(ticket)
     add("ticket-ouvert", ticket.get("state") == "open", f"ticket {ticket.get('state')}", info=True)
     add("ticket-agent-auto", REQUIRED_TICKET_LABEL in t_labels, f"labels ticket : {sorted(t_labels)}", info=True)
-    actor = last_label_actor(facts.get("ticket_events"), AUTHORIZE_LABEL)
+    auth = last_label_event(facts.get("ticket_events"), AUTHORIZE_LABEL) or {}
+    actor = (auth.get("actor") or {}).get("login")
     add("autorisation-merge-auto", AUTHORIZE_LABEL in t_labels and actor in TRUSTED_ACTORS,
         f"`{AUTHORIZE_LABEL}` " + (f"posé par {actor}" if actor else "absent ou posé par un compte non autorisé"), info=True)
+    after = facts.get("authorized_after")
+    if after:
+        when = auth.get("created_at") or ""
+        add("autorisation-apres-activation", bool(when) and when >= after,
+            f"`{AUTHORIZE_LABEL}` posé le {when or '?'} ; activation le {after} : reposer le label pour autoriser")
     vetoes = sorted((t_labels | _labels(pr)) & set(VETO_LABELS))
     add("aucun-veto", not vetoes, f"veto : {', '.join(vetoes)}" if vetoes else "")
     latest_review = {}
@@ -275,7 +318,8 @@ def revalidate(decision, fresh_facts):
 
 
 def render(decision):
-    verdict = "ÉLIGIBLE (simulation : aucune fusion effectuée)" if decision.eligible else "REFUSÉE"
+    verdict = ("REFUSÉE" if not decision.eligible else
+               "ÉLIGIBLE (simulation : aucune fusion effectuée)" if decision.dry_run else "ÉLIGIBLE")
     lines = [f"PR #{decision.pr} — ticket #{decision.ticket} — tête {decision.head_sha[:10]} — "
              f"politique v{decision.policy_version}", f"Verdict : {verdict}", "",
              "| Critère | Résultat | Détail |", "|---|---|---|"]
@@ -320,8 +364,46 @@ def collect(number, get=gh_get):
         "check_runs": _pages(get, f"repos/{REPO}/commits/{sha}/check-runs"),
         "ticket": get(f"repos/{REPO}/issues/{n}") if n else {},
         "ticket_events": _pages(get, f"repos/{REPO}/issues/{n}/events") if n else [],
+        "base_compare": get(f"repos/{REPO}/compare/{sha}...{(pr.get('base') or {}).get('ref') or DEFAULT_BRANCH}"),
     }
     return facts
+
+
+# --- Fusion (superviseur uniquement, mode `on`) ---------------------------------------------------
+
+class MergeError(RuntimeError):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status  # code HTTP (405 non fusionnable, 409 tête modifiée…) ou None
+
+
+def merge(decision, title=""):
+    """`PUT …/pulls/<n>/merge` avec `sha` = SHA évalué : GitHub refuse (409) si la tête a bougé et
+    (405) si la PR n'est plus fusionnable ou déjà fusionnée — aucune double fusion possible. Rend le
+    SHA du commit de fusion ; lève MergeError sinon. Uniquement sur une décision éligible et non à blanc."""
+    if not decision.eligible or decision.dry_run:
+        raise MergeError(None, "décision non éligible ou à blanc : aucune fusion")
+    req = decision.merge_request()
+    args = [os.environ.get("LQ_GH", "gh"), "api", "-X", req["method"], req["path"]]
+    for key, value in req["fields"].items():
+        args += ["-f", f"{key}={value}"]
+    if title:
+        args += ["-f", f"commit_title={title}"]
+    try:
+        proc = subprocess.run(args, capture_output=True, text=True, timeout=90)
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise MergeError(None, f"appel GitHub impossible : {type(exc).__name__}") from None
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()
+        m = re.search(r"HTTP (\d{3})", err)
+        raise MergeError(int(m.group(1)) if m else None, err[:300] or "échec sans message")
+    try:
+        data = json.loads(proc.stdout or "{}")
+    except json.JSONDecodeError:
+        data = {}
+    if not data.get("merged"):
+        raise MergeError(None, f"réponse inattendue : {(proc.stdout or '')[:200]}")
+    return data.get("sha", "")
 
 
 def _ts(value):

@@ -288,11 +288,14 @@ def test_collect_reads_paginated_github_facts():
             return f["ticket"]
         if "/events" in path:
             return f["ticket_events"]
+        if f"/compare/{SHA}...main" in path:
+            return {"ahead_by": 0, "files": []}
         raise AssertionError(path)
 
     got = mp.collect(300, get)
     assert mp.evaluate(got).eligible
     assert any(f"commits/{SHA}/check-runs" in c for c in calls)
+    assert got["base_compare"] == {"ahead_by": 0, "files": []}
 
 
 def test_metrics_measure_wait_between_green_ci_and_merge():
@@ -308,3 +311,64 @@ def test_metrics_measure_wait_between_green_ci_and_merge():
     m = mp.metrics(10, get)
     assert [r["pr"] for r in m["prs"]] == [1, 3]
     assert m["median_wait_s"] == 900 and m["total_wait_s"] == 1800
+
+
+# --- Phase 2 (#200) --------------------------------------------------------------------------------
+
+def test_aggregate_ci_result_replaces_conditional_jobs_when_present():
+    runs = [run(mp.CHECK_DETECT), run("Python 3.12 tests"), run("Windows smoke tests", "skipped"), run(mp.CHECK_AGGREGATE)]
+    assert mp.evaluate(facts(check_runs=runs)).eligible
+    runs[-1] = run(mp.CHECK_AGGREGATE, "failure")
+    assert "ci" in refused(mp.evaluate(facts(check_runs=runs)))
+    # Sans agrégateur, les jobs historiques restent exigés (avant la fusion de #198).
+    assert mp.required_checks(facts()["files"], {mp.CHECK_DETECT}) == (mp.CHECK_DETECT, *mp.CHECKS_CODE)
+
+
+@pytest.mark.parametrize("compare, ok", [
+    ({"ahead_by": 0, "files": []}, True),
+    ({"ahead_by": 3, "files": [{"filename": "docs/x.md"}]}, True),
+    ({"ahead_by": 3, "files": [{"filename": "webui/lody/view_home.py"}]}, False),
+    ({"ahead_by": mp.MAX_BEHIND + 1, "files": []}, False),
+    (None, False),
+])
+def test_base_behind_main_only_without_common_files(compare, ok):
+    d = mp.evaluate(facts(base_compare=compare))
+    assert ("base-sans-chevauchement" not in refused(d)) is ok
+
+
+def test_authorization_must_follow_activation():
+    events = [{"event": "labeled", "label": {"name": "merge:auto"}, "actor": {"login": OWNER},
+               "created_at": "2026-11-12T09:00:00Z"}]
+    late = mp.evaluate(facts(ticket_events=events, authorized_after="2026-11-12T10:00:00Z"))
+    assert refused(late) == {"autorisation-apres-activation"}
+    assert mp.evaluate(facts(ticket_events=events, authorized_after="2026-11-12T08:00:00Z")).eligible
+    assert mp.last_label_event(events + [{"event": "unlabeled", "label": {"name": "merge:auto"}}], "merge:auto") is None
+
+
+def test_merge_refuses_dry_run_or_ineligible_decision_without_calling_github(monkeypatch):
+    monkeypatch.setattr(mp.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("appel")))
+    d = mp.evaluate(facts())
+    assert d.eligible and d.dry_run
+    with pytest.raises(mp.MergeError):
+        mp.merge(d)
+    d.dry_run, d.eligible = False, False
+    with pytest.raises(mp.MergeError):
+        mp.merge(d)
+
+
+def test_merge_sends_expected_sha_and_maps_http_errors(monkeypatch):
+    seen = []
+
+    class Proc:
+        def __init__(self, code, out="", err=""):
+            self.returncode, self.stdout, self.stderr = code, out, err
+    answers = [Proc(0, json.dumps({"merged": True, "sha": "m" * 40})),
+               Proc(1, err="gh: Head branch was modified. (HTTP 409)")]
+    monkeypatch.setattr(mp.subprocess, "run", lambda args, **k: seen.append(args) or answers.pop(0))
+    d = mp.evaluate(facts())
+    d.dry_run = False
+    assert mp.merge(d, title="t") == "m" * 40
+    assert seen[0][2:5] == ["-X", "PUT", f"repos/{mp.REPO}/pulls/300/merge"] and f"sha={SHA}" in seen[0]
+    with pytest.raises(mp.MergeError) as err:
+        mp.merge(d)
+    assert err.value.status == 409

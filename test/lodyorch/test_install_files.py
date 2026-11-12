@@ -115,3 +115,10 @@ def test_install_dry_run_changes_nothing_and_starts_nothing(tmp_path):
     assert "lodyorch-console" not in out.stdout
     assert "rien n'a été démarré" in out.stdout
     assert Path(ORCH_DIR / "install.sh").stat().st_mode & 0o111
+
+
+def test_merge_policy_is_installed_root_owned_next_to_the_supervisor():
+    """#200 : lodyorch.py importe merge_policy.py depuis son dossier ; plafond de fusion dans l'env root."""
+    script = (ORCH_DIR / "install.sh").read_text(encoding="utf-8")
+    assert re.search(r"for f in lodyorch\.py guard\.py merge_policy\.py console_settings\.py; do", script)
+    assert instance_env()["LQ_AUTO_MERGE"] == "dry-run"
