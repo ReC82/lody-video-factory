@@ -104,6 +104,11 @@ def test_fingerprint_is_the_voice_casting_formula():
                                          separators=(",", ":")).encode()).hexdigest()
     assert voiceover.fingerprint("v", {"b": 2, "a": 1}, "t") == expected
     assert voiceover.fingerprint("v", {"a": 1, "b": 2}, "t2") != expected
+    # #185 : copie gardée pour que le worker n'importe pas ``settings`` ; elle doit rester identique au casting.
+    from lody import voice_casting
+
+    assert voiceover.FINGERPRINT_VERSION == voice_casting.FINGERPRINT_VERSION
+    assert voiceover.fingerprint("v", {"b": 2, "a": 1}, "t") == voice_casting.fingerprint("v", {"a": 1, "b": 2}, "t")
 
 
 def test_render_text_is_unchanged_without_lexicon_module(monkeypatch):

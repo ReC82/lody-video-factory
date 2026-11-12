@@ -32,7 +32,8 @@ from pathlib import Path
 from typing import Any
 
 from lody import settings
-from lody.animation import modes, voiceover
+from lody.animation import modes, scene_cache, voiceover
+from lody.animation import preflight as animation_preflight
 from lody.animation import worker as animation_worker
 from lody.animation.assets import FILE_EXTENSIONS, AnimationAssetRepository, AssetNotFound
 from lody.animation.contract import (
@@ -84,7 +85,8 @@ def spawn_worker(directory: Path) -> None:
     """
     env = animation_worker.minimal_env()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
-    for key in (animation_worker.RENDERER_ENV, animation_worker.SCENE_TIMEOUT_ENV):
+    for key in (animation_worker.RENDERER_ENV, animation_worker.SCENE_TIMEOUT_ENV,
+                animation_worker.RENDERER_REVISION_ENV, scene_cache.MAX_CACHE_BYTES_ENV):
         if os.environ.get(key):
             env[key] = os.environ[key]
     with (directory / "worker.stderr").open("ab") as stderr:
@@ -101,6 +103,11 @@ def binding(request: GenerationRequest) -> tuple[str, dict[str, Any]] | None:
     if not isinstance(project_id, str) or not isinstance(storyboard, dict) or not storyboard:
         return None
     return project_id, storyboard
+
+
+def preview_scale_of(request: GenerationRequest) -> float:
+    """Échelle de prévisualisation demandée (``animation.preview_scale``, #121) ; 1 = rendu final."""
+    return animation_worker.preview_scale({"preview": {"scale": (request.animation or {}).get("preview_scale", 1.0)}})
 
 
 def narration_of(storyboard: dict[str, Any]) -> str:
@@ -315,10 +322,15 @@ class AnimationConnector(VideoGenerationProvider):
                 Capability.ENGINE, CapabilityState.UNAVAILABLE, requested="moteur 2D",
                 message="L'outil d'assemblage vidéo (ffmpeg) est introuvable sur ce serveur.", fix="platform",
                 admin="ffmpeg absent du PATH et imageio-ffmpeg indisponible."))
+        elif not (licence := animation_preflight.license_allows_render())[0]:
+            # #154 : la licence Remotion n'est jamais supposée gratuite — décision écrite du propriétaire requise.
+            items.append(CapabilityStatus(
+                Capability.ENGINE, CapabilityState.UNAVAILABLE, requested="moteur 2D", message=licence[1],
+                fix="platform", admin=f"{animation_preflight.LICENSE_ENV} : voir docs/lody-animation-worker-docker.md."))
         else:
             items.append(CapabilityStatus(
                 Capability.ENGINE, CapabilityState.READY, requested="moteur 2D", configured="worker 2D",
-                message="Worker 2D disponible : un rendu à la fois, priorité basse."))
+                message="Worker 2D disponible : un rendu à la fois, priorité basse. " + licence[1]))
         # Stockage : place libre pour les rendus de scène et la vidéo finale.
         seconds = duration_seconds(bound[1]) if storyboard_ok and bound else 60
         need = int(seconds * DISK_PER_SECOND + DISK_MARGIN)
@@ -444,6 +456,9 @@ class AnimationConnector(VideoGenerationProvider):
         job = {"schema": animation_worker.JOB_SCHEMA, "task_id": task_id, "project_id": project_id,
                "mode": self.mode_of(request), "storyboard": storyboard, "assets": job_assets,
                "asset_info": self._asset_info(project_id, files), "created_at": self._clock()}
+        scale = preview_scale_of(request)
+        if scale < 1.0:  # #121 : prévisualisation basse résolution, cache de scène séparé du rendu final
+            job["preview"] = {"scale": scale}
         try:
             self._prepare_voice(request, storyboard, staging)  # #164 : avant publication du dossier
         except BaseException:

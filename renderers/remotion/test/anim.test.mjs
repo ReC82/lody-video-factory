@@ -129,3 +129,12 @@ test('enveloppe par image : silence à 0, parole proche de 1, fenêtre décalée
   assert.deepEqual(envelope(decoded, 10, 15, 3), env.slice(15, 18));
   assert.throws(() => decodeWav(Buffer.from('pas un wav')), /WAV/);
 });
+
+test('échelle de rendu (#121) : prévisualisation bornée, rendu final par défaut', async () => {
+  const {renderScale} = await import('../lib/input.mjs');
+  assert.equal(renderScale({}), 1);
+  assert.equal(renderScale({render: {scale: 0.5}}), 0.5);
+  assert.equal(renderScale({render: {scale: 0.1}}), 1);
+  assert.equal(renderScale({render: {scale: 2}}), 1);
+  assert.equal(renderScale({render: {scale: 'x'}}), 1);
+});

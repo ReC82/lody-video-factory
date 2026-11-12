@@ -28,6 +28,10 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Worker 2D Remotion en Docker — pilote DEV](lody-animation-worker-docker.md) — image reproductible,
+  compose DEV isolé, préflight (licence Remotion comprise), atelier 2D, mesures CPU/RAM.
+- [Réédition ciblée et contrôle qualité du rendu 2D](lody-animation-reedit.md) — cache de scène par
+  empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4 ; écran « Nouvelle version » scène par scène (#159).
 - [Voix ElevenLabs du rendu 2D](lody-animation-voix.md) — voix de la fiche personnage, lexique de
   prononciation, cache, piste calée et repères recalés pour la bouche et les sous-titres (#164).
 
@@ -35,6 +39,8 @@ ainsi que l'existence des fichiers liés.
 
 - [Catalogue des voix ElevenLabs](lody-elevenlabs-voices.md) — choix d'une voix ElevenLabs
   depuis l'interface sans recopier son `voice_id`, à partir d'un catalogue généré côté hôte.
+- [Choisir la voix d'un personnage](lody-voix-personnage.md) — comparer 2 à 3 voix ElevenLabs
+  sur le même dialogue, budget visible avant tout appel, voix mémorisée pour tous les épisodes.
 
 ## Sécurité
 

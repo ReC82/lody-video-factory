@@ -52,6 +52,7 @@ view_production ──prepare(animation=…)──► ProductionService ──fr
 | `scenes/NN-input.json` | Entrée du moteur de scène (`lody.animation-scene/1`) |
 | `scenes/NN.mp4`, `scenes/NN.json` | Rendu et trace de chaque scène : statut (`animated` / `fallback`), durée attendue, **durée réelle** mesurée, durée de rendu, SHA-256 |
 | `state.json` | `queued`, `running`, `interrupted`, `done`, `failed` ou `cancelled`, avec l'avancement en images et le battement |
+| `qa.json` | Contrôle qualité automatique du rendu (#121) |
 | `out.mp4`, `manifest.json` | Vidéo finale (H.264 yuv420p) et son manifeste : durée réelle, empreinte, taille, scènes, replis, avertissements |
 | `subtitles.srt` | Sous-titres tirés des repères de parole (`render.speech.cues`), décalés par scène |
 | `worker.log` | Journal **nettoyé** (`safety.sanitize`) |
@@ -101,4 +102,4 @@ moteur pour un repli `still` ; à défaut, un carton neutre. La source utilisée
   encore appelée par le fournisseur : sans fichier déposé, la vidéo reste muette et le préflight l'annonce.
 - **Import des fichiers d'assets** : le catalogue (#119) référence des chemins du dossier de données, mais
   aucun écran ne téléverse encore ces fichiers.
-- Réédition ciblée par scène et contrôle qualité : #121.
+- Réédition ciblée par scène et contrôle qualité : voir [lody-animation-reedit.md](lody-animation-reedit.md) (#121).

@@ -72,6 +72,24 @@ Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgque
 - Une session interrompue (crash, redémarrage) est **reprise en premier**, sur la même branche et la
   même PR : jamais deux tickets entamés en parallèle, jamais de deuxième PR.
 
+### File de préparation et file vide (ticket #165)
+
+- **Préparation** : quand aucun ticket n'est exécutable, un ticket de la file dont **toutes** les
+  dépendances ouvertes ont déjà une PR en revue (ticket `WAITING_OWNER` avec PR) est lancé en *mode
+  préparation*. La session ne fait avancer que ce qui ne dépend pas du code non fusionné (contrats,
+  tests, maquettes), sur sa propre branche partie d'`origin/main`, et ouvre une PR **brouillon**.
+  Elle ne fusionne rien et n'empile jamais sa branche sur celle d'une dépendance. Le ticket redevient
+  ensuite `READY` avec ses dépendances : il est repris en entier dès leur fusion.
+- Une seule préparation par état des dépendances (clé `prep_key`, conservée après un redémarrage).
+  Un ticket `agent:blocked`, `agent:human` ou suspendu n'est jamais préparé.
+- Plafond `max_prep_sessions_per_day` (`LQ_MAX_PREP_SESSIONS_PER_DAY`, 3 par défaut, 0 = désactivé),
+  compté en plus dans `max_sessions_per_day` : pas de sessions de remplissage.
+- **File à l'arrêt** : quand il ne reste rien à exécuter ni à préparer, aucune session n'est lancée.
+  Le motif d'attente (`status`, `pulse`) donne une synthèse : tickets exécutables, prochain ticket à
+  préparer, PR en revue et état de leur CI, tickets bloqués, dépendances non fusionnées. Un **seul**
+  e-mail « File à l'arrêt » part, et seulement si le propriétaire peut débloquer la file (PR à relire
+  ou ticket bloqué). Il est dédoublonné sur l'état de la file et espacé d'au moins 12 h.
+
 ## Labels tenus par le superviseur
 
 | Situation | Label |

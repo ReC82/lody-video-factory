@@ -1,0 +1,116 @@
+{
+ "schema": "lody.animation-render/1",
+ "mode": "animation_2d",
+ "frames": 585,
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "preview": false,
+ "scale": 1.0,
+ "expected_seconds": 19.5,
+ "duration_seconds": 19.5,
+ "sha256": "07a3b76d010fffe48ff59f036bffa7b5ce61daea2344e4d261f3b18f81412bc7",
+ "size_bytes": 2245406,
+ "storyboard_sha256": "d147c450bd9034c2471ba519480ea08d469437495b49d1dda79c8a5b90bdcd25",
+ "render_ms": 86689,
+ "subtitle_cues": 7,
+ "audio": {
+  "voice": {
+   "provisional": true,
+   "source": "Piper fr_FR-upmc-medium (locuteur pierre), synthèse locale",
+   "license": "CC BY-SA 4.0 (modèle)",
+   "note": "Aucune voix choisie dans la fiche Voltix : voix de test provisoire, à remplacer."
+  },
+  "music": {
+   "provisional": true,
+   "source": "scripts/animation/musique_test.py (générée)",
+   "license": "aucune piste tierce"
+  },
+  "music_level": 0.2,
+  "mixed": true
+ },
+ "scenes": [
+  {
+   "index": 1,
+   "id": "accueil",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 174,
+   "expected_seconds": 5.8,
+   "duration_seconds": 5.8,
+   "render_ms": 6,
+   "sha256": "41257cd2d712af34334ccb39b94e79f167c3548d5313c16f7493954818ff08a9",
+   "cache": "hit",
+   "render_ms_saved": 121474,
+   "reused_from": {
+    "task": "anim-b0d140578639ddc407eb",
+    "scene": "accueil",
+    "index": 1
+   }
+  },
+  {
+   "index": 2,
+   "id": "coaxial",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 175,
+   "expected_seconds": 5.833,
+   "duration_seconds": 5.83,
+   "render_ms": 47509,
+   "sha256": "f6e1f2c60554308724e699b14d48c8e3a1f06e2e615d7654d9f9c29bce3e1f8e",
+   "cache": "miss"
+  },
+  {
+   "index": 3,
+   "id": "bnc",
+   "status": "animated",
+   "detail": "",
+   "fallback_source": "",
+   "frames": 236,
+   "expected_seconds": 7.867,
+   "duration_seconds": 7.87,
+   "render_ms": 9,
+   "sha256": "d71e2ff22d105abbab248f1098fc9a003493880a4006489d3f640d7a37500e5f",
+   "cache": "hit",
+   "render_ms_saved": 49149,
+   "reused_from": {
+    "task": "anim-b0d140578639ddc407eb",
+    "scene": "bnc",
+    "index": 3
+   }
+  }
+ ],
+ "fallback_scenes": [],
+ "audit": {
+  "scenes_rendered": 1,
+  "scenes_reused": 2,
+  "reused_scenes": [
+   1,
+   3
+  ],
+  "rendered_scenes": [
+   2
+  ],
+  "render_ms_spent": 47509,
+  "render_ms_saved": 170623,
+  "steps_ms": {
+   "scenes_ms": 47553,
+   "soundtrack_ms": 662,
+   "assembly_ms": 32030,
+   "qa_ms": 6337
+  },
+  "external_calls": 0,
+  "external_cost": 0.0
+ },
+ "qa": {
+  "status": "ok",
+  "counts": {
+   "info": 0,
+   "warning": 0,
+   "error": 0
+  }
+ },
+ "warnings": []
+}
