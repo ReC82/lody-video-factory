@@ -3,6 +3,7 @@
 //
 //   lody-remotion --input scenes/NN-input.json --output scenes/NN.render.mp4
 //   lody-remotion --input scenes/NN-input.json --still <image> --output scenes/NN-still.png
+//   lody-remotion --version      → « lody-remotion <empreinte des sources> » (identité pour le cache de scène #121)
 //   lody-remotion --prepare      (image Docker #154 : télécharge Chrome headless et préconstruit le bundle)
 //
 // Rendu sobre pour un hôte partagé : une page Chrome à la fois (concurrence 1), bundle webpack construit une
@@ -67,9 +68,13 @@ async function ensureBundle() {
 }
 
 async function main() {
+  if (process.argv.length === 3 && process.argv[2] === '--version') {
+    console.log(`lody-remotion ${sourceDigest()}`); // le worker #121 invalide son cache quand les sources changent
+    return 0;
+  }
   const args = parseArgs(process.argv.slice(2));
   if (!args) {
-    console.error('usage : lody-remotion --input <scène.json> [--still <image>] --output <fichier> | --prepare');
+    console.error('usage : lody-remotion --input <scène.json> [--still <image>] --output <fichier> | --prepare | --version');
     return 2;
   }
   // Chemins résolus AVANT de changer de dossier : le worker lance le moteur depuis le dossier de la tâche.
@@ -92,12 +97,13 @@ async function main() {
   if (args.still !== undefined) {
     const frame = Math.min(Number(args.still), composition.durationInFrames - 1);
     await renderStill({composition, serveUrl, inputProps: props, frame, output, imageFormat: 'png',
-      overwrite: true, logLevel: 'error'});
+      scale: props.scale, overwrite: true, logLevel: 'error'});
   } else {
     let last = -10;
     await renderMedia({
       composition, serveUrl, inputProps: props, codec: 'h264', outputLocation: output, crf: 20,
       pixelFormat: 'yuv420p', imageFormat: 'jpeg', jpegQuality: 92, concurrency: 1, muted: true,
+      scale: props.scale, // #121 : prévisualisation basse résolution (1 = rendu final)
       overwrite: true, logLevel: 'error',
       onProgress: ({progress}) => {
         const pct = Math.floor(progress * 100);

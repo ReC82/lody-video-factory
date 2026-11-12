@@ -54,10 +54,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from lody.animation import audio, modes
+from lody.animation import audio, modes, qa, scene_cache
 from lody.animation.contract import (
     AnimationValidationError,
-    canonical_json,
     document_sha256,
     total_frames,
     validate_document,
@@ -69,6 +68,9 @@ JOB_SCHEMA = "lody.animation-job/1"
 SCENE_SCHEMA = "lody.animation-scene/1"
 RENDERER_ENV = "LODY_ANIMATION_RENDERER"
 SCENE_TIMEOUT_ENV = "LODY_ANIMATION_SCENE_TIMEOUT"
+RENDERER_REVISION_ENV = "LODY_ANIMATION_RENDERER_REVISION"  # #121 : à changer quand le moteur change (purge du cache)
+MIN_PREVIEW_SCALE = 0.25
+PREVIEW_SCALES = (0.25, 0.5, 0.75)   # prévisualisation : ¼, ½ ou ¾ de la résolution finale
 DEFAULT_SCENE_TIMEOUT = 900.0          # 15 min par scène : ≈ 7× le temps réel mesuré en #118, avec marge
 MAX_TOTAL_SECONDS = 600                # 10 min de vidéo au plus par tâche (plafond d'images = fps × 600)
 NICENESS = 10
@@ -236,6 +238,7 @@ class CommandRenderer:
         if not command:
             raise JobError("Aucun moteur de rendu 2D n'est configuré.")
         self.command = list(command)
+        self._identity: str | None = None
 
     def _run(self, arguments: list[str], output: Path, timeout: float, tick: Callable[[], None]) -> None:
         log = output.with_suffix(output.suffix + ".log")
@@ -262,6 +265,25 @@ class CommandRenderer:
             raise SceneRenderError(f"le moteur de rendu a échoué (code {code})")
         if not output.is_file() or output.stat().st_size == 0:
             raise SceneRenderError("le moteur de rendu n'a produit aucun fichier")
+
+    def identity(self) -> str:
+        """Identité du moteur pour le cache de scène (#121) : commande, révision déclarée, version annoncée.
+
+        ``<commande> --version`` (gratuit, local) renvoie l'empreinte des sources de l'adaptateur Remotion ; un
+        moteur qui ne la connaît pas est identifié par sa commande et ``LODY_ANIMATION_RENDERER_REVISION``.
+        """
+        if self._identity is None:
+            announced = ""
+            try:
+                done = subprocess.run(self.command + ["--version"], capture_output=True, text=True, timeout=30,
+                                      env=minimal_env(), stdin=subprocess.DEVNULL, check=False)
+                if done.returncode == 0:
+                    announced = (done.stdout or "").strip()[:200]
+            except (OSError, subprocess.SubprocessError):
+                announced = ""
+            self._identity = "\x1f".join([shlex.join(self.command), os.environ.get(RENDERER_REVISION_ENV, ""),
+                                           announced])
+        return self._identity
 
     def render(self, scene_input: Path, output: Path, timeout: float, tick: Callable[[], None]) -> None:
         self._run(["--input", str(scene_input), "--output", str(output)], output, timeout, tick)
@@ -294,6 +316,17 @@ class _Context:
     stop_requested: Callable[[], bool]
     state: dict[str, Any]
     last_beat: float = 0.0
+    cache: scene_cache.SceneCache | None = None
+    identity: str = ""
+
+    @property
+    def scale(self) -> float:
+        return preview_scale(self.job)
+
+    def frame_size(self) -> tuple[int, int]:
+        """Dimensions de sortie : celles du canevas, réduites (paires) en prévisualisation."""
+        canvas = self.job["storyboard"]["canvas"]
+        return scaled_size(canvas["width"], canvas["height"], self.scale)
 
     def save_state(self, **changes: Any) -> None:
         self.state.update(changes)
@@ -312,6 +345,34 @@ class _Context:
 
         with (self.directory / "worker.log").open("a", encoding="utf-8") as sink:
             sink.write(f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(self.clock()))} {sanitize(message, 400)}\n")
+
+
+def preview_scale(job: dict[str, Any]) -> float:
+    """Échelle de rendu (#121) : 1 pour le rendu final, ``[0.25, 1[`` pour une prévisualisation basse résolution."""
+    raw = (job.get("preview") or {}).get("scale", 1.0) if isinstance(job.get("preview"), dict) else 1.0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 1.0
+    if not (MIN_PREVIEW_SCALE <= value < 1.0):
+        return 1.0
+    return min(PREVIEW_SCALES, key=lambda allowed: abs(allowed - value))  # paliers fixes : cache partagé
+
+
+def scaled_size(width: int, height: int, scale: float) -> tuple[int, int]:
+    def even(value: float) -> int:
+        return max(2, int(round(value / 2)) * 2)
+
+    return (width, height) if scale >= 1.0 else (even(width * scale), even(height * scale))
+
+
+def renderer_identity(renderer: SceneRenderer | None) -> str:
+    """Identité du moteur de scène pour le cache : ``identity()`` du moteur, sinon le nom de sa classe."""
+    if renderer is None:
+        return ""
+    identity = getattr(renderer, "identity", None)
+    value = identity() if callable(identity) else identity
+    return str(value or type(renderer).__name__)
 
 
 def load_job(directory: Path) -> dict[str, Any]:
@@ -349,6 +410,8 @@ def scene_input(ctx: _Context, index: int, scene: dict[str, Any]) -> Path:
               for key in sorted(used) if key in (ctx.job.get("assets") or {})}
     data = {"schema": SCENE_SCHEMA, "canvas": ctx.job["storyboard"]["canvas"], "index": index, "scene": scene,
             "assets": assets}
+    if ctx.scale < 1.0:  # #121 : prévisualisation basse résolution (le moteur rend à cette échelle)
+        data["render"] = {"scale": ctx.scale}
     info = ctx.job.get("asset_info") or {}
     if info:  # #150 : type, dimensions et ancrage du manifeste (placement exact par le moteur de scène)
         data["asset_info"] = {key: info[key] for key in sorted(used) if key in info}
@@ -362,8 +425,8 @@ def scene_input(ctx: _Context, index: int, scene: dict[str, Any]) -> Path:
 
 
 def _encode_still(ctx: _Context, image: Path | None, seconds: float, output: Path) -> None:
-    canvas = ctx.job["storyboard"]["canvas"]
-    width, height, fps = canvas["width"], canvas["height"], canvas["fps"]
+    fps = ctx.job["storyboard"]["canvas"]["fps"]
+    width, height = ctx.frame_size()
     if image is not None:
         source = ["-loop", "1", "-i", str(image)]
         video_filter = (f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -406,23 +469,37 @@ def _fallback(ctx: _Context, index: int, scene: dict[str, Any], input_path: Path
     return "carton neutre"
 
 
-def _voice_digest(ctx: _Context) -> str:
-    voice = ctx.directory / audio.VOICE_FILE
-    return sha256_file(voice) if voice.is_file() else ""
-
-
 def _render_scene(ctx: _Context, index: int, scene: dict[str, Any]) -> dict[str, Any]:
     scenes_dir = ctx.directory / "scenes"
     output = scenes_dir / f"{index:02d}.mp4"
     trace_path = scenes_dir / f"{index:02d}.json"
-    expected = canonical_json(scene) + _voice_digest(ctx)  # une voix changée rend la scène à refaire (bouche)
+    voice = ctx.directory / audio.VOICE_FILE
+    # #121 : clé = empreinte des SEULES dépendances de la scène (voir ``scene_cache``) ; une voix retouchée
+    # ailleurs, une intention narrative ou un déplacement de la scène ne la rendent pas à refaire.
+    key = scene_cache.dependency_key(scene_cache.scene_dependencies(
+        ctx.job, index, scene, voice if voice.is_file() else None, ctx.identity, ctx.scale))
     cached = read_json(trace_path)
-    if (cached and cached.get("scene_sha256") == hashlib.sha256(expected.encode()).hexdigest()
+    if (cached and cached.get("scene_sha256") == key
             and output.is_file() and sha256_file(output) == cached.get("sha256")):
-        return {**cached, "cached": True}  # reprise : scène déjà rendue et intacte, jamais refaite
+        return {**cached, "cached": True, "resumed": True}  # reprise : scène déjà rendue et intacte
 
     fps = ctx.job["storyboard"]["canvas"]["fps"]
     started = time.monotonic()
+    output.unlink(missing_ok=True)  # jamais d'écriture dans un fichier partagé (lien physique du cache)
+    if ctx.cache is not None:
+        hit = ctx.cache.lookup(key, output)
+        if hit is not None:  # rendue par une tâche précédente du projet (V1, prévisualisation…) : réutilisée
+            trace = {
+                "index": index, "id": scene["id"], "status": "animated", "detail": "", "fallback_source": "",
+                "frames": scene["duration_frames"], "expected_seconds": round(scene["duration_frames"] / fps, 3),
+                "duration_seconds": hit.get("duration_seconds") or media_duration(ctx.ffmpeg, output),
+                "render_ms": int((time.monotonic() - started) * 1000), "sha256": hit["sha256"],
+                "scene_sha256": key, "cache": "hit", "render_ms_saved": int(hit.get("render_ms") or 0),
+                "reused_from": hit.get("origin") or {},
+            }
+            write_json(trace_path, trace)
+            ctx.log(f"scène {index} « {scene['id']} » : réutilisée depuis le cache (aucun rendu)")
+            return trace
     input_path = scene_input(ctx, index, scene)
     temporary = scenes_dir / f"{index:02d}.render.mp4"
     temporary.unlink(missing_ok=True)
@@ -443,14 +520,17 @@ def _render_scene(ctx: _Context, index: int, scene: dict[str, Any]) -> dict[str,
         "index": index, "id": scene["id"], "status": status, "detail": detail, "fallback_source": source,
         "frames": scene["duration_frames"], "expected_seconds": round(scene["duration_frames"] / fps, 3),
         "duration_seconds": media_duration(ctx.ffmpeg, output), "render_ms": int((time.monotonic() - started) * 1000),
-        "sha256": sha256_file(output), "scene_sha256": hashlib.sha256(expected.encode()).hexdigest(),
+        "sha256": sha256_file(output), "scene_sha256": key, "cache": "miss",
     }
     write_json(trace_path, trace)
+    if ctx.cache is not None:
+        ctx.cache.store(key, output, trace)  # seulement si animée : un repli n'est jamais mis en cache
     return trace
 
 
 def _concat(ctx: _Context, outputs: list[Path], target: Path) -> None:
     canvas = ctx.job["storyboard"]["canvas"]
+    width, height = ctx.frame_size()
     listing = ctx.directory / "scenes" / "concat.txt"
     listing.write_text("".join(f"file '{path.name}'\n" for path in outputs), encoding="utf-8")
     temporary = ctx.directory / "out.partial.mp4"
@@ -461,7 +541,7 @@ def _concat(ctx: _Context, outputs: list[Path], target: Path) -> None:
                     "-shortest"]
     else:
         command += ["-an"]
-    command += ["-vf", f"fps={canvas['fps']},scale={canvas['width']}:{canvas['height']},format=yuv420p",
+    command += ["-vf", f"fps={canvas['fps']},scale={width}:{height},format=yuv420p",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-movflags", "+faststart", "-f", "mp4",
                 str(temporary)]
     done = subprocess.run(command, capture_output=True, timeout=max(600.0, ctx.timeout), check=False)
@@ -489,8 +569,11 @@ def write_subtitles(directory: Path, storyboard: dict[str, Any]) -> int:
 
 def run_job(directory: Path, renderer: SceneRenderer | None, *, ffmpeg: str | None = None,
             timeout: float | None = None, clock: Callable[[], float] = time.time,
-            stop_requested: Callable[[], bool] = lambda: False) -> dict[str, Any]:
-    """Exécute (ou reprend) une tâche jusqu'à un état final ou un arrêt. Renvoie l'état final."""
+            stop_requested: Callable[[], bool] = lambda: False, use_cache: bool = True) -> dict[str, Any]:
+    """Exécute (ou reprend) une tâche jusqu'à un état final ou un arrêt. Renvoie l'état final.
+
+    ``use_cache`` (#121) : réutilise les scènes déjà rendues dans ce projet dont les dépendances sont identiques.
+    """
     directory = Path(directory)
     with file_lock(directory / "job.lock", blocking=False) as mine:
         if not mine:
@@ -502,6 +585,9 @@ def run_job(directory: Path, renderer: SceneRenderer | None, *, ffmpeg: str | No
                        stop_requested, state)
         try:
             ctx.job = load_job(directory)
+            ctx.identity = renderer_identity(renderer)
+            if use_cache:
+                ctx.cache = scene_cache.SceneCache(directory.parent)
             if not ctx.ffmpeg:
                 raise JobError("ffmpeg est introuvable : l'assemblage de la vidéo est impossible.")
             ctx.save_state(state="queued", step="En attente d'un emplacement de rendu", error="")
@@ -538,12 +624,15 @@ def _global_slot(ctx: _Context) -> Iterator[None]:
 def _execute(ctx: _Context) -> None:
     storyboard = ctx.job["storyboard"]
     scenes = storyboard["scenes"]
+    fps = storyboard["canvas"]["fps"]
     total = total_frames(storyboard)
     (ctx.directory / "scenes").mkdir(exist_ok=True)
     started = time.monotonic()
+    steps: dict[str, int] = {}
     ctx.save_state(state="running", total_scenes=len(scenes), total_frames=total, rendered_frames=0,
                    step="Rendu des scènes")
-    ctx.log(f"rendu démarré : {len(scenes)} scène(s), {total} image(s), mode {ctx.job['mode']}")
+    ctx.log(f"rendu démarré : {len(scenes)} scène(s), {total} image(s), mode {ctx.job['mode']}"
+            + (f", prévisualisation ×{ctx.scale}" if ctx.scale < 1.0 else ""))
     traces, done_frames = [], 0
     for index, scene in enumerate(scenes, 1):
         ctx.tick()
@@ -552,35 +641,68 @@ def _execute(ctx: _Context) -> None:
         traces.append(trace)
         done_frames += scene["duration_frames"]
         ctx.save_state(rendered_frames=done_frames)
+    steps["scenes_ms"] = int((time.monotonic() - started) * 1000)
     ctx.tick()
     ctx.save_state(step="Assemblage de la vidéo")
     target = ctx.directory / "out.mp4"
+    mark = time.monotonic()
     try:
-        sound = audio.prepare_soundtrack(ctx.ffmpeg, ctx.directory, total / storyboard["canvas"]["fps"])
+        sound = audio.prepare_soundtrack(ctx.ffmpeg, ctx.directory, total / fps)
     except (audio.SoundtrackError, subprocess.SubprocessError, OSError):
         raise JobError("Le mixage de la voix et de la musique a échoué.") from None
     if sound:
         ctx.log(f"bande son : {sound}")
+    steps["soundtrack_ms"] = int((time.monotonic() - mark) * 1000)
+    mark = time.monotonic()
     _concat(ctx, [ctx.directory / "scenes" / f"{i:02d}.mp4" for i in range(1, len(scenes) + 1)], target)
     cues = write_subtitles(ctx.directory, storyboard)
+    steps["assembly_ms"] = int((time.monotonic() - mark) * 1000)
+    ctx.save_state(step="Contrôle qualité")
+    mark = time.monotonic()
+    report = qa.run(ctx.ffmpeg, ctx.directory, storyboard, traces, frame_size=ctx.frame_size())
+    write_json(ctx.directory / "qa.json", report)
+    steps["qa_ms"] = int((time.monotonic() - mark) * 1000)
     fallbacks = [t for t in traces if t["status"] == "fallback"]
+    width, height = ctx.frame_size()
     manifest = {
         "schema": "lody.animation-render/1", "mode": ctx.job["mode"], "frames": total,
-        "fps": storyboard["canvas"]["fps"], "width": storyboard["canvas"]["width"],
-        "height": storyboard["canvas"]["height"],
-        "expected_seconds": round(total / storyboard["canvas"]["fps"], 3),
+        "fps": fps, "width": width, "height": height,
+        "preview": ctx.scale < 1.0, "scale": ctx.scale,
+        "expected_seconds": round(total / fps, 3),
         "duration_seconds": media_duration(ctx.ffmpeg, target), "sha256": sha256_file(target),
         "size_bytes": target.stat().st_size, "storyboard_sha256": document_sha256(storyboard),
         "render_ms": int((time.monotonic() - started) * 1000), "subtitle_cues": cues,
         "audio": audio.describe(ctx.directory),
-        "scenes": [{key: value for key, value in t.items() if key != "scene_sha256"} for t in traces],
+        "scenes": [{key: value for key, value in t.items() if key not in ("scene_sha256", "cached", "resumed")}
+                   for t in traces],
         "fallback_scenes": [t["index"] for t in fallbacks],
+        "audit": render_audit(traces, steps),
+        "qa": qa.summary(report),
         "warnings": [f"Scène {t['index']} « {t['id']} » : animation en échec, remplacée par l'image de repli "
-                     f"({t['fallback_source']})." for t in fallbacks],
+                     f"({t['fallback_source']})." for t in fallbacks] + qa.warnings(report),
     }
     write_json(ctx.directory / "manifest.json", manifest)
     ctx.save_state(state="done", step="Terminée", rendered_frames=total)
-    ctx.log(f"rendu terminé : {manifest['duration_seconds']} s, {len(fallbacks)} repli(s)")
+    audit = manifest["audit"]
+    ctx.log(f"rendu terminé : {manifest['duration_seconds']} s, {len(fallbacks)} repli(s), "
+            f"{audit['scenes_reused']} scène(s) réutilisée(s), contrôle qualité « {report['status']} »")
+
+
+def render_audit(traces: list[dict[str, Any]], steps: dict[str, int]) -> dict[str, Any]:
+    """Audit des ressources par étape (#121) : scènes rendues ou réutilisées, temps réellement évité, coût externe.
+
+    Le rendu 2D est local : aucun appel externe, coût fournisseur nul. Le temps « évité » est la durée de rendu
+    MESURÉE à l'origine des scènes réutilisées (pas une estimation).
+    """
+    reused = [t for t in traces if t.get("cache") == "hit"]
+    rendered = [t for t in traces if t.get("cache") != "hit"]  # y compris celles rendues avant une reprise
+    return {
+        "scenes_rendered": len(rendered), "scenes_reused": len(reused),
+        "reused_scenes": [t["index"] for t in reused], "rendered_scenes": [t["index"] for t in rendered],
+        "render_ms_spent": sum(int(t.get("render_ms") or 0) for t in rendered),
+        "render_ms_saved": sum(int(t.get("render_ms_saved") or 0) for t in reused),
+        "steps_ms": dict(steps), "external_calls": 0, "external_cost": 0.0,
+    }
 
 
 # -- point d'entrée du processus dédié -----------------------------------------------------------------------

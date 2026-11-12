@@ -12,6 +12,10 @@ lody-remotion --input scenes/NN-input.json --still <image> --output scenes/NN-st
 
 Code de sortie 0 = fichier produit ; 2 = arguments invalides ; 1 = échec (entrée refusée ou rendu).
 
+`lody-remotion --version` affiche l'empreinte des sources (`src/`, `lib/`, `package-lock.json`) : le worker
+l'utilise comme identité du moteur pour son cache de scène (#121). Une entrée de scène portant
+`"render": {"scale": 0.5}` est rendue en prévisualisation basse résolution (¼, ½ ou ¾).
+
 ## Installation (DEV)
 
 ```bash
