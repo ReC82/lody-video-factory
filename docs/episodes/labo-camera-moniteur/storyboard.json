@@ -1,0 +1,2252 @@
+{
+  "schema": "lody.animation/1",
+  "canvas": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920
+  },
+  "scenes": [
+    {
+      "id": "question",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Nora, comment l'image de cette caméra arrive-t-elle sur l'écran, là-bas ?",
+        "purpose": "Accrocher : poser la question du novice devant le matériel.",
+        "mood": "curieux",
+        "notes": "Réplique de Sam. Texte affiché : « Comment ? » / « caméra → écran »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  },
+                  {
+                    "frame": 110,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 60,
+                    "end": 66,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": false
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "confusion"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 18,
+                    "end": 42,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 120,
+                    "end": 126,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Comment ?",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "sous-titre",
+                "type": "text",
+                "text": {
+                  "content": "caméra → écran",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 12,
+                    "value": 0
+                  },
+                  {
+                    "frame": 22,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "sam",
+          "cues": [
+            {
+              "text": "Nora, comment l'image de cette",
+              "start": 8,
+              "end": 75
+            },
+            {
+              "text": "caméra arrive-t-elle sur",
+              "start": 75,
+              "end": 128
+            },
+            {
+              "text": "l'écran, là-bas ?",
+              "start": 128,
+              "end": 166
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "fade",
+          "frames": 10
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 90
+        }
+      }
+    },
+    {
+      "id": "capter",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Dans la caméra, un capteur transforme la lumière en signal électrique.",
+        "purpose": "Étape un : la caméra convertit la lumière en signal électrique.",
+        "mood": "pédagogique",
+        "notes": "Réplique de Nora. Texte affiché : « 1. Capter » / « lumière → signal »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "signal-camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 500,
+                    "y": 540
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 60,
+                    "value": 0
+                  },
+                  {
+                    "frame": 72,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 14,
+                    "end": 44,
+                    "name": "expliquer"
+                  },
+                  {
+                    "start": 90,
+                    "end": 114,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 96,
+                    "end": 102,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": false
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "1. Capter",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "sous-titre",
+                "type": "text",
+                "text": {
+                  "content": "lumière → signal",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 12,
+                    "value": 0
+                  },
+                  {
+                    "frame": 22,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "nora",
+          "cues": [
+            {
+              "text": "Dans la caméra, un capteur",
+              "start": 8,
+              "end": 68
+            },
+            {
+              "text": "transforme la lumière en",
+              "start": 68,
+              "end": 124
+            },
+            {
+              "text": "signal électrique.",
+              "start": 124,
+              "end": 166
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 90
+        }
+      }
+    },
+    {
+      "id": "cable",
+      "duration_frames": 150,
+      "intent": {
+        "narration": "Et ce signal file dans le câble jusqu'à l'écran ?",
+        "purpose": "Faire apparaître le câble : le lien entre la caméra et l'écran.",
+        "mood": "pédagogique",
+        "notes": "Réplique de Sam. Texte affiché : « 2. Transporter ? »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 660
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 20,
+                    "value": 0
+                  },
+                  {
+                    "frame": 32,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-cable",
+                "type": "text",
+                "text": {
+                  "content": "Câble",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 800
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 20,
+                    "value": 0
+                  },
+                  {
+                    "frame": 30,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 70,
+                    "end": 90,
+                    "name": "pencher-tete"
+                  }
+                ],
+                "lipsync": false
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "confusion"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 12,
+                    "end": 36,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "2. Transporter ?",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "sam",
+          "cues": [
+            {
+              "text": "Et ce signal file dans le",
+              "start": 8,
+              "end": 75
+            },
+            {
+              "text": "câble jusqu'à l'écran ?",
+              "start": 75,
+              "end": 136
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 75
+        }
+      }
+    },
+    {
+      "id": "transporter",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Oui. Le câble ne transporte pas une photo : il transporte ce signal, image après image.",
+        "purpose": "Étape deux : le câble porte un signal, pas une image.",
+        "mood": "pédagogique",
+        "notes": "Réplique de Nora. Texte affiché : « 2. Transporter » / « le signal voyage »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 660
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "signal-cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 10,
+                    "x": 510,
+                    "y": 600
+                  },
+                  {
+                    "frame": 190,
+                    "x": 690,
+                    "y": 600
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ],
+                "easing": "ease_in_out"
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-cable",
+                "type": "text",
+                "text": {
+                  "content": "Câble",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 800
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 12,
+                    "end": 42,
+                    "name": "expliquer"
+                  },
+                  {
+                    "start": 110,
+                    "end": 140,
+                    "name": "expliquer"
+                  }
+                ],
+                "lipsync": true
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  },
+                  {
+                    "frame": 150,
+                    "name": "surprise"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 60,
+                    "end": 66,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": false
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "2. Transporter",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "sous-titre",
+                "type": "text",
+                "text": {
+                  "content": "le signal voyage",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 12,
+                    "value": 0
+                  },
+                  {
+                    "frame": 22,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "nora",
+          "cues": [
+            {
+              "text": "Oui. Le câble ne transporte",
+              "start": 8,
+              "end": 68
+            },
+            {
+              "text": "pas une photo : il transporte",
+              "start": 68,
+              "end": 132
+            },
+            {
+              "text": "ce signal, image après image.",
+              "start": 132,
+              "end": 196
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 105
+        }
+      }
+    },
+    {
+      "id": "inverse",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Et l'écran, alors, il fait le chemin inverse ?",
+        "purpose": "Annoncer l'étape trois par la question de Sam.",
+        "mood": "pédagogique",
+        "notes": "Réplique de Sam. Texte affiché : « 3. Afficher ? »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 660
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-cable",
+                "type": "text",
+                "text": {
+                  "content": "Câble",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 800
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 120,
+                    "end": 126,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": false
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "confusion"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 10,
+                    "end": 30,
+                    "name": "pencher-tete"
+                  },
+                  {
+                    "start": 70,
+                    "end": 94,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "3. Afficher ?",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "sam",
+          "cues": [
+            {
+              "text": "Et l'écran, alors, il fait le",
+              "start": 8,
+              "end": 110
+            },
+            {
+              "text": "chemin inverse ?",
+              "start": 110,
+              "end": 166
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 90
+        }
+      }
+    },
+    {
+      "id": "afficher",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Oui : le moniteur décode le signal et allume ses points lumineux pour recomposer l'image.",
+        "purpose": "Étape trois : l'écran recompose l'image à partir du signal.",
+        "mood": "pédagogique",
+        "notes": "Réplique de Nora. Texte affiché : « 3. Afficher » / « signal → image »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 660
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "image-ecran",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 592
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.55
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 40,
+                    "value": 0
+                  },
+                  {
+                    "frame": 52,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-cable",
+                "type": "text",
+                "text": {
+                  "content": "Câble",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 800
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 16,
+                    "end": 40,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 100,
+                    "end": 130,
+                    "name": "expliquer"
+                  }
+                ],
+                "lipsync": true
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 140,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 80,
+                    "end": 86,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": false
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "3. Afficher",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "sous-titre",
+                "type": "text",
+                "text": {
+                  "content": "signal → image",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 12,
+                    "value": 0
+                  },
+                  {
+                    "frame": 22,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "nora",
+          "cues": [
+            {
+              "text": "Oui : le moniteur décode le",
+              "start": 8,
+              "end": 67
+            },
+            {
+              "text": "signal et allume ses points",
+              "start": 67,
+              "end": 126
+            },
+            {
+              "text": "lumineux pour recomposer",
+              "start": 126,
+              "end": 178
+            },
+            {
+              "text": "l'image.",
+              "start": 178,
+              "end": 196
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 105
+        }
+      }
+    },
+    {
+      "id": "recap",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Donc la caméra capte, le câble transporte, et l'écran affiche !",
+        "purpose": "Récapituler la chaîne complète en une phrase.",
+        "mood": "enjoué",
+        "notes": "Réplique de Sam. Texte affiché : « En résumé » / « capte → transporte → affiche »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "sujet",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 100,
+                    "y": 630
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.8
+                  }
+                ]
+              },
+              {
+                "id": "camera",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 660
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 620
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.95
+                  }
+                ]
+              },
+              {
+                "id": "signal-cable",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 10,
+                    "x": 510,
+                    "y": 600
+                  },
+                  {
+                    "frame": 160,
+                    "x": 690,
+                    "y": 600
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ],
+                "easing": "ease_in_out"
+              },
+              {
+                "id": "image-ecran",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_174000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 592
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.55
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-camera",
+                "type": "text",
+                "text": {
+                  "content": "Caméra",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-moniteur",
+                "type": "text",
+                "text": {
+                  "content": "Écran",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 800
+                  }
+                ]
+              },
+              {
+                "id": "etiquette-cable",
+                "type": "text",
+                "text": {
+                  "content": "Câble",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 600,
+                    "y": 800
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "personnages",
+            "objects": [
+              {
+                "id": "nora",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 130,
+                    "end": 160,
+                    "name": "saluer"
+                  }
+                ],
+                "lipsync": false
+              },
+              {
+                "id": "sam",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_173000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 790,
+                    "y": 1790
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.15
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 10,
+                    "end": 34,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 80,
+                    "end": 110,
+                    "name": "expliquer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          },
+          {
+            "id": "texte-affiche",
+            "objects": [
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "En résumé",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 170
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 6,
+                    "value": 0
+                  },
+                  {
+                    "frame": 16,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "sous-titre",
+                "type": "text",
+                "text": {
+                  "content": "capte → transporte → affiche",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 12,
+                    "value": 0
+                  },
+                  {
+                    "frame": 22,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "speech": {
+          "speaker": "sam",
+          "cues": [
+            {
+              "text": "Donc la caméra capte, le câble",
+              "start": 8,
+              "end": 86
+            },
+            {
+              "text": "transporte, et l'écran affiche",
+              "start": 86,
+              "end": 164
+            },
+            {
+              "text": "!",
+              "start": 164,
+              "end": 166
+            }
+          ]
+        },
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "fade",
+          "frames": 12
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 90
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "Labo — De la caméra à l'écran",
+  "description": "Projet expérimental du laboratoire (#174) : dialogue Nora / Sam, « Comment l'image d'une caméra apparaît-elle sur un moniteur ? ». Voir docs/episodes/labo-camera-moniteur.md.",
+  "payload": {
+    "duration_min": 30,
+    "duration_max": 45,
+    "narration_pace": "normal",
+    "scenes_per_minute_min": 8,
+    "scenes_per_minute_max": 12,
+    "structure": [
+      "Question de Sam devant la caméra et l'écran",
+      "Capter : la caméra transforme la lumière en signal électrique",
+      "Le câble apparaît entre la caméra et l'écran",
+      "Transporter : le câble porte un signal, pas une photo",
+      "Question : l'écran fait-il le chemin inverse ?",
+      "Afficher : le moniteur décode le signal et recompose l'image",
+      "Récapitulatif : capter, transporter, afficher"
+    ],
+    "standing_instructions": "Projet de laboratoire, indépendant des épisodes publiés. Dialogue entre deux personnages fictifs adultes, Nora (explique) et Sam (pose les questions du novice), une réplique par scène. Une seule notion centrale : la caméra capte la lumière et la change en signal électrique, le câble transporte ce signal, l'écran le décode pour recomposer l'image. Aucun nom de norme, de connecteur ni de marque. Texte oral TTS-safe : aucun chiffre ni sigle.",
+    "visual_rules": "Illustration vectorielle plate, contours brun foncé, 9:16. Schéma sur une ligne : sujet, caméra, câble, écran, de gauche à droite ; le signal circule dans le même sens. Texte affiché court et distinct du texte oral : étape numérotée en haut, étiquettes sous le matériel. Nora à gauche, Sam à droite, sans changer leurs palettes. Une action visuelle toutes les 5 à 7 secondes.",
+    "visual_avoid": [
+      "Personnes réelles ou collègues reconnaissables",
+      "Logos ou marques de fabricants",
+      "Noms de normes ou de connecteurs",
+      "Texte en anglais à l'écran",
+      "Nouveau personnage non prévu par le catalogue"
+    ],
+    "hook_notes": "Question de Sam dès la première seconde, en montrant l'écran éteint.",
+    "subtitle_notes": "Sous-titres français en phrases entières, découpés par réplique ; le titre affiché n'est jamais la copie du texte oral.",
+    "music_notes": "Pas de musique imposée pour l'animatic ; musique libre de droits discrète en option."
+  }
+}
