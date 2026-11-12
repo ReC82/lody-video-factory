@@ -335,3 +335,120 @@ def test_regular_character_fields_still_work_unrelated_to_voice(engine, _no_cata
     assert not app.exception
     character = _char_repo().list_for_project(project.id)[0]
     assert character.name == "Gaston" and character.role == "Guide" and character.is_primary
+
+
+# -- #191 : choix + Enregistrer dans le MÊME envoi de formulaire (comportement réel du navigateur) ----------------------
+# Dans un ``st.form``, choisir une voix ne relance PAS le script : le navigateur envoie la sélection et le clic
+# « Enregistrer » ensemble, et le callback ``_submit`` s'exécute AVANT le rendu. Les tests ci-dessus relancent le
+# script après ``select()`` (ce qu'AppTest fait mais pas le navigateur) et masquaient donc la perte de la voix.
+def test_191_character_voice_chosen_and_saved_in_one_submit_is_persisted_and_redisplayed(engine, _no_catalog_by_default):  # noqa: F811
+    _write_report(_no_catalog_by_default, [RACHEL, NOVA])
+    project = _project()
+    character = _char_repo().create(project.id, name="Voltix")
+    app = _open_edit_character_form(project, character.id)
+    pc = f"char_{project.id}_{character.id}"
+    app.selectbox(key=f"{pc}_ev_select").select(_select_option(RACHEL))
+    app = _button(app, "Enregistrer").click().run()
+    assert not app.exception
+    saved = _char_repo().get(project.id, character.id)
+    assert (saved.voice_provider, saved.voice_name, saved.external_voice_id) == ("elevenlabs", "Rachel", RACHEL.voice_id)
+    # Sortie puis retour sur la fiche (nouvelle session : équivaut à F5 / redémarrage) : la voix est réaffichée.
+    app = _open_edit_character_form(project, character.id)
+    assert app.selectbox(key=f"{pc}_ev_select").value == RACHEL.voice_id
+    assert app.text_input(key=f"{pc}_external_voice_id").value == RACHEL.voice_id
+
+
+def test_191_new_character_voice_chosen_and_saved_in_one_submit(engine, _no_catalog_by_default):  # noqa: F811
+    _write_report(_no_catalog_by_default, [RACHEL])
+    project = _project()
+    app = _open_new_character_form(project)
+    pc = f"char_{project.id}_new"
+    app.text_input(key=f"{pc}_name").set_value("Gaston")
+    app.selectbox(key=f"{pc}_ev_select").select(_select_option(RACHEL))
+    app = _button(app, "Enregistrer").click().run()
+    created = _char_repo().list_for_project(project.id)[0]
+    assert (created.voice_provider, created.voice_name, created.external_voice_id) == ("elevenlabs", "Rachel", RACHEL.voice_id)
+
+
+def test_191_project_voice_chosen_and_saved_in_one_submit_is_persisted_and_redisplayed(engine, _no_catalog_by_default):  # noqa: F811
+    _write_report(_no_catalog_by_default, [RACHEL, NOVA])
+    project = _project()
+    repo = ProjectRepository(settings.db_path())
+    repo.update(project.id, voice_provider="elevenlabs")
+    app = _settings(project)
+    p = f"set_{project.id}"
+    app.selectbox(key=f"{p}_ev_select").select(_select_option(NOVA))
+    app = _button(app, "Enregistrer les paramètres").click().run()
+    assert not app.exception
+    updated = repo.get(project.id)
+    assert updated.voice_provider == "elevenlabs" and updated.voice_name == "Nova"
+    assert updated.settings["brief"]["voice_id"] == NOVA.voice_id
+    app = _settings(project)
+    assert app.selectbox(key=f"{p}_ev_select").value == NOVA.voice_id
+    assert app.text_input(key=f"{p}_voice_id").value == NOVA.voice_id
+
+
+def test_191_untouched_picker_never_overwrites_a_manual_edit(engine, _no_catalog_by_default):  # noqa: F811
+    """La voix déjà enregistrée est présélectionnée : la renvoyer telle quelle n'écrase pas une saisie manuelle
+    faite dans le même envoi (ancien identifiant encore valide, voix absente du catalogue)."""
+    _write_report(_no_catalog_by_default, [RACHEL])
+    project = _project()
+    character = _char_repo().create(project.id, name="Voltix", voice_provider="elevenlabs", voice_name="Rachel",
+                                    external_voice_id=RACHEL.voice_id)
+    app = _open_edit_character_form(project, character.id)
+    pc = f"char_{project.id}_{character.id}"
+    app.text_input(key=f"{pc}_voice_name").set_value("Voix privée")
+    app.text_input(key=f"{pc}_external_voice_id").set_value("private-voice-xyz")
+    app = _button(app, "Enregistrer").click().run()
+    saved = _char_repo().get(project.id, character.id)
+    assert (saved.voice_name, saved.external_voice_id) == ("Voix privée", "private-voice-xyz")
+
+
+def test_191_saved_voice_missing_from_catalog_is_kept_with_a_warning(engine, _no_catalog_by_default):  # noqa: F811
+    _write_report(_no_catalog_by_default, [RACHEL])
+    project = _project()
+    character = _char_repo().create(project.id, name="Voltix", voice_provider="elevenlabs", voice_name="Eli",
+                                    external_voice_id="eli-voice-0001")
+    app = _open_edit_character_form(project, character.id)
+    assert "n’apparaît pas dans le catalogue" in _all_text(app)
+    app = _button(app, "Enregistrer").click().run()
+    assert _char_repo().get(project.id, character.id).external_voice_id == "eli-voice-0001"
+
+
+def test_191_saved_professional_voice_stays_preselected_with_the_generated_filter(engine, _no_catalog_by_default):  # noqa: F811
+    """Une voix « professional » enregistrée ne disparaît plus derrière le filtre « Uniquement les voix générées »."""
+    _write_report(_no_catalog_by_default, [RACHEL, ADAM])
+    project = _project()
+    character = _char_repo().create(project.id, name="Voltix", voice_provider="elevenlabs", voice_name="Adam",
+                                    external_voice_id=ADAM.voice_id)
+    app = _open_edit_character_form(project, character.id)
+    pc = f"char_{project.id}_{character.id}"
+    assert app.selectbox(key=f"{pc}_ev_select").value == ADAM.voice_id
+    app = _button(app, "Enregistrer").click().run()
+    assert _char_repo().get(project.id, character.id).external_voice_id == ADAM.voice_id
+
+
+def test_191_voices_saved_through_the_forms_are_seen_by_generation(engine, _no_catalog_by_default):  # noqa: F811
+    """Bout en bout sans appel payant : ce que les formulaires enregistrent est exactement ce que lisent la
+    préparation classique (``build_request`` → statut « Voix ») et la voix off 2D (``voiceover.voice_spec``)."""
+    from lody.animation import voiceover
+    from lody.generation.service import build_request
+
+    _write_report(_no_catalog_by_default, [RACHEL, NOVA])
+    project = _project()
+    repo = ProjectRepository(settings.db_path())
+    repo.update(project.id, voice_provider="elevenlabs")
+    app = _settings(project)
+    p = f"set_{project.id}"
+    app.selectbox(key=f"{p}_ev_select").select(_select_option(NOVA))
+    _button(app, "Enregistrer les paramètres").click().run()
+    voice = build_request(repo.get(project.id), "Sujet").voice
+    assert (voice.provider, voice.voice_id, voice.name) == ("elevenlabs", NOVA.voice_id, "Nova")
+
+    character = _char_repo().create(project.id, name="Voltix")
+    app = _open_edit_character_form(project, character.id)
+    pc = f"char_{project.id}_{character.id}"
+    app.selectbox(key=f"{pc}_ev_select").select(_select_option(RACHEL))
+    _button(app, "Enregistrer").click().run()
+    spec = voiceover.voice_spec(_char_repo().get(project.id, character.id))
+    assert spec is not None and spec.voice_id == RACHEL.voice_id

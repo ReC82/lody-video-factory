@@ -99,6 +99,8 @@ def _activate(repo: CharacterRepository, project_id: str, character_id: str) -> 
 def _submit(repo: CharacterRepository, project_id: str, target: str | None) -> None:
     p = _prefix(project_id, target)
     ss = st.session_state
+    # #191 : la voix choisie dans le catalogue doit être reportée AVANT de lire les champs (voir voice_picker).
+    voice_picker.apply_pending_selection(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id")
     fields = dict(
         name=ss.get(f"{p}_name", ""), role=ss.get(f"{p}_role", ""), personality=ss.get(f"{p}_personality", ""),
         visual_description=ss.get(f"{p}_visual_description", ""), reference_prompt=ss.get(f"{p}_reference_prompt", ""),

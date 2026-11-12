@@ -25,7 +25,17 @@ automatique).
 ``render()`` renvoie un ``PickerResult`` (``available``/``matched``) que l'appelant utilise pour décider si
 sa propre section « Saisie manuelle » doit être dépliée par défaut (ticket #62) : une valeur existante non
 représentée par le catalogue — ancien identifiant, autre fournisseur, catalogue indisponible — n'est jamais
-cachée silencieusement derrière un repli."""
+cachée silencieusement derrière un repli.
+
+#191 — cause de la perte de voix : dans un ``st.form``, choisir une voix ne relance PAS le script. Le
+navigateur envoie la sélection et le clic « Enregistrer » dans le même envoi, et le callback ``on_click`` du
+bouton s'exécute AVANT le rendu : il lisait donc ``name_key``/``voice_id_key`` encore vides (ou l'ancienne
+voix), et l'application de la sélection par ``render()`` n'arrivait qu'après l'enregistrement. Le callback
+d'enregistrement de chaque formulaire appelle désormais ``apply_pending_selection()`` en premier : même règle
+que ``render()``, mais exécutée avant la lecture des champs. ``last_applied`` est réinitialisé à la valeur
+présélectionnée à chaque (ré)ouverture du sélecteur : une voix présélectionnée et renvoyée telle quelle
+n'écrase jamais une saisie manuelle faite dans le même envoi, et re-choisir une voix déjà appliquée lors
+d'une visite précédente s'applique bien."""
 
 from __future__ import annotations
 
@@ -48,6 +58,30 @@ class PickerResult:
 _UNAVAILABLE = PickerResult(available=False, matched=False)
 
 
+def _keys(prefix: str) -> tuple[str, str, str, str]:
+    """(sélecteur, dernière voix appliquée, noms des options affichées, fournisseur)."""
+    return f"{prefix}_ev_select", f"{prefix}_ev_last_applied", f"{prefix}_ev_names", f"{prefix}_voice_provider"
+
+
+def apply_pending_selection(prefix: str, *, name_key: str, voice_id_key: str) -> bool:
+    """Reporte dans les champs du formulaire la voix choisie dans le sélecteur si elle ne l'a pas encore été
+    (#191). À appeler en tête du callback d'enregistrement : voir le docstring du module. Renvoie ``True`` si
+    les champs ont été modifiés. Ne lit que ``session_state`` (aucun accès réseau ni fichier)."""
+    ss = st.session_state
+    select_key, last_applied_key, names_key, provider_key = _keys(prefix)
+    chosen = ss.get(select_key)
+    if not chosen or chosen == ss.get(last_applied_key):
+        return False
+    name = (ss.get(names_key) or {}).get(chosen)
+    if name is None:  # option inconnue (catalogue changé entre deux rendus) : ne rien inventer
+        return False
+    ss[provider_key] = "elevenlabs"
+    ss[name_key] = name
+    ss[voice_id_key] = chosen
+    ss[last_applied_key] = chosen
+    return True
+
+
 def render(prefix: str, *, name_key: str, voice_id_key: str, current_voice_id: str = "") -> PickerResult:
     """``name_key``/``voice_id_key`` : clés ``session_state`` DÉJÀ utilisées par les champs manuels du
     formulaire appelant (nom de la voix / identifiant) — une sélection les pré-remplit, ainsi que
@@ -60,9 +94,7 @@ def render(prefix: str, *, name_key: str, voice_id_key: str, current_voice_id: s
     ``voice_id``, #59), et à calculer ``PickerResult.matched``."""
     search_key = f"{prefix}_ev_search"
     generated_only_key = f"{prefix}_ev_generated_only"
-    select_key = f"{prefix}_ev_select"
-    last_applied_key = f"{prefix}_ev_last_applied"
-    provider_key = f"{prefix}_voice_provider"
+    select_key, last_applied_key, names_key, _provider_key = _keys(prefix)
 
     with st.container(key=f"{prefix}_ev_picker"):
         st.text_input("Rechercher une voix (nom, identifiant, langue…)", key=search_key,
@@ -88,9 +120,18 @@ def render(prefix: str, *, name_key: str, voice_id_key: str, current_voice_id: s
                       "(./scripts/lody-elevenlabs-voices-report.sh).")
 
         matched = bool(current_voice_id) and any(voice.voice_id == current_voice_id for voice in result.voices)
+        if current_voice_id and not matched:
+            # #191 : jamais d'effacement silencieux — la valeur enregistrée reste dans « Saisie manuelle ».
+            st.caption(f"⚠️ La voix enregistrée (identifiant « {current_voice_id} ») n’apparaît pas dans le "
+                       "catalogue préparé côté hôte : elle reste enregistrée telle quelle (voir « Saisie "
+                       "manuelle »). Choisis une autre voix ci-dessous pour la remplacer.")
 
         generated_only = bool(st.session_state.get(generated_only_key, True))
-        pool = [voice for voice in result.voices if voice.category == "generated"] if generated_only else list(result.voices)
+        # #191 : la voix enregistrée (ou déjà choisie) reste toujours proposée, même hors catégorie « generated »
+        # (ex. une voix « professional ») — sinon elle apparaissait comme « aucune voix sélectionnée ».
+        keep = {current_voice_id, str(st.session_state.get(select_key) or "")} - {""}
+        pool = ([voice for voice in result.voices if voice.category == "generated" or voice.voice_id in keep]
+                if generated_only else list(result.voices))
         if generated_only and not pool:
             st.caption("Aucune voix « generated » disponible sur ce compte : décoche « Uniquement les voix "
                       "générées » ci-dessus pour voir les autres catégories (ex. « professional »).")
@@ -116,16 +157,15 @@ def render(prefix: str, *, name_key: str, voice_id_key: str, current_voice_id: s
             # ``current_voice_id`` (paramètre explicite) en priorité ; session_state[voice_id_key] en repli
             # (utile si ce rendu est déclenché après une interaction qui l'a déjà peuplé dans ce run).
             current_value = current_voice_id or str(st.session_state.get(voice_id_key, ""))
-            st.session_state[select_key] = current_value if current_value in by_id else _PLACEHOLDER
+            preselected = current_value if current_value in by_id else _PLACEHOLDER
+            st.session_state[select_key] = preselected
+            # #191 : les champs reflètent déjà cette voix — seul un CHANGEMENT de sélection les réécrit.
+            st.session_state[last_applied_key] = preselected
 
+        # #191 : noms des options affichées, relus par ``apply_pending_selection`` au moment de l'enregistrement.
+        st.session_state[names_key] = {voice_id: voice.name for voice_id, voice in by_id.items()}
         chosen = st.selectbox("Choisir une voix", options=options, format_func=_format, key=select_key)
-
-        if chosen and chosen != st.session_state.get(last_applied_key):
-            voice = by_id[chosen]
-            st.session_state[provider_key] = "elevenlabs"
-            st.session_state[name_key] = voice.name
-            st.session_state[voice_id_key] = voice.voice_id
-            st.session_state[last_applied_key] = chosen
+        apply_pending_selection(prefix, name_key=name_key, voice_id_key=voice_id_key)
 
         if chosen:
             voice = by_id[chosen]
