@@ -515,3 +515,7 @@ button[data-baseweb="tab"] p { font-size: 0.98rem; }
   .st-key-sys_head { flex-direction: column; align-items: stretch; }
   .sys-logout-btn { width: 100%; }
 }
+
+/* #159 — nouvelle version d'une vidéo animée : lignes d'une scène et du plan de réédition */
+.scene-lines { margin: 0.2rem 0 0.4rem 1rem; padding: 0; color: var(--text); }
+.scene-lines li { margin: 0.15rem 0; }

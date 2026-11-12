@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
-from lody import catalog, nav, view_kit
+from lody import catalog, nav, view_kit, view_reedit
 from lody.components import format_datetime
 from lody.generation import costing
 from lody.generation import export
@@ -237,12 +237,18 @@ def _render_result(service: ProductionService, project: Project, production: Pro
             st.markdown(f'<div class="banner banner-info" role="status">Avertissement : {esc(warning)}</div>',
                         unsafe_allow_html=True)
         with st.container(horizontal=True, key="result_actions"):
-            st.button("Créer une V2", type="primary", icon=":material/edit_note:", key="create_v2",
-                      on_click=_go_v2, args=(service, project, production))
+            st.button("Créer une nouvelle version" if production.is_animated else "Créer une V2", type="primary",
+                      icon=":material/edit_note:", key="create_v2", on_click=_go_v2, args=(service, project, production))
             st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project_result",
                       on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
-        st.markdown('<p class="muted-note">Une V2 conserve cette version intacte et lance de nouveaux appels payants.</p>',
-                    unsafe_allow_html=True)
+        if production.is_animated:  # #159 : réédition scène par scène, rendu 2D local
+            st.markdown('<p class="muted-note">Une nouvelle version conserve celle-ci intacte et ne recalcule que les '
+                        "scènes modifiées.</p>", unsafe_allow_html=True)
+        else:
+            st.markdown('<p class="muted-note">Une V2 conserve cette version intacte et lance de nouveaux appels payants.</p>',
+                        unsafe_allow_html=True)
+    if production.is_animated:
+        view_reedit.render_comparison(service, project, production)
 
 
 def _asset(production: Production, kind: str) -> dict | None:

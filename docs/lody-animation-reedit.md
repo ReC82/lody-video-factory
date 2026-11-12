@@ -4,8 +4,8 @@
 > Objectif : retoucher une scène, un geste, une expression, un plan, un texte ou une réplique **sans refaire
 > le reste de la vidéo**, voir le résultat vite, et repérer automatiquement les défauts visibles.
 
-Cette étape livre les **fondations moteur** (worker, fournisseur, outil DEV). L'écran « actions simples » qui
-les expose dans l'interface est une suite proposée (voir « Limites »).
+Cette étape livre les **fondations moteur** (worker, fournisseur, outil DEV). L'écran « Nouvelle version » qui
+les expose dans l'interface est livré par #159 (section 6).
 
 ## 1. Cache de scène par projet
 
@@ -89,6 +89,53 @@ affichés dans le suivi de la production ; `manifest.qa` en donne le statut et l
 appels externes (0) et coût externe (0). Chaque scène du manifeste porte `cache` (`hit`/`miss`) et, si réutilisée,
 `reused_from` (tâche et scène d'origine) et `render_ms_saved`.
 
+## 6. Écran « Nouvelle version » (#159) — mode d'emploi
+
+Pour une vidéo **animée** terminée (fournisseur Animation 2D) :
+
+1. Page de suivi de la vidéo → **« Créer une nouvelle version »**. Un brouillon V2 est créé ; la V1 n'est jamais
+   modifiée (storyboard figé, MP4 et dossier de rendu intacts) et reste accessible par la barre « Versions ».
+2. La page liste les **scènes** : miniature (tirée du rendu de la V1), début → fin, objectif, personnage avec ses
+   gestes et expressions, répliques (« texte dit », avec leurs temps), textes affichés, schémas et décors (version).
+3. **« Modifier cette scène »** ouvre un formulaire simple, avec info-bulles :
+   - *Expression* et *Geste* de chaque personnage : listes limitées à ce que la version de l'asset déclare
+     (aucun nom inventé) ; le moment du geste ne change pas ;
+   - *Texte dit* (60 caractères, c'est aussi le sous-titre) et *Texte affiché* (titres, étiquettes) ;
+   - *Version* d'un personnage, schéma ou décor quand le catalogue en a plusieurs ;
+   - *Cadrage* : plan large / moyen / serré (zoom de la caméra ; un mouvement de caméra existant garde ses
+     proportions) ;
+   - *Durée de la scène* : toute l'animation de la scène est étirée ou resserrée.
+   « Enregistrer la scène » regèle le storyboard du brouillon (mêmes vérifications que #119 : gestes et
+   expressions déclarés, versions existantes) ; « Annuler » ne change rien.
+4. **Plan de réédition avant dépense** : scènes réutilisées / à recalculer et pourquoi, temps de rendu estimé,
+   temps évité (mesuré sur la V1), coût. Le rendu 2D est local : coût 0 €. Une réplique modifiée met à jour les
+   **sous-titres seulement** : tant que la voix réelle du worker (#169) n'est pas fusionnée, l'écran l'annonce
+   explicitement comme **non re-voisée** (aucune synthèse, aucun coût, aucune case d'accord). Le drapeau
+   `reedit_v2.VOICE_REGENERATION_AVAILABLE` ne passera à vrai qu'avec #169 ; l'accord de coût sera alors exigé.
+5. **« Aperçu rapide »** : rendu ½ résolution du brouillon, sans créer de version ni rien confirmer (tâche
+   déterministe : relancé sans changement, il ne refait rien). Puis **« Générer la V2 »**. L'aperçu et la
+   génération respectent la même garde de licence Remotion que le worker Docker #156 : sans
+   `LODY_REMOTION_LICENSE` ni `LODY_REMOTION_EVALUATION=1` (pilote DEV), ni l'un ni l'autre ne part (#184).
+6. Dans le suivi de la V2 : bloc **« Réédition et contrôle qualité »** — scènes réutilisées / recalculées, temps
+   de rendu évité, contrôles qualité (`qa.json`), lecture **V1 et V2 côte à côte**, bouton « Revenir à la V1 ».
+
+Code : `webui/lody/animation/scene_edit.py` (résumé et modifications d'une scène, module pur),
+`webui/lody/generation/reedit_v2.py` (plan, aperçu, miniatures, comparaison), `ProductionService.prepare_animation_v2`,
+`webui/lody/view_reedit.py` (écran). Les miniatures sont rangées dans `animation/<projet>/.thumbs/` (jamais dans le
+dossier de rendu d'une version ; supprimables sans risque).
+
+Vérification réelle (DEV, moteur Remotion, voix provisoire Piper locale, aucun appel payant) :
+
+```bash
+cd renderers/remotion && npm ci && cd -
+uv run --no-sync python scripts/animation/demo_reedit_159.py --out /tmp/voltix-159 \
+    --piper-model /chemin/fr_FR-upmc-medium.onnx --preview
+```
+
+Le script refait la démo Voltix #150 (V1), modifie **uniquement la scène 2** avec les fonctions de l'écran (geste et
+expression), affiche le plan, lance l'aperçu ½ puis la V2, et vérifie `scenes_reused == 2`, `render_ms_saved > 0`,
+scène rendue = `[2]`, V1 inchangée (empreinte du MP4 et storyboard).
+
 ## Outil DEV
 
 ```bash
@@ -101,10 +148,6 @@ uv run --no-sync python scripts/animation/reedit.py qa <dossier de la tâche>
 
 ## Limites (suites proposées)
 
-- **Interface** : pas encore d'écran « modifier une scène » dans la V2 (aujourd'hui `prepare_v2` ne change que
-  le script, et la V2 hérite du storyboard figé). Suite : action « Importer le storyboard modifié » sur un
-  brouillon de V2 → plan affiché → aperçu ½ → rendu final ; puis actions simples (changer un geste, une
-  expression, le texte d'une réplique) sans éditer le JSON.
 - **Voix par scène** : la TTS n'est pas branchée dans le fournisseur ; quand elle le sera, synthétiser
   **par scène** et ne régénérer que les répliques modifiées (le plan les liste déjà), avec accord de coût.
 - Les contrôles de texte sont des estimations ; la caméra (zoom) n'est pas prise en compte.
