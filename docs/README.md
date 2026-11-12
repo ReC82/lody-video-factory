@@ -34,6 +34,8 @@ ainsi que l'existence des fichiers liés.
   empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4 ; écran « Nouvelle version » scène par scène (#159).
 - [Voix ElevenLabs du rendu 2D](lody-animation-voix.md) — voix de la fiche personnage, lexique de
   prononciation, cache, piste calée et repères recalés pour la bouche et les sous-titres (#164).
+- [Recette contrôlée du rendu 2D parlé](lody-recette-dev-2d.md) — prérequis DEV, jeu de test 2 scènes
+  Voltix V1/V2/V3, coût ElevenLabs estimé et plafonné, autorisation écrite, critères PASS/FAIL (#187).
 
 ## Voix
 

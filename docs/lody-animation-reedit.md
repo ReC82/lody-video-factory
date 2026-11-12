@@ -108,12 +108,13 @@ Pour une vidéo **animée** terminée (fournisseur Animation 2D) :
    « Enregistrer la scène » regèle le storyboard du brouillon (mêmes vérifications que #119 : gestes et
    expressions déclarés, versions existantes) ; « Annuler » ne change rien.
 4. **Plan de réédition avant dépense** : scènes réutilisées / à recalculer et pourquoi, temps de rendu estimé,
-   temps évité (mesuré sur la V1), coût. Le rendu 2D est local : coût 0 €. Une réplique modifiée met à jour les
-   **sous-titres seulement** : tant que la voix réelle du worker (#169) n'est pas fusionnée, l'écran l'annonce
-   explicitement comme **non re-voisée** (aucune synthèse, aucun coût, aucune case d'accord). Le drapeau
-   `reedit_v2.VOICE_REGENERATION_AVAILABLE` ne passera à vrai qu'avec #169 ; l'accord de coût sera alors exigé.
+   temps évité (mesuré sur la V1), coût. Le rendu 2D est local : coût 0 €. Depuis #169, une réplique modifiée dont
+   le locuteur a une voix ElevenLabs est **réellement re-voisée** au lancement (seules les répliques absentes du
+   cache de voix sont payées) : l'écran affiche les caractères à synthétiser et exige la **case d'accord** dès qu'un
+   caractère est facturable (#187, `reedit_v2.billable_voice_characters`). Voix déjà en cache : coût 0 €, pas de case.
 5. **« Aperçu rapide »** : rendu ½ résolution du brouillon, sans créer de version ni rien confirmer (tâche
-   déterministe : relancé sans changement, il ne refait rien). Puis **« Générer la V2 »**. L'aperçu et la
+   déterministe : relancé sans changement, il ne refait rien ; **refusé tant qu'une voix reste à payer** : l'aperçu
+   n'appelle jamais ElevenLabs, #187). Puis **« Générer la V2 »**. L'aperçu et la
    génération respectent la même garde de licence Remotion que le worker Docker #156 : sans
    `LODY_REMOTION_LICENSE` ni `LODY_REMOTION_EVALUATION=1` (pilote DEV), ni l'un ni l'autre ne part (#184).
 6. Dans le suivi de la V2 : bloc **« Réédition et contrôle qualité »** — scènes réutilisées / recalculées, temps

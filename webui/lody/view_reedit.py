@@ -100,7 +100,7 @@ def _generate(service: ProductionService, project: Project, production: Producti
     keys = _keys(production)
     st.session_state[keys["error"]] = ""
     try:
-        launched = service.confirm(production.id, accept_partial=True)  # rendu 2D local : coût fournisseur nul
+        launched = service.confirm(production.id, accept_partial=True)  # rendu local ; voix payante seulement après la case d'accord (#187)
         nav.go(nav.VIEW_TRACK, project.id, launched.id)
     except (AlreadyRunning, LaunchError) as error:
         st.session_state[keys["error"]] = error.message
@@ -331,7 +331,8 @@ def render_editor(service: ProductionService, project: Project, production: Prod
         st.markdown('<p class="muted-note">Aucune scène modifiée pour l’instant : choisis « Modifier cette scène ».</p>',
                     unsafe_allow_html=True)
     else:
-        cost, needs_consent = reedit_v2.voice_notice(plan, reedit_v2.has_voice(service, parent))
+        cost, needs_consent = reedit_v2.voice_notice(plan, reedit_v2.has_voice(service, parent),
+                                                     reedit_v2.billable_voice_characters(service, production))
         _plan_panel(plan, cost, needs_consent, production)
         _preview_panel(service, production)
         report = service.preflight(production)

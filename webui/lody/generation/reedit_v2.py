@@ -31,9 +31,11 @@ from lody.generation.service import EDITABLE_STATUSES, LaunchError, ProductionSe
 from lody.generation.store import Production
 
 PREVIEW_SCALE = 0.5
-# #184 : la V2 ne re-voise PAS encore une réplique modifiée (voix réelle ElevenLabs du worker : #169, non fusionnée).
-# Tant que ce drapeau est faux, l'interface ne présente jamais une réplique modifiée comme réellement re-voisée.
-VOICE_REGENERATION_AVAILABLE = False
+# #187 : depuis #169, la V2 re-voise RÉELLEMENT une réplique modifiée — la synthèse ElevenLabs a lieu au lancement
+# (``AnimationConnector.submit``), pour les seules scènes dont le texte parlé est absent du cache de voix. Le coût
+# affiché et l'accord demandé viennent donc des caractères réellement facturables (``billable_voice_characters``),
+# jamais du seul plan ; l'aperçu rapide, lui, n'appelle jamais ElevenLabs.
+VOICE_REGENERATION_AVAILABLE = True
 THUMBS_DIR = ".thumbs"
 
 
@@ -88,17 +90,29 @@ def plan_for(service: ProductionService, draft: Production) -> dict[str, Any] | 
                        has_voice=has_voice(service, parent))
 
 
-def voice_notice(plan: dict[str, Any], has_parent_voice: bool) -> tuple[str, bool]:
-    """(message de coût/voix du plan, accord de synthèse requis ?) — jamais de « re-voisée » sans re-voisage réel."""
+def billable_voice_characters(service: ProductionService, draft: Production) -> int:
+    """Caractères qu'ElevenLabs facturerait au lancement de ce brouillon (texte parlé absent du cache). Aucun appel."""
+    connector = connector_of(service, draft)
+    if connector is None or not draft.is_animated:
+        return 0
+    return int(connector.plan_units(request_of(draft)).characters[0])
+
+
+def voice_notice(plan: dict[str, Any], has_parent_voice: bool, billable_characters: int = 0) -> tuple[str, bool]:
+    """(message de coût/voix du plan, accord de synthèse requis ?).
+
+    L'accord est exigé dès qu'un caractère serait facturé (#187), même si le plan n'annonce aucune réplique
+    modifiée (cache de voix vidé, voix changée sur la fiche…) : jamais d'appel payant sans case cochée."""
+    if billable_characters > 0:
+        return (f"Voix à régénérer : {billable_characters} caractère(s) à synthétiser par ElevenLabs au lancement "
+                "(payant, estimation ; seules les répliques absentes du cache) — jamais lancée sans ton accord "
+                "ci-dessous."), True
     if not plan["summary"]["voice_to_regenerate"]:
         return "Coût : 0 € — rendu 2D local, aucun appel externe.", False
-    if not has_parent_voice:
-        return ("Répliques modifiées : la voix off n’est pas encore produite par le rendu 2D (sous-titres mis à jour, "
-                "aucune synthèse, aucun coût)."), False
-    if not VOICE_REGENERATION_AVAILABLE:
-        return ("Répliques modifiées : elles ne sont PAS re-voisées dans cette version — la régénération de la voix "
-                "réelle n’est pas encore branchée (#169). Seuls les sous-titres changent ; aucune synthèse, aucun coût."), False
-    return "Voix à régénérer : synthèse payante — jamais lancée sans ton accord ci-dessous.", True
+    if not has_parent_voice or not VOICE_REGENERATION_AVAILABLE:
+        return ("Répliques modifiées : aucune voix ElevenLabs n’est reliée à leur locuteur — sous-titres mis à jour, "
+                "aucune synthèse, aucun coût."), False
+    return ("Répliques modifiées : leur voix est déjà en cache — re-voisées sans appel ElevenLabs, coût 0 €."), False
 
 
 # -- aperçu rapide --------------------------------------------------------------------------------------------
@@ -125,6 +139,12 @@ def start_preview(service: ProductionService, draft: Production) -> ExternalTask
     allowed, message = animation_preflight.license_allows_render()
     if not allowed:
         raise LaunchError(f"Aperçu impossible : {message}")
+    # #187 : l'aperçu passe par ``submit``, qui synthétiserait la voix manquante — jamais d'appel payant ici.
+    billable = billable_voice_characters(service, draft)
+    if billable:
+        raise LaunchError(f"Aperçu impossible : {billable} caractère(s) de voix ne sont pas encore synthétisés "
+                          "(ElevenLabs, payant). L’aperçu rapide n’appelle jamais un service payant : génère la "
+                          "nouvelle version après accord sur le coût.")
     request = request_of(draft)
     request = request.with_updates(animation={**(request.animation or {}), "preview_scale": PREVIEW_SCALE})
     try:

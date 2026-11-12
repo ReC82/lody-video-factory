@@ -255,16 +255,18 @@ def test_v2_preview_and_launch_respect_the_remotion_licence_gate(tmp_path, monke
     assert reedit_v2.preview_state(studio.service, ready).state == "done"
 
 
-def test_modified_line_is_never_presented_as_revoiced_before_169():
-    """#184 : tant que la voix réelle du worker (#169) n'est pas fusionnée, aucune réplique n'est dite re-voisée."""
-    assert reedit_v2.VOICE_REGENERATION_AVAILABLE is False
+def test_modified_line_is_revoiced_only_with_consent_when_it_costs():
+    """#184 puis #187 : une réplique n'est dite re-voisée que si la voix est réellement produite ; tout caractère
+    facturable exige l'accord, et rien n'est annoncé payant quand la voix est déjà en cache."""
     quiet = {"summary": {"voice_to_regenerate": []}}
     changed = {"summary": {"voice_to_regenerate": ["suite"]}}
     assert reedit_v2.voice_notice(quiet, True) == ("Coût : 0 € — rendu 2D local, aucun appel externe.", False)
     for has_voice in (False, True):
-        message, consent = reedit_v2.voice_notice(changed, has_voice)
-        assert not consent and "aucun coût" in message and "Voix à régénérer" not in message
-    assert "PAS re-voisées" in reedit_v2.voice_notice(changed, True)[0]
+        message, consent = reedit_v2.voice_notice(changed, has_voice, 0)
+        assert not consent and "Voix à régénérer" not in message
+        message, consent = reedit_v2.voice_notice(changed, has_voice, 7)
+        assert consent and "7 caractère(s)" in message
+    assert "aucun coût" in reedit_v2.voice_notice(changed, False)[0]
 
 
 # -- interface (AppTest) ------------------------------------------------------------------------------------------
