@@ -180,6 +180,10 @@ sont alors « skipped », ce que GitHub compte comme réussi pour les vérificat
 fichier — code, tests, `deploy/`, workflows, `.md` ailleurs, fichiers non Markdown de `docs/` —
 déclenche le pipeline complet, et un push sur `main` aussi.
 
+Fusion automatique (#193) : **non activée**. La politique proposée et l'évaluateur à blanc
+`deploy/lodyorch/merge_policy.py` (`evaluate <PR>`, `metrics`) sont décrits dans
+[lody-fusion-auto.md](lody-fusion-auto.md) ; ils ne fusionnent rien et ne lisent GitHub qu'en GET.
+
 ## Rapport permanent par tentative (ticket #123)
 
 Après chaque tentative (livraison, blocage, échec, crash, interruption récupérée au redémarrage du

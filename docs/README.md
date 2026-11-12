@@ -55,3 +55,5 @@ ainsi que l'existence des fichiers liés.
 
 - [LODYORCH](lodyorch.md) — orchestrateur autonome qui traite un ticket GitHub à la fois et
   livre une pull request, sans jamais fusionner ni déployer.
+- [Fusion automatique des PR — politique](lody-fusion-auto.md) — label `merge:auto`, critères
+  cumulatifs, exclusions, niveau DEV séparé ; évaluateur à blanc (#193), rien d'activé.
