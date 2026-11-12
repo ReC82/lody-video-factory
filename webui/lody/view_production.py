@@ -17,7 +17,7 @@ import json
 import streamlit as st
 
 from lody import brief as brief_lib
-from lody import nav, view_estimate
+from lody import nav, view_animation_pilot, view_estimate
 from lody.animation import modes as render_modes
 from lody.characters import Character, CharacterRepository
 from lody.generation.models import PreflightReport
@@ -149,11 +149,14 @@ def _uploaded_storyboard(project: Project) -> object | None:
     """Storyboard animé importé (JSON lody.animation/1), ``None`` sans fichier. Lève ``InvalidInput`` si illisible."""
     uploaded = st.session_state.get(_keys(project)["animation"])
     if uploaded is None:
-        return None
+        # #154 : storyboard de la démo installée depuis l'atelier 2D (déjà adapté aux assets du projet).
+        return st.session_state.get(view_animation_pilot.preset_key(project))
     try:
-        return json.loads(uploaded.getvalue().decode("utf-8"))
+        document = json.loads(uploaded.getvalue().decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
         raise InvalidInput("Le storyboard animé n’est pas un fichier JSON lisible (UTF-8).") from None
+    # #154 : storyboard figé dans un autre projet → mêmes assets (même empreinte) de ce projet.
+    return view_animation_pilot.adopt(project, document)
 
 
 def _forget_draft(project: Project) -> None:
@@ -344,6 +347,7 @@ def render(project: Project, service: ProductionService, character_repo: Charact
                 key=keys["animation"], on_change=_forget_draft, args=(project,),
                 help=render_modes.DESCRIPTIONS[mode] + " Les assets doivent exister dans le catalogue du projet ; "
                      "leurs versions sont figées à la préparation.")
+            view_animation_pilot.render(project)
         st.toggle("Mode démonstration : simuler la génération, sans aucun fournisseur", key=keys["demo"])
         with st.container(horizontal=True, vertical_alignment="center", key="composer_actions"):
             st.markdown(

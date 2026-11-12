@@ -29,6 +29,7 @@ from typing import Any
 
 from lody import settings
 from lody.animation import modes, scene_cache
+from lody.animation import preflight as animation_preflight
 from lody.animation import worker as animation_worker
 from lody.animation.assets import FILE_EXTENSIONS, AnimationAssetRepository, AssetNotFound
 from lody.animation.contract import (
@@ -279,10 +280,15 @@ class AnimationConnector(VideoGenerationProvider):
                 Capability.ENGINE, CapabilityState.UNAVAILABLE, requested="moteur 2D",
                 message="L'outil d'assemblage vidéo (ffmpeg) est introuvable sur ce serveur.", fix="platform",
                 admin="ffmpeg absent du PATH et imageio-ffmpeg indisponible."))
+        elif not (licence := animation_preflight.license_allows_render())[0]:
+            # #154 : la licence Remotion n'est jamais supposée gratuite — décision écrite du propriétaire requise.
+            items.append(CapabilityStatus(
+                Capability.ENGINE, CapabilityState.UNAVAILABLE, requested="moteur 2D", message=licence[1],
+                fix="platform", admin=f"{animation_preflight.LICENSE_ENV} : voir docs/lody-animation-worker-docker.md."))
         else:
             items.append(CapabilityStatus(
                 Capability.ENGINE, CapabilityState.READY, requested="moteur 2D", configured="worker 2D",
-                message="Worker 2D disponible : un rendu à la fois, priorité basse."))
+                message="Worker 2D disponible : un rendu à la fois, priorité basse. " + licence[1]))
         # Stockage : place libre pour les rendus de scène et la vidéo finale.
         seconds = duration_seconds(bound[1]) if storyboard_ok and bound else 60
         need = int(seconds * DISK_PER_SECOND + DISK_MARGIN)

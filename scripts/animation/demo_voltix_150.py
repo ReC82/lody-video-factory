@@ -226,6 +226,9 @@ def coax_manifest(data_dir: Path) -> dict:
 
 # -- exécution ---------------------------------------------------------------------------------------------------
 def run(out: Path, model: Path, tts: list[str], renderer: str, keep: Path | None = None) -> dict:
+    # Démo DEV d'évaluation (#154) : la licence Remotion n'est pas décidée, rien n'est publié.
+    import os
+    os.environ.setdefault("LODY_REMOTION_EVALUATION", "1")
     out.mkdir(parents=True, exist_ok=True)
     work = keep or Path(tempfile.mkdtemp(prefix="lody-150-"))
     data_dir, db = work / "data", work / "lody.sqlite3"

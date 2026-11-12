@@ -28,6 +28,8 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Worker 2D Remotion en Docker — pilote DEV](lody-animation-worker-docker.md) — image reproductible,
+  compose DEV isolé, préflight (licence Remotion comprise), atelier 2D, mesures CPU/RAM.
 - [Réédition ciblée et contrôle qualité du rendu 2D](lody-animation-reedit.md) — cache de scène par
   empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4.
 

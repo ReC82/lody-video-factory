@@ -221,6 +221,18 @@ def test_remotion_adapter_announces_its_source_digest():
     assert done.returncode == 0 and done.stdout.startswith("lody-remotion ")
 
 
+def test_remotion_adapter_keeps_docker_prepare_and_cache_version_modes():
+    """#183 : la fusion du worker Docker #156 conserve --prepare (image) et --version (cache de scène #121)."""
+    adapter = ROOT / "renderers" / "remotion" / "bin" / "lody-remotion.mjs"
+    source = adapter.read_text(encoding="utf-8")
+    assert "args.prepare" in source and "'--version'" in source and "process.chdir(ROOT)" in source
+    node = __import__("shutil").which("node")
+    if not node:
+        pytest.skip("node indisponible")
+    done = subprocess.run([node, str(adapter)], capture_output=True, text=True, timeout=60)
+    assert done.returncode == 2 and "--prepare" in done.stderr and "--version" in done.stderr
+
+
 # -- prévisualisation basse résolution ------------------------------------------------------------------------------
 @needs_ffmpeg
 def test_low_resolution_preview_is_scaled_and_cached_apart_from_the_final_render(world):
