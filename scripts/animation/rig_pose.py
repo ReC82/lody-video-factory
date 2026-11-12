@@ -2,8 +2,8 @@
 
 Le rig (``voltix-rig.json``) ne contient que des **données** : rotations autour des pivots déclarés dans le
 SVG (``data-pivot``), choix de variantes (``data-variants`` / ``data-variant``), regard, compression des
-ressorts (``lift``), écrasement du haut du corps (``squash``), saut (``air``) et accessoires accrochés à des
-points ``data-slot``. Ce module applique une pose à un SVG et compose la planche de contrôle ; il sert à
+ressorts (``lift``, ignorés si la marionnette n'en a pas), écrasement du haut du corps (``squash``), saut
+(``air``) et accessoires accrochés à des points ``data-slot``. Ce module applique une pose à un SVG et compose la planche de contrôle ; il sert à
 VÉRIFIER le rig (pivots, ancrages, variantes) avant que le moteur de rendu (#120) ne le consomme.
 
 Usage : ``python scripts/animation/rig_pose.py`` → ``docs/animation/voltix/planche-voltix.svg``.
@@ -142,7 +142,9 @@ def apply_pose(svg_text: str, rig: dict, pose: dict[str, Any], *, props: dict[st
         _prepend(upper, f"translate(0 {-lift}) translate({px} {py}) scale({1 + squash} {1 - squash}) "
                         f"translate({-px} {-py})")
         for side in ("left", "right"):
-            spring = need(f"springs-{side}")
+            spring = ids.get(f"springs-{side}")
+            if spring is None:  # marionnette sans ressorts (personnage humain, #173) : jambes inchangées
+                continue
             sx, sy = _pivot(spring)
             length = float(spring.get("data-length"))
             ratio = (length + lift) / length

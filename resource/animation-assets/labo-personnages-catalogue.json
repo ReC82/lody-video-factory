@@ -1,0 +1,178 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_173000000001",
+      "name": "Nora — marionnette",
+      "kind": "character",
+      "description": "Technicienne vidéo fictive (#173) : tenue bleu nuit, casque d'intercom, boîtier à la ceinture, badge sur cordon ; silhouette élancée. Personnage de laboratoire, à valider.",
+      "is_active": true,
+      "character": "Nora",
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 900,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.98
+            },
+            "parts": [
+              "puppet",
+              "shadow",
+              "upper",
+              "body",
+              "neck",
+              "head",
+              "hair",
+              "hair-front",
+              "face",
+              "eyes",
+              "pupils",
+              "lids",
+              "eyebrows",
+              "nose",
+              "mouth-visemes",
+              "arm-left",
+              "arm-right",
+              "forearm-left",
+              "forearm-right",
+              "hand-left",
+              "hand-right",
+              "legs-left",
+              "legs-right",
+              "shoes",
+              "accessories",
+              "headset",
+              "beltpack",
+              "badge"
+            ],
+            "expressions": [
+              "concentration",
+              "confusion",
+              "neutre",
+              "sourire",
+              "surprise"
+            ],
+            "gestures": [
+              "cligner",
+              "expliquer",
+              "montrer",
+              "pencher-tete",
+              "saluer",
+              "tenir-cable"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/nora/v1/nora-face.svg",
+                "sha256": "70a69702fdac29acf5397cd7771dc3a6c6c422145ace723d6c8e2169b36d5d5a"
+              },
+              {
+                "role": "trois-quarts",
+                "path": "animation-assets/nora/v1/nora-trois-quarts.svg",
+                "sha256": "67ae9c383107f7eaa8932d7f0e94828b9d1fb8c6700ce78ee0d885cae3bd0d2c"
+              },
+              {
+                "role": "rig",
+                "path": "animation-assets/nora/v1/nora-rig.json",
+                "sha256": "da81736517d4728382499cc04a72455c7ef01d1da4ee79c56a5403037bb4315f"
+              }
+            ]
+          },
+          "sha256": "d702b776fa5956102b9ef8fad140bd0b579acb34792194fa6e1959c47e92a983",
+          "notes": "Version 1 (laboratoire) : vues de face et 3/4, 5 expressions, 7 visèmes, 6 gestes."
+        }
+      ]
+    },
+    {
+      "id": "ast_173000000002",
+      "name": "Sam — marionnette",
+      "kind": "character",
+      "description": "Technicien multimédia fictif (#173) : gilet orange à bandes réfléchissantes sur t-shirt gris, cheveux courts bouclés, barbe courte ; silhouette trapue. Personnage de laboratoire, à valider.",
+      "is_active": true,
+      "character": "Sam",
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 900,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.98
+            },
+            "parts": [
+              "puppet",
+              "shadow",
+              "upper",
+              "body",
+              "neck",
+              "head",
+              "hair",
+              "hair-front",
+              "face",
+              "eyes",
+              "pupils",
+              "lids",
+              "eyebrows",
+              "nose",
+              "mouth-visemes",
+              "arm-left",
+              "arm-right",
+              "forearm-left",
+              "forearm-right",
+              "hand-left",
+              "hand-right",
+              "legs-left",
+              "legs-right",
+              "shoes",
+              "accessories",
+              "beard",
+              "vest"
+            ],
+            "expressions": [
+              "concentration",
+              "confusion",
+              "neutre",
+              "sourire",
+              "surprise"
+            ],
+            "gestures": [
+              "cligner",
+              "expliquer",
+              "montrer",
+              "pencher-tete",
+              "saluer",
+              "tenir-cable"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/sam/v1/sam-face.svg",
+                "sha256": "d432806451c573e24e105418bf845ec5d3a5c6390749960af6f972ec74fca1b5"
+              },
+              {
+                "role": "trois-quarts",
+                "path": "animation-assets/sam/v1/sam-trois-quarts.svg",
+                "sha256": "5ba1c4e2a4691956d889b6bc5f3e3a53c6b4d03c8ebf8db6eac12560a8d34dc2"
+              },
+              {
+                "role": "rig",
+                "path": "animation-assets/sam/v1/sam-rig.json",
+                "sha256": "941752473fc38f845388d1040f78fe6c675ca7077301757b0fec17614d03e827"
+              }
+            ]
+          },
+          "sha256": "481db5015f3bee99d6d843402887889cd630d2c582a15e683209c8cda9bc49f2",
+          "notes": "Version 1 (laboratoire) : vues de face et 3/4, 5 expressions, 7 visèmes, 6 gestes."
+        }
+      ]
+    }
+  ]
+}

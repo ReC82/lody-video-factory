@@ -118,7 +118,8 @@ export function applyPose(template, pose, props = {}) {
     prepend(upper, `translate(0 ${f(-lift)}) translate(${px} ${py}) scale(${f(1 + squash)} ${f(1 - squash)}) `
       + `translate(${-px} ${-py})`);
     for (const side of ['left', 'right']) {
-      const spring = need(`springs-${side}`);
+      const spring = ids.get(`springs-${side}`);
+      if (!spring) continue; // marionnette sans ressorts (personnage humain, #173) : jambes inchangées
       const [sx, sy] = pivot(spring);
       const length = Number(spring.getAttribute('data-length'));
       const ratio = Math.max(0.2, (length + lift) / length);
