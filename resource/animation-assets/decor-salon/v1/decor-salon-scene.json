@@ -1,0 +1,225 @@
+{
+  "schema": "lody.decor/1",
+  "decor": "decor-salon",
+  "version": 1,
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "layers": [
+    {
+      "id": "fond",
+      "file": "decor-salon-fond.svg"
+    },
+    {
+      "id": "objets",
+      "file": "decor-salon-objets.svg"
+    },
+    {
+      "id": "avant",
+      "file": "decor-salon-avant.svg"
+    }
+  ],
+  "order": [
+    "fond",
+    "objets",
+    "personnages",
+    "avant"
+  ],
+  "zones": {
+    "subtitles": {
+      "x": 40,
+      "y": 1500,
+      "width": 1000,
+      "height": 360
+    },
+    "title": {
+      "x": 60,
+      "y": 60,
+      "width": 960,
+      "height": 170
+    },
+    "action": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 1500
+    }
+  },
+  "floor_y": 1240,
+  "places": [
+    {
+      "id": "gauche",
+      "x": 190,
+      "y": 1480,
+      "height": 820,
+      "note": "À gauche, près de la table basse"
+    },
+    {
+      "id": "centre",
+      "x": 540,
+      "y": 1480,
+      "height": 820,
+      "note": "Au centre, devant le meuble TV"
+    },
+    {
+      "id": "droite",
+      "x": 900,
+      "y": 1480,
+      "height": 820,
+      "note": "À droite, près du câble HDMI"
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "meuble-tv",
+      "label": "Meuble TV",
+      "layer": "objets",
+      "bbox": [
+        248,
+        1058,
+        584,
+        276
+      ],
+      "point": [
+        540,
+        1196
+      ]
+    },
+    {
+      "id": "pied-tv",
+      "label": "Pied du téléviseur",
+      "layer": "objets",
+      "bbox": [
+        428,
+        930,
+        224,
+        132
+      ],
+      "point": [
+        540,
+        996
+      ]
+    },
+    {
+      "id": "tv",
+      "label": "Téléviseur",
+      "layer": "objets",
+      "bbox": [
+        208,
+        558,
+        664,
+        376
+      ],
+      "point": [
+        540,
+        746
+      ]
+    },
+    {
+      "id": "prise-hdmi-tv",
+      "label": "Entrées HDMI du téléviseur",
+      "layer": "objets",
+      "bbox": [
+        868,
+        778,
+        34,
+        134
+      ],
+      "point": [
+        885,
+        845
+      ]
+    },
+    {
+      "id": "box",
+      "label": "Box TV",
+      "layer": "objets",
+      "bbox": [
+        358,
+        1198,
+        304,
+        94
+      ],
+      "point": [
+        510,
+        1245
+      ]
+    },
+    {
+      "id": "cable-hdmi",
+      "label": "Câble HDMI",
+      "layer": "objets",
+      "bbox": [
+        693,
+        855,
+        243,
+        403
+      ],
+      "point": [
+        814,
+        1056
+      ]
+    },
+    {
+      "id": "prise-hdmi-box",
+      "label": "Sortie HDMI de la box",
+      "layer": "objets",
+      "bbox": [
+        658,
+        1204,
+        38,
+        82
+      ],
+      "point": [
+        677,
+        1245
+      ]
+    },
+    {
+      "id": "table-basse",
+      "label": "Table basse",
+      "layer": "objets",
+      "bbox": [
+        68,
+        1250,
+        214,
+        96
+      ],
+      "point": [
+        175,
+        1298
+      ]
+    },
+    {
+      "id": "telecommande",
+      "label": "Télécommande",
+      "layer": "objets",
+      "bbox": [
+        118,
+        1220,
+        114,
+        34
+      ],
+      "point": [
+        175,
+        1237
+      ]
+    },
+    {
+      "id": "accoudoir",
+      "label": "Accoudoir du canapé (avant-plan)",
+      "layer": "avant",
+      "bbox": [
+        0,
+        1298,
+        102,
+        194
+      ],
+      "point": [
+        51,
+        1395
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <title>Décor — salle de contrôle / régie vidéo — couche fond</title>
+  <g id="fond"><rect x="0" y="0" width="1080" height="1240" fill="#262B33" stroke="none"/><rect x="0" y="1240" width="1080" height="680" fill="#3A4049" stroke="none"/><rect x="0" y="1226" width="1080" height="14" fill="#30363F" stroke="none"/><line x1="0" y1="1240" x2="1080" y2="1240" stroke="#22262E" stroke-width="3" stroke-linecap="round"/></g>
+</svg>

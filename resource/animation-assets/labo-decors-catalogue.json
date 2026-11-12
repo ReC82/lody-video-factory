@@ -1,0 +1,278 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_175000000001",
+      "name": "Décor — salon (box, HDMI, téléviseur)",
+      "kind": "background",
+      "description": "Salon schématique : téléviseur sur meuble bas, box sur l'étagère, câble HDMI visible de la box au panneau latéral du téléviseur, télécommande. Sans marque ni texte.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1080,
+            "height": 1920,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fond",
+              "objets",
+              "avant",
+              "meuble-tv",
+              "pied-tv",
+              "tv",
+              "prise-hdmi-tv",
+              "box",
+              "cable-hdmi",
+              "prise-hdmi-box",
+              "table-basse",
+              "telecommande",
+              "accoudoir"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/decor-salon/v1/decor-salon.svg",
+                "sha256": "a1d18f897dea8708a02b0856e89928f53adc3ba9e1f7e9fbecd9634efd0824f0"
+              },
+              {
+                "role": "fond",
+                "path": "animation-assets/decor-salon/v1/decor-salon-fond.svg",
+                "sha256": "d61d1c63dc1def1964c40c5ba0b51171fef116e6fb2d6a5a905c5d7dbc154a62"
+              },
+              {
+                "role": "objets",
+                "path": "animation-assets/decor-salon/v1/decor-salon-objets.svg",
+                "sha256": "1197d638cd705fd3c009f47a4b23230ea13b454df56b11465461686dafcd581c"
+              },
+              {
+                "role": "avant",
+                "path": "animation-assets/decor-salon/v1/decor-salon-avant.svg",
+                "sha256": "05a3cf26020a4ee89dd32a68b89420a518852367aeaca51fb53fd3ef71888cb1"
+              },
+              {
+                "role": "scene",
+                "path": "animation-assets/decor-salon/v1/decor-salon-scene.json",
+                "sha256": "31b1e4849d6a93b1eaf7ad4c9c6db047f023c3507c81f9b1ed86de537dc33b36"
+              }
+            ]
+          },
+          "sha256": "0ee09617838841204c1dd0a548ed736b7a53068ac12025eb5ab1cab0523ba982",
+          "notes": "Version 1 (#175) : 9:16, couches fond/objets/avant, fiche de scène."
+        }
+      ]
+    },
+    {
+      "id": "ast_175000000002",
+      "name": "Décor — bureau (PC, DisplayPort, VGA)",
+      "kind": "background",
+      "description": "Bureau schématique : tour PC vue de dos (carte graphique DisplayPort, sortie VGA), écran 16:9 relié en DisplayPort, ancien écran 4:3 relié en VGA, clavier, souris.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1080,
+            "height": 1920,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fond",
+              "objets",
+              "avant",
+              "plan-de-travail",
+              "ecran-displayport",
+              "ecran-vga",
+              "tour-pc",
+              "cable-displayport",
+              "cable-vga",
+              "prise-dp-ecran",
+              "prise-vga-ecran",
+              "sortie-vga-pc",
+              "sortie-dp-pc",
+              "ports-usb-pc",
+              "clavier",
+              "souris",
+              "dossier-chaise"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/decor-bureau/v1/decor-bureau.svg",
+                "sha256": "2d1469288e1ec57c1236f82751af906f5caf75f36255194169ed3c3621aa57f8"
+              },
+              {
+                "role": "fond",
+                "path": "animation-assets/decor-bureau/v1/decor-bureau-fond.svg",
+                "sha256": "d6aa0ff7b09d72315044fbf70ea78e96d21e1ec4806869957c586a77c29e7856"
+              },
+              {
+                "role": "objets",
+                "path": "animation-assets/decor-bureau/v1/decor-bureau-objets.svg",
+                "sha256": "1258eace9d812247d14222088ede2b611c442e0fb608aef621675d8a3c550867"
+              },
+              {
+                "role": "avant",
+                "path": "animation-assets/decor-bureau/v1/decor-bureau-avant.svg",
+                "sha256": "ba039b884e942b6ce76c9c2ec3e3ee38ce4e407ec2e4a632bfd15bb42ecbbc74"
+              },
+              {
+                "role": "scene",
+                "path": "animation-assets/decor-bureau/v1/decor-bureau-scene.json",
+                "sha256": "5be7f75680d106fdb577f6d9fef4e657904cd2ff3b3dd0f5a5879e83ed322f0f"
+              }
+            ]
+          },
+          "sha256": "851dfc8239c5275208f150fb62ee9c56d0dc2cdc997299841d2c825e65a063f8",
+          "notes": "Version 1 (#175) : 9:16, couches fond/objets/avant, fiche de scène."
+        }
+      ]
+    },
+    {
+      "id": "ast_175000000003",
+      "name": "Décor — plateau de télévision (caméra professionnelle)",
+      "kind": "background",
+      "description": "Plateau schématique : caméra de studio de profil sur trépied à roulettes, voyant tally, sortie SDI (BNC) et câble, deux projecteurs, fond bleu, bureau de présentation, moniteur de retour, marque au sol.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1080,
+            "height": 1920,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fond",
+              "objets",
+              "avant",
+              "projecteur-gauche",
+              "projecteur-droit",
+              "cable-camera",
+              "trepied",
+              "tete-trepied",
+              "camera",
+              "tally",
+              "sortie-sdi-camera",
+              "moniteur-retour",
+              "marque-sol",
+              "bureau-presentateur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/decor-plateau/v1/decor-plateau.svg",
+                "sha256": "7ea329e59f173714fda58ed96ce7ed093d71dec1519ce1c374d905db7658fca4"
+              },
+              {
+                "role": "fond",
+                "path": "animation-assets/decor-plateau/v1/decor-plateau-fond.svg",
+                "sha256": "b9d887094cc000af8b67948d2c37ead0fe3c7e1dbbb0f0861a9a4170add24b4a"
+              },
+              {
+                "role": "objets",
+                "path": "animation-assets/decor-plateau/v1/decor-plateau-objets.svg",
+                "sha256": "944ea5c220f7179e8674bcd93ea51525b65a12089c98edcf025af7d8cc4e9db9"
+              },
+              {
+                "role": "avant",
+                "path": "animation-assets/decor-plateau/v1/decor-plateau-avant.svg",
+                "sha256": "794b0894ce9d5e23941b7789c940750b7cb2d36ce7f0928a9f15eff069d15b3d"
+              },
+              {
+                "role": "scene",
+                "path": "animation-assets/decor-plateau/v1/decor-plateau-scene.json",
+                "sha256": "32d3753a004eae735287cc40b6b583d78ca5e969ce831834adedcb3b022acf7a"
+              }
+            ]
+          },
+          "sha256": "c48b26f2c3ee3605f7b73ed55bf3255208953af03ae67aba4da0d3a51c16b32c",
+          "notes": "Version 1 (#175) : 9:16, couches fond/objets/avant, fiche de scène."
+        }
+      ]
+    },
+    {
+      "id": "ast_175000000004",
+      "name": "Décor — salle de contrôle / régie vidéo",
+      "kind": "background",
+      "description": "Régie schématique : mur de moniteurs (aperçu PVW cadre vert, programme PGM cadre rouge, quatre sources), pupitre, mélangeur avec rangées programme/aperçu et levier T-bar, baie de connecteurs BNC.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1080,
+            "height": 1920,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fond",
+              "objets",
+              "avant",
+              "mur-moniteurs",
+              "apercu-pvw",
+              "programme-pgm",
+              "pupitre",
+              "melangeur",
+              "levier-t-bar",
+              "rangee-programme",
+              "rangee-apercu",
+              "baie-bnc",
+              "dossier-fauteuil"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/decor-regie/v1/decor-regie.svg",
+                "sha256": "f8aa78688b02eceb443dbdd20dc48b1f1cf4be3e5c0f2524ed5b4583b0dcf527"
+              },
+              {
+                "role": "fond",
+                "path": "animation-assets/decor-regie/v1/decor-regie-fond.svg",
+                "sha256": "c084aa1f22bf6fc01e585ac2a5df4e764bd53803e5ac1e8238e33858cb947aa1"
+              },
+              {
+                "role": "objets",
+                "path": "animation-assets/decor-regie/v1/decor-regie-objets.svg",
+                "sha256": "3b5d2b660975fe4158a4fe59a17b6d38fda6833c369d45dab234800ff81bac67"
+              },
+              {
+                "role": "avant",
+                "path": "animation-assets/decor-regie/v1/decor-regie-avant.svg",
+                "sha256": "9705df9640270d4bf4281c444a7be16b2be845988ae1954cca6fe19ca773a196"
+              },
+              {
+                "role": "scene",
+                "path": "animation-assets/decor-regie/v1/decor-regie-scene.json",
+                "sha256": "f8b0c3a8dc072aef57dbf2907ecc8db680e3452507d10ae3190dbb6992ca8bb9"
+              }
+            ]
+          },
+          "sha256": "a541d79589cfdcdbd7344eaece3dc9952b55b73ed344f280ab516f20e1eaf65c",
+          "notes": "Version 1 (#175) : 9:16, couches fond/objets/avant, fiche de scène."
+        }
+      ]
+    }
+  ]
+}
