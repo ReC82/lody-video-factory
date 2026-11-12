@@ -28,9 +28,26 @@ logger = logging.getLogger("lody.locations")
 
 NAME_MIN, NAME_MAX = 2, 80
 LOCATION_TYPE_MAX = 60
-DESCRIPTION_MAX = 500
-REFERENCE_PROMPT_MAX = 500
-CONTINUITY_NOTES_MAX = 500
+# Bornes des champs longs (#202). Un lieu se définit UNE fois puis sert dans plusieurs épisodes : il doit
+# pouvoir être décrit en détail (agencement, position des caméras, lumière, couleurs, accessoires,
+# continuité). L'ancienne borne de 500 caractères n'avait aucune justification technique (SQLite ``TEXT``
+# n'impose rien) et obligeait à raccourcir artificiellement les descriptions. Ces bornes restent finies
+# (garde-fou contre un fichier ou un collage extravagant) mais larges :
+# - description et notes de continuité : 8 000 caractères (référentiel canonique, jamais envoyé tel quel) ;
+# - prompt de référence : 4 000 caractères (texte déjà formulé pour un générateur d'images, donc plus court).
+# Le texte canonique est TOUJOURS conservé intégralement ; c'est la composition des prompts qui le condense
+# explicitement à son propre budget (voir ``generation.narrative_context.condense_fields``).
+DESCRIPTION_MAX = 8000
+REFERENCE_PROMPT_MAX = 4000
+CONTINUITY_NOTES_MAX = 8000
+
+# Champs longs dont les retours à la ligne sont conservés (#202) : ils permettent d'organiser un lieu en zones
+# (identité, agencement, lumière, équipements, continuité). Les champs courts restent sur une seule ligne.
+MULTILINE_FIELDS = ("description", "reference_prompt", "continuity_notes")
+FIELD_LIMITS = {
+    "description": DESCRIPTION_MAX, "reference_prompt": REFERENCE_PROMPT_MAX,
+    "continuity_notes": CONTINUITY_NOTES_MAX,
+}
 
 EDITABLE_FIELDS = (
     "name", "location_type", "description", "reference_prompt", "continuity_notes",
@@ -76,14 +93,44 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def normalize_multiline(raw: Any) -> str:
+    """Nettoie un texte long SANS perdre sa structure (#202) : fins de ligne unifiées, espaces superflus
+    retirés dans chaque ligne, au plus une ligne vide consécutive, aucun blanc en tête/fin. Idempotent :
+    un texte déjà nettoyé (export puis réimport, par exemple) ressort strictement identique."""
+    lines = [" ".join(line.split()) for line in str(raw or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    kept: list[str] = []
+    for line in lines:
+        if not line and (not kept or not kept[-1]):
+            continue
+        kept.append(line)
+    while kept and not kept[-1]:
+        kept.pop()
+    return "\n".join(kept)
+
+
+def format_count(value: int) -> str:
+    return f"{value:,}".replace(",", "\u202f")  # espace fine insécable, typographie française
+
+
+def _too_long(label: str, length: int, maximum: int) -> str:
+    """Message qui donne la mesure réelle et la capacité du produit (#202) — jamais une faute imputée au
+    contenu : le texte n'est ni enregistré à moitié ni tronqué en silence."""
+    return (f"{label} : {format_count(length)} caractères pour une capacité de {format_count(maximum)} caractères. "
+            "Rien n'a été enregistré ni tronqué : répartis le texte entre description, prompt de référence "
+            "et notes de continuité, ou retire les répétitions.")
+
+
 def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
-    """Nettoie et valide un jeu complet de champs. Lève ``LocationValidationError``."""
+    """Nettoie et valide un jeu complet de champs. Lève ``LocationValidationError``.
+
+    Seule source de vérité des limites d'un lieu : le formulaire, l'import de lieux (#57), l'import et la
+    mise à jour de projet (#44/#66) passent tous par ici — jamais de troncature silencieuse (#202)."""
     errors: dict[str, str] = {}
     clean: dict[str, Any] = {}
 
     def text(key: str, maximum: int, too_long: str, required: str | None = None) -> None:
         raw = fields.get(key, DEFAULTS.get(key, ""))
-        value = " ".join(str(raw or "").split())
+        value = normalize_multiline(raw) if key in MULTILINE_FIELDS else " ".join(str(raw or "").split())
         if required and not value:
             errors[key] = required
         elif len(value) > maximum:
@@ -94,11 +141,12 @@ def validate_fields(fields: dict[str, Any]) -> dict[str, Any]:
     if "name" not in errors and len(clean["name"]) < NAME_MIN:
         errors["name"] = f"Le nom doit faire au moins {NAME_MIN} caractères."
     text("location_type", LOCATION_TYPE_MAX, f"Le type de lieu est trop long ({LOCATION_TYPE_MAX} caractères maximum).")
-    text("description", DESCRIPTION_MAX, f"La description est trop longue ({DESCRIPTION_MAX} caractères maximum).")
-    text("reference_prompt", REFERENCE_PROMPT_MAX,
-         f"Le prompt de référence est trop long ({REFERENCE_PROMPT_MAX} caractères maximum).")
-    text("continuity_notes", CONTINUITY_NOTES_MAX,
-         f"Les notes de continuité sont trop longues ({CONTINUITY_NOTES_MAX} caractères maximum).")
+    for key, label in (("description", "Description"), ("reference_prompt", "Prompt de référence"),
+                       ("continuity_notes", "Notes de continuité")):
+        maximum = FIELD_LIMITS[key]
+        text(key, maximum, "")
+        if len(clean[key]) > maximum:
+            errors[key] = _too_long(label, len(clean[key]), maximum)
 
     clean["is_primary"] = bool(fields.get("is_primary", DEFAULTS["is_primary"]))
     clean["is_active"] = bool(fields.get("is_active", DEFAULTS["is_active"]))

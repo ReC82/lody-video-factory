@@ -194,6 +194,74 @@ def _detail_line(item: dict[str, Any], fields: Sequence[str], labels: dict[str, 
     return "; ".join(f"{labels[field]} : {item[field]}" for field in fields if item.get(field))
 
 
+# -- condensation explicite d'un lieu détaillé au moment de composer un prompt (#202) ---------------------------------
+#
+# Un lieu peut désormais être décrit sur plusieurs milliers de caractères (voir ``locations.FIELD_LIMITS``). Ce
+# texte CANONIQUE n'est jamais modifié (ni en base, ni dans l'instantané ``narrative_context`` d'une production) :
+# seule sa reprise dans un prompt est condensée, ici, au moment de la composition. Sans cette étape, la ligne
+# du lieu dépasserait le budget du bloc et ``_bounded_block`` l'abandonnerait ENTIÈREMENT — le lieu disparaîtrait
+# du prompt, en silence, exactement ce que #92 avait corrigé pour les personnages.
+#
+# Stratégie (déterministe, testée) : le budget de la ligne est partagé équitablement entre les champs non vides ;
+# un champ plus court que sa part laisse le reste aux autres (aucun caractère perdu inutilement). Un champ qui
+# dépasse sa part est coupé entre deux mots et marqué « […] », toujours visible dans le prompt envoyé : jamais
+# une coupure muette. Les retours à la ligne du texte canonique (zones, #202) deviennent de simples espaces dans
+# le prompt (une ligne par élément, comme avant).
+#
+# Bornes PAR LIGNE, à l'intérieur des budgets de bloc existants (NARRATIVE_BLOCK_MAX/VISUAL_BLOCK_MAX), donc
+# aucun coût supplémentaire par scène : un lieu répété à chaque scène pèse au plus ce qu'il pesait déjà avec
+# l'ancienne limite de 3 × 500 caractères. Un lieu rempli dans ces anciennes bornes ressort strictement identique.
+LOCATION_SCRIPT_LINE_MAX = 500  # tient seul dans NARRATIVE_BLOCK_MAX, en-tête et pied compris
+# ≥ nom (80) + type (60) + 3 × 500 + libellés : aucun changement pour un lieu rempli dans les bornes d'avant #202.
+LOCATION_VISUAL_LINE_MAX = 1750
+CONDENSED_MARK = " […]"
+
+
+def _flatten(value: Any) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _cut_between_words(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    room = limit - len(CONDENSED_MARK)
+    if room <= 0:
+        return CONDENSED_MARK.strip()
+    cut = text[:room]
+    space = cut.rfind(" ")
+    if space >= room // 2:  # coupe entre deux mots, sauf si cela sacrifie plus de la moitié de la part
+        cut = cut[:space]
+    return cut.rstrip(" ,;:.—-") + CONDENSED_MARK
+
+
+def condense_fields(item: dict[str, Any], fields: Sequence[str], budget: int) -> dict[str, str]:
+    """Valeurs (aplaties sur une ligne) des ``fields`` non vides de ``item``, dont la longueur TOTALE ne dépasse
+    pas ``budget`` — partage équitable, reliquat redistribué, coupure entre mots marquée ``CONDENSED_MARK``.
+    Ordre des clés : celui de ``fields``. Ne modifie jamais ``item``."""
+    values = {field: _flatten(item.get(field)) for field in fields}
+    values = {field: value for field, value in values.items() if value}
+    allowance: dict[str, int] = {}
+    remaining = max(budget, 0)
+    pending = sorted(values, key=lambda field: (len(values[field]), fields.index(field)))
+    for position, field in enumerate(pending):
+        share = remaining // (len(pending) - position)
+        allowance[field] = min(len(values[field]), share)
+        remaining -= allowance[field]
+    return {field: _cut_between_words(values[field], allowance[field]) for field in fields if field in values}
+
+
+def _condensed_location_line(location: dict[str, Any], fields: Sequence[str], labels: dict[str, str],
+                             line_max: int) -> str:
+    name = _flatten(location.get("name", ""))
+    present = [field for field in fields if _flatten(location.get(field))]
+    overhead = len(f"Lieu : {name}")
+    if present:
+        overhead += len(" — ") + sum(len(labels[field]) + len(" : ") for field in present) + len("; ") * (len(present) - 1)
+    condensed = condense_fields(location, present, line_max - overhead)
+    details = "; ".join(f"{labels[field]} : {value}" for field, value in condensed.items())
+    return f"Lieu : {name}" + (f" — {details}" if details else "")
+
+
 def _character_line(character: dict[str, Any]) -> str:
     details = _detail_line(character, _SCRIPT_CHARACTER_FIELDS, _FIELD_LABELS)
     name = character.get("name", "")
@@ -201,9 +269,7 @@ def _character_line(character: dict[str, Any]) -> str:
 
 
 def _location_line(location: dict[str, Any]) -> str:
-    details = _detail_line(location, _SCRIPT_LOCATION_FIELDS, _FIELD_LABELS)
-    name = location.get("name", "")
-    return f"Lieu : {name}" + (f" — {details}" if details else "")
+    return _condensed_location_line(location, _SCRIPT_LOCATION_FIELDS, _FIELD_LABELS, LOCATION_SCRIPT_LINE_MAX)
 
 
 def render_prompt_block(narrative_context: dict[str, Any] | None) -> str:
@@ -217,7 +283,8 @@ def render_prompt_block(narrative_context: dict[str, Any] | None) -> str:
     production antérieure à #35 qui n'a jamais eu ce bloc dans son snapshot.
 
     Ordre déterministe (celui, déjà figé, des personnages dans le snapshot, puis le lieu en dernier) ; taille
-    bornée par ``NARRATIVE_BLOCK_MAX`` (troncature nette entre éléments, jamais au milieu d'un champ).
+    bornée par ``NARRATIVE_BLOCK_MAX`` (troncature nette entre éléments, jamais au milieu d'un champ — seul un
+    lieu très détaillé est condensé à ``LOCATION_SCRIPT_LINE_MAX``, avec une marque « […] » visible, #202).
     """
     if not narrative_context:
         return ""
@@ -273,9 +340,7 @@ def _character_visual_full(character: dict[str, Any]) -> str:
 
 
 def _location_visual_full(location: dict[str, Any]) -> str:
-    details = _detail_line(location, _VISUAL_LOCATION_FIELDS, _VISUAL_FIELD_LABELS)
-    name = location.get("name", "")
-    return f"Lieu : {name}" + (f" — {details}" if details else "")
+    return _condensed_location_line(location, _VISUAL_LOCATION_FIELDS, _VISUAL_FIELD_LABELS, LOCATION_VISUAL_LINE_MAX)
 
 
 def _mentions(narration: str, name: str) -> bool:

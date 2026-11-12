@@ -70,7 +70,10 @@ from lody.secrets_guard import find_secret_path
 SCHEMA_VERSION = 1
 # Taille et volumétrie généreuses pour un usage réel (un projet a rarement plus de quelques personnages
 # ou lieux), mais bornées pour ne jamais laisser un fichier extravagant bloquer le serveur.
-MAX_FILE_BYTES = 512 * 1024
+# 2 Mo depuis #202 (512 Ko avant) : un lieu détaillé peut désormais atteindre 20 000 caractères (voir
+# ``locations.FIELD_LIMITS``), soit ~22 Ko en JSON UTF-8 accentué ; MAX_ITEMS lieux complets doivent tenir
+# dans un seul fichier, avec la marge des personnages et du projet. Lecture/analyse JSON de 2 Mo : négligeable.
+MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_ITEMS = 50
 
 _KNOWN_TOP_KEYS = {"schema_version", "project", "characters", "locations"}
@@ -216,9 +219,21 @@ CHARACTER_EXAMPLE_SECONDARY = {
 }
 LOCATION_EXAMPLE_PRIMARY = {
     "name": "Lieu principal", "location_type": "Intérieur",
-    "description": "Décris ici l'ambiance, la lumière, les éléments récurrents de ce lieu.",
+    # #202 : exemple multi-lignes organisé en zones — montre qu'un lieu peut être décrit en détail (jusqu'à
+    # 8 000 caractères pour la description et les notes, 4 000 pour le prompt de référence, voir
+    # ``locations.FIELD_LIMITS``) et que les retours à la ligne (« \n » en JSON) sont conservés.
+    "description": (
+        "Identité : décris ici ce qui rend ce lieu reconnaissable au premier coup d'œil.\n"
+        "Agencement : position stable des meubles, des caméras et des personnages.\n"
+        "Lumière et couleurs : sources de lumière, température, palette dominante.\n"
+        "Équipements et accessoires : ce qui est toujours visible, et où.\n"
+        "Jusqu'à 8 000 caractères : sois aussi précis que nécessaire, le texte est conservé en entier."
+    ),
     "reference_prompt": "plan large, lumière douce, mêmes couleurs à chaque apparition",
-    "continuity_notes": "Toujours le même agencement d'une vidéo à l'autre.",
+    "continuity_notes": (
+        "Toujours le même agencement d'une vidéo à l'autre.\n"
+        "Ce qui peut changer (heure, météo, écrans) et ce qui ne change jamais."
+    ),
     "is_primary": True,
 }
 LOCATION_EXAMPLE_SECONDARY = {"name": "Lieu secondaire", "location_type": "Extérieur", "is_primary": False}

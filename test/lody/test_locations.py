@@ -256,10 +256,12 @@ def test_name_validation_messages_are_human(repo, project, name, expected):
     assert repo.count_for_project(project.id) == 0
 
 
-@pytest.mark.parametrize("field", ["location_type", "description", "reference_prompt", "continuity_notes"])
-def test_field_length_limits_are_enforced(repo, project, field):
+@pytest.mark.parametrize("field, maximum", [("location_type", 60), ("description", 8000),
+                                            ("reference_prompt", 4000), ("continuity_notes", 8000)])
+def test_field_length_limits_are_enforced(repo, project, field, maximum):
+    # Bornes relevées par #202 (500 auparavant pour les trois champs longs) : voir test_location_long_descriptions.
     with pytest.raises(LocationValidationError) as error:
-        repo.create(project.id, name="Test", **{field: "x" * 1000})
+        repo.create(project.id, name="Test", **{field: "x" * (maximum + 1)})
     assert field in error.value.errors
 
 
