@@ -378,7 +378,8 @@ class AnimationConnector(VideoGenerationProvider):
             billable = voiceover.billable_characters(plan, cache)
             voices = ", ".join(dict.fromkeys(f"{s.spec.character} ({s.spec.voice_name or s.spec.voice_id})"
                                              for s in plan.scenes))
-            unlinked = (f" {len(plan.unlinked)} scène(s) au locuteur sans fiche restent muettes."
+            unlinked = (f" {len(plan.unlinked)} scène(s) au locuteur sans fiche restent muettes (Atelier 2D → "
+                        "« Voix des marionnettes »)."
                         if plan.unlinked else "")
             return CapabilityStatus(
                 Capability.VOICE, CapabilityState.READY, requested="voix ElevenLabs des personnages",
@@ -387,7 +388,8 @@ class AnimationConnector(VideoGenerationProvider):
                         f"{billable} caractère(s) à synthétiser au lancement.{unlinked}")
         return CapabilityStatus(Capability.VOICE, CapabilityState.DISABLED, requested="aucune",
                                 message="Rendu 2D : aucun locuteur relié à une fiche personnage, la vidéo est "
-                                        "muette ; les répliques du storyboard deviennent les sous-titres.")
+                                        "muette ; les répliques du storyboard deviennent les sous-titres. Pour la "
+                                        "faire parler : Atelier 2D → « Voix des marionnettes ».")
 
     def _prepare_voice(self, request: GenerationRequest, storyboard: dict[str, Any], staging: Path) -> None:
         """Synthèse (scènes absentes du cache seulement) puis piste ``voice.wav`` + repères recalés. Lève
