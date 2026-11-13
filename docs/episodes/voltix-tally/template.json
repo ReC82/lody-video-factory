@@ -1,0 +1,35 @@
+{
+  "name": "Voltix — Le Tally",
+  "description": "Épisode « Pourquoi une caméra a une lumière rouge ? Le Tally » de la série Voltix décrypte le broadcast (#140). Préproduction : voir docs/episodes/voltix-tally.md.",
+  "payload": {
+    "duration_min": 45,
+    "duration_max": 65,
+    "narration_pace": "rapide",
+    "scenes_per_minute_min": 8,
+    "scenes_per_minute_max": 11,
+    "structure": [
+      "Hook : la bourde en direct (mauvaise caméra)",
+      "Contexte : plusieurs caméras, le réalisateur choisit l'image",
+      "Schéma : caméras, mélangeur, programme",
+      "Question et nom : le Tally",
+      "Signal retour et voyant sur la caméra, généralement rouge",
+      "Démonstration : caméra un puis caméra deux",
+      "Bénéfice : présentateur et opérateur",
+      "Nuance : prévisualisation, couleur selon équipement",
+      "Mise en garde : pas le voyant d'enregistrement",
+      "Chute humoristique avant / après"
+    ],
+    "standing_instructions": "Série Voltix décrypte le broadcast, personnage canonique Voltix sans modification. Français grand public, une seule idée centrale : le Tally est le signal de la régie qui indique la caméra à l'antenne. Ne jamais affirmer que rouge signifie toujours enregistrement ; dire « généralement rouge » ; la couleur de prévisualisation dépend du matériel ; ne pas confondre Tally, voyant d'enregistrement et prévisualisation. Script TTS-safe : nombres en toutes lettres, aucun sigle prononcé.",
+    "visual_rules": "Illustration vectorielle plate, contours brun foncé, 9:16. Schémas techniquement exacts avec légendes en français. Le voyant Tally est situé sur la caméra (au-dessus de l'objectif et près du viseur). Flèche du flux image distincte de la flèche retour du Tally. Rouge Tally #E53935, vert prévisualisation #43A047. Une action visuelle toutes les 5 à 7 secondes.",
+    "visual_avoid": [
+      "Personnes réelles ou collègues reconnaissables",
+      "Logos ou marques de fabricants",
+      "Voyant rouge présenté comme enregistrement",
+      "Texte en anglais à l'écran",
+      "Modification de la silhouette ou de la palette de Voltix"
+    ],
+    "hook_notes": "Phrase d'accroche dans la première seconde : « Cette petite lumière rouge sur une caméra ? Elle peut vous éviter une énorme bourde en direct ! », avec Voltix qui jaillit et le panneau « Oups ! ».",
+    "subtitle_notes": "Sous-titres français en phrases entières, apostrophes typographiques, « Tally » avec majuscule, « Caméra 1 » en chiffres à l'écran.",
+    "music_notes": "Musique instrumentale discrète et dynamique, droits vérifiés, environ 20 % sous la voix avec ducking, durée strictement limitée à la narration, aucun bip synthétique."
+  }
+}
