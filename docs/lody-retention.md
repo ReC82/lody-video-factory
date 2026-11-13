@@ -14,7 +14,7 @@
 | Authentification | `docker-compose.lody.yml`, `Dockerfile.lody-auth` | `lody-auth:<tag>` | reconstruite à **chaque** livraison avant #209 (même sans changement) |
 | Interface + rendu 2D (PROD) | **aucun** avant #209 : override racine `docker-compose.lody-2d.override.yml` **non versionné** (audit) | `lody-video-factory-2d:local` | tag **mutable** : retour arrière non reproductible |
 | Pilote DEV 2D | `docker-compose.lody-dev-2d.yml` | `lody-video-factory-2d:${LODY_IMAGE_TAG:-local}` | instance séparée (#154) |
-| Moteur MoneyPrinterTurbo | `docker-compose.engine-local.yml`, `Dockerfile` | `moneyprinterturbo:<tag>` ; amont `ghcr.io/harry0703/moneyprinterturbo:latest` | partagé API/WebUI : **hors rétention automatique** |
+| Moteur MoneyPrinterTurbo | `docker-compose.engine-local.yml`, `Dockerfile` | `moneyprinterturbo:<tag>` ; image amont MoneyPrinterTurbo éventuelle (`…/moneyprinterturbo:latest`) | partagé API/WebUI : **hors rétention automatique** |
 | Image publique | `.github/workflows/docker-ghcr.yml` | `ghcr.io/rec82/lody-video-factory` | non utilisée par la production |
 
 Avant #209, il n'y avait **aucun script de livraison** : le « tag SHA à chaque déploiement » de l'audit vient de la
