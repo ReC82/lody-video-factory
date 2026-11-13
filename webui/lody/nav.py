@@ -9,6 +9,11 @@
   ?projet=<id>&vue=v2&production=<id>    → création d'une V2 (script modifiable)
   ?projet=<id>&vue=personnages          → personnages récurrents du projet (#32)
   ?projet=<id>&vue=lieux                → lieux récurrents du projet (#33)
+  ?vue=personnages                      → personnages de tous les projets, en lecture (#213)
+  ?vue=ressources                       → lieux et éléments animés de tous les projets, en lecture (#213)
+
+Sans ``projet``, ``personnages`` mène à la vue transverse ; avec ``projet``, à la page du projet,
+exactement comme avant (aucun lien profond existant ne change de destination).
 """
 
 from __future__ import annotations
@@ -26,6 +31,10 @@ VIEW_TRACK = "suivi"
 VIEW_V2 = "v2"
 VIEW_CHARACTERS = "personnages"
 VIEW_LOCATIONS = "lieux"
+# Domaines de premier niveau (#213) : identifiants internes distincts des sous-pages d'un projet.
+VIEW_ALL_CHARACTERS = "tous_personnages"
+VIEW_RESOURCES = "ressources"
+TOP_LEVEL_VIEWS = (VIEW_HOME, VIEW_ALL_CHARACTERS, VIEW_RESOURCES)
 # Accessible uniquement en connaissant ce paramètre : aucun bouton ni lien n'y mène nulle part dans l'interface
 # (verrouillée en plus par settings.system_settings_enabled(), désactivée par défaut — voir docs/lody-secrets.md).
 VIEW_SYSTEM_SETTINGS = "systeme"
@@ -54,6 +63,10 @@ def current_route() -> Route:
         return Route(VIEW_PROJECT, project_id)
     if view == VIEW_NEW:
         return Route(VIEW_NEW)
+    if view == VIEW_CHARACTERS:
+        return Route(VIEW_ALL_CHARACTERS)
+    if view == VIEW_RESOURCES:
+        return Route(VIEW_RESOURCES)
     if view == VIEW_SYSTEM_SETTINGS:
         return Route(VIEW_SYSTEM_SETTINGS)
     return Route(VIEW_HOME)
@@ -81,6 +94,10 @@ def go(view: str = VIEW_HOME, project_id: str | None = None, production_id: str 
             params["production"] = production_id
     elif view == VIEW_NEW:
         params["vue"] = VIEW_NEW
+    elif view == VIEW_ALL_CHARACTERS:
+        params["vue"] = VIEW_CHARACTERS
+    elif view == VIEW_RESOURCES:
+        params["vue"] = VIEW_RESOURCES
     st.query_params.clear()
     st.query_params.update(params)
 

@@ -7,8 +7,9 @@ import logging
 import streamlit as st
 
 from lody import nav, settings
-from lody import view_characters, view_form, view_home, view_locations, view_production, view_project, view_settings, \
+from lody import view_characters, view_form, view_home, view_library, view_locations, view_production, view_project, view_settings, \
     view_system_settings, view_tracking, view_v2
+from lody.animation.assets import AnimationAssetRepository
 from lody.characters import CharacterRepository
 from lody.generation.kit_service import KitService
 from lody.generation.runtime import DEFAULT_PROVIDER, build_kit_service, build_service
@@ -53,6 +54,12 @@ def get_character_repository() -> CharacterRepository:
 def get_location_repository() -> LocationRepository:
     """Lieux récurrents (#31/#33) : facultatifs, jamais lus par le pipeline de génération."""
     return LocationRepository(settings.db_path())
+
+
+@st.cache_resource(show_spinner=False)
+def get_animation_asset_repository() -> AnimationAssetRepository:
+    """Assets d'animation 2D (#119), lus ici seulement pour la vue transverse Ressources (#213)."""
+    return AnimationAssetRepository(settings.db_path())
 
 
 def _render_storage_error() -> None:
@@ -102,6 +109,10 @@ def render() -> None:
 
     if route.view == nav.VIEW_HOME:
         view_home.render(repo)
+    elif route.view == nav.VIEW_ALL_CHARACTERS:
+        view_library.render_characters(repo, get_character_repository())
+    elif route.view == nav.VIEW_RESOURCES:
+        view_library.render_resources(repo, get_location_repository(), get_animation_asset_repository())
     elif route.view == nav.VIEW_NEW:
         view_form.render(repo, service.option_states(None, DEFAULT_PROVIDER))
     elif route.view == nav.VIEW_SETTINGS and project:
