@@ -6,7 +6,7 @@
 > Les sections 1 à 7 décrivent la politique de la phase 1 (#193), complétée par la section 8.
 >
 > **Mise en service (#205)** : constat et procédure dans
-> [lody-fusion-auto-mise-en-service.md](lody-fusion-auto-mise-en-service.md) — non activée à ce jour.
+> [lody-fusion-auto-mise-en-service.md](lody-fusion-auto-mise-en-service.md) — non activée à ce jour ; `dry-run` d'abord, mode réel en attente d'une correction de la séparation des pouvoirs.
 
 **Fusion GitHub ≠ déploiement.** Fusionner une PR dans `main` et mettre une version en service sur
 AWS sont deux niveaux distincts, avec des garde-fous distincts. Aucune fusion n'entraîne de

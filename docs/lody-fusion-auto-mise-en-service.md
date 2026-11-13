@@ -1,6 +1,9 @@
 # Mise en service de la fusion automatique sur AWS (#205)
 
-> **Statut au 13/11/2026 : non activée.** Constat fait en lecture seule par une session lodyorch,
+> **Statut au 13/11/2026 : non activée.** Décision du propriétaire du même jour : identité GitHub
+> unique (`ReC82`), installation et recette en `dry-run` d'abord, mode réel en attente d'une
+> correction technique de la séparation des pouvoirs (§2), protection de `main` progressive (§3).
+> Constat fait en lecture seule par une session lodyorch,
 > qui n'a ni root, ni Docker, ni systemd, ni le droit de piloter le superviseur, de poser un label ou
 > de modifier la protection de `main` (crochet de garde). Toutes les étapes ci-dessous sont donc à
 > lancer **par le propriétaire**, dans l'ordre. Rien n'a été installé, fusionné ni déployé.
@@ -24,53 +27,66 @@ Production (`/srv/moneyprinterturbo`, conteneurs, volume `lody-video-factory-dat
 pour la session, **non inspectée** ; SHA déployé et rendus en cours restent à relever par le
 propriétaire (§4, étape 1).
 
-## 2. Blocage : origine du consentement `merge:auto`
+## 2. Identité GitHub unique : décision du propriétaire et risque résiduel
 
-`merge_policy.py` accepte `merge:auto` si le dernier ajout du label sur le ticket a été fait par un
-compte de `LQ_MERGE_TRUSTED` (par défaut `ReC82`). Or le superviseur **et** les sessions Claude
-utilisent le jeton `gh` de `ReC82`, administrateur. Le journal d'événements GitHub montrera donc
-`ReC82` que le label vienne du propriétaire, du superviseur ou d'une session. Les protections
-actuelles sont seulement logicielles :
+**Décision du 13/11/2026** ([commentaire du propriétaire sur #205](https://github.com/ReC82/lody-video-factory/issues/205#issuecomment-6848306621)) :
+**pas de second compte GitHub**. Le superviseur et les sessions gardent l'identité `ReC82`. La
+mise en service n'est plus conditionnée à un compte machine ; la séparation des pouvoirs se fait
+au niveau des processus et de l'hôte, et les garde-fous existants restent en place.
 
-- le crochet de garde refuse aux sessions les commandes de labels et de fusion (motifs de commande) ;
-- le superviseur ne pose jamais `merge:auto` (code relu).
+### 2.1 Ce que la garde actuelle garantit — et ce qu'elle ne garantit pas
 
-Le jeton lui-même permettrait tout (labels, fusion, protection de branche). Le ticket demande de
-**ne pas activer le mode réel** dans ce cas sans mesure compensatoire fiable.
+`merge_policy.py` accepte `merge:auto` si le dernier ajout du label sur le ticket vient d'un compte
+de `LQ_MERGE_TRUSTED` (par défaut `ReC82`). Avec un compte partagé, le journal GitHub montre
+`ReC82` quel que soit le processus qui a posé le label : **l'auteur humain du label n'est pas
+authentifiable**. C'est un risque résiduel assumé, pas une garantie.
 
-**Mesure recommandée : compte machine distinct pour lodyorch.**
+| Barrière | Nature | Limite |
+|---|---|---|
+| Le superviseur ne pose jamais `merge:auto` | code relu (`lodyorch.py`) | — |
+| Les tickets `agent:auto` ne donnent aucun droit de fusion | `merge_policy.py` (`autorisation-merge-auto`) | — |
+| Crochet de garde des sessions (`guard.py`) | refus par **motifs de commande** (`gh pr merge`, `pulls/<n>/merge`, `/labels`, `lodyorch …`) | son en-tête le dit : « un garde-fou contre les erreurs, pas un bac à sable ». Le processus de la session exécute `gh` avec le jeton `ReC82` (admin) ; une formulation que les motifs ne couvrent pas resterait techniquement possible. **Non testé volontairement** (contourner le garde est interdit aux sessions). |
+| CI sur le SHA courant, veto `merge:manual`, chemins sensibles, non-rétroactivité, audit, kill switch | `merge_policy.py` + superviseur | protègent contre une fusion **non conforme**, pas contre un label posé par le mauvais processus |
 
-1. Créer un compte GitHub dédié (ex. `lody-bot`), l'inviter sur le dépôt avec le rôle **Write**
-   (pas Admin, pas Maintain).
-2. Sur l'hôte, authentifier `gh` de l'utilisateur `ubuntu` avec un jeton de ce compte (fine-grained,
-   limité au dépôt : Contents RW, Pull requests RW, Issues RW, Metadata R, Checks R, Actions R).
-3. Garder `LQ_MERGE_TRUSTED=ReC82` (valeur par défaut) : un `merge:auto` posé par `lody-bot` ne
-   vaut plus rien ; seul le propriétaire, depuis son propre compte, autorise une fusion.
-4. Effets à prévoir : les PR seront ouvertes par `lody-bot` → ajouter ce compte au critère
-   `auteur-de-confiance` (variable dédiée ou adaptation de `merge_policy.py`, **PR séparée** relue
-   par le propriétaire) ; les commentaires `<!-- lodyorch -->` viendront de `lody-bot`, ce qui
-   simplifie la distinction propriétaire / outillage.
-5. Protection de `main` avec `enforce_admins` : `lody-bot` (Write) ne peut fusionner que si
-   `CI result` est vert ; le propriétaire garde la main.
+**Conclusion (point 4 du plan révisé)** : les sessions Claude peuvent techniquement atteindre
+l'API GitHub avec le même jeton administrateur ; seule la garde logicielle les en empêche. Le mode
+réel (`on`) reste donc **en attente** ; `dry-run` peut être installé et testé tout de suite.
 
-Alternative plus faible (non recommandée) : garder le compte partagé et accepter que la seule
-barrière soit le crochet de garde. À décider explicitement par le propriétaire.
+### 2.2 Correction technique proposée, sans second compte (ticket séparé à créer)
 
-## 3. Protection de `main` : pas maintenant
+Objectif : qu'une session ne détienne plus aucun jeton capable de fusionner ou de poser un label
+indiscernable de celui du propriétaire. Pistes compatibles avec une identité unique, à arbitrer
+dans un ticket dédié (toutes demandent une configuration root ponctuelle de l'hôte) :
+
+1. **Utilisateur Unix séparé pour le superviseur** (ex. `lodyorch`) : seul lui lit le jeton
+   `ReC82` (répertoire de configuration de `gh` en `0700`) ; les sessions tournent sous un autre
+   utilisateur, sans accès à ce répertoire. Indispensable à toutes les variantes ci-dessous.
+2. **Jeton de session restreint** fourni par le superviseur à chaque lancement (`GH_TOKEN`) :
+   - **jeton fine-grained de `ReC82`** limité au dépôt avec *Contents : read* (le push des branches
+     passe par une **clé de déploiement** en écriture) ; sans *Contents : write*, `PUT …/merge` est
+     refusé par GitHub. Reste possible : poser un label (*Issues : write* est nécessaire aux
+     commentaires) — label toujours attribué à `ReC82` ;
+   - **ou application GitHub** appartenant à `ReC82` (ce n'est pas un compte) : jeton d'installation
+     d'une heure, actions attribuées à `<app>[bot]` ; un `merge:auto` posé par une session devient
+     discernable et rejeté par `LQ_MERGE_TRUSTED=ReC82`. Combiné à un ruleset « Restrict updates »
+     sur `main` avec le seul rôle administrateur en contournement, l'app ne peut pas fusionner.
+3. Le superviseur garde son propre jeton (`ReC82`) pour les seules opérations prévues : labels de
+   suivi, fusion en mode `on` après tous les contrôles.
+
+Recommandation de la session : **application GitHub + utilisateur Unix séparé** (seule variante qui
+rend l'origine du label discernable). Tant que ce ticket n'est pas livré, rester en `dry-run`.
+
+## 3. Protection de `main` : approche progressive (voie A, décidée)
 
 `python3 deploy/lodyorch/branch_protection.py` (à blanc) proposerait d'exiger `CI result` avec
 `enforce_admins: true`. Les 14 PR ouvertes n'ont pas ce check sur leur SHA de tête : GitHub les
 déclarerait non fusionnables, **y compris pour le propriétaire**, jusqu'à un nouveau push
-(une relance de l'ancien run réutilise l'ancien `ci.yml`, sans `CI result`). Conformément au
-ticket, la protection n'est **pas** appliquée tant qu'elle bloque les PR courantes.
+(une relance de l'ancien run réutilise l'ancien `ci.yml`, sans `CI result`).
 
-Deux voies :
-
-- **A (recommandée)** : appliquer la protection après le compte machine (§2), une fois les PR
-  ouvertes à conserver mises à jour par `git merge origin/main` (nouveau run avec `CI result`) ou
-  fermées.
-- **B** : appliquer tout de suite et accepter que chaque PR ancienne doive être actualisée avant
-  fusion.
+**Voie A retenue par le propriétaire (13/11/2026)** : la protection est appliquée **après** mise à
+jour des PR historiques à conserver (`git merge origin/main` → nouveau run avec `CI result`) ou
+leur fermeture. Elle ne dépend plus d'un compte machine. Tant qu'elle n'est pas posée,
+`merge_policy.py` vérifie lui-même `CI result` sur le SHA courant avant toute fusion.
 
 ## 4. Procédure pour le propriétaire (dans l'ordre)
 
@@ -97,13 +113,15 @@ Chaque étape a son retour arrière. Ne pas passer à la suivante si une vérifi
    - (c) non-rétroactivité : vérifiée à l'étape 6 (label posé avant `automerge on` → refus
      `autorisation-apres-activation`) ;
    - (d) arrêt : `lodyorch automerge off` → plus aucun verdict de fusion ; puis `dry-run`.
-6. **Mode réel** — seulement après la décision du §2 (compte machine en place, ou risque accepté
-   par écrit) : `LQ_AUTO_MERGE=on` dans l'env installé, réinstaller, `lodyorch reload`, puis
-   `lodyorch automerge on`. Le `merge:auto` posé à l'étape 5 est antérieur : verdict attendu
-   « refusée — autorisation antérieure » (non-rétroactivité). Retirer puis reposer `merge:auto`
-   sur #205 → fusion réelle de la PR factice, ticket rouvert et gardé `status:needs-test`, aucun
-   déploiement. Kill switch : `lodyorch automerge off`, vérifier `lodyorch automerge`, puis `on`.
-7. **Protection de `main`** : voie A ou B du §3, `branch_protection.py --apply`. Retour arrière :
+6. **Mode réel** — **en attente** de la correction technique du §2.2 (le refus d'un second compte
+   n'autorise pas à retirer les protections). Une fois livrée : `LQ_AUTO_MERGE=on` dans l'env
+   installé, réinstaller, `lodyorch reload`, puis `lodyorch automerge on`. Le `merge:auto` posé à
+   l'étape 5 est antérieur : verdict attendu « refusée — autorisation antérieure »
+   (non-rétroactivité). Retirer puis reposer `merge:auto` sur #205 → fusion réelle de la PR factice,
+   ticket rouvert et gardé `status:needs-test`, aucun déploiement. Kill switch :
+   `lodyorch automerge off`, vérifier `lodyorch automerge`, puis `on`.
+7. **Protection de `main`** (voie A du §3, indépendante de l'étape 6) : après actualisation ou
+   fermeture des PR historiques, `branch_protection.py --apply`. Retour arrière :
    `gh api -X DELETE repos/ReC82/lody-video-factory/branches/main/protection`.
 8. Rapport : coller dans #205 les sorties de `lodyorch automerge`, le verdict, le SHA de fusion et
    le mode final.
