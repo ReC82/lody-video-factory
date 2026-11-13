@@ -225,7 +225,8 @@ export const SPEAKING_THRESHOLD = 0.12;
 /**
  * Bouche à l'image `frame` : null si la marionnette ne parle pas (la bouche de l'expression reste),
  * sinon un visème du rig. Pendant un repère de parole, l'enveloppe audio (0-1) décide si la bouche est
- * ouverte ; le visème suit les lettres du repère, réparties sur sa durée. Sans audio, les lettres seules.
+ * ouverte ; le visème suit les lettres du repère (`spoken` si présent, sinon `text`), réparties sur sa durée.
+ * Sans audio, les lettres seules.
  */
 export function mouthAt(cues, envelope, frame) {
   const cue = (cues ?? []).find((c) => frame >= c.start && frame < c.end);
@@ -234,7 +235,7 @@ export function mouthAt(cues, envelope, frame) {
     const level = envelope[Math.min(frame, envelope.length - 1)] ?? 0;
     if (level < SPEAKING_THRESHOLD) return 'mbp';
   }
-  const visemes = visemesOf(cue.text);
+  const visemes = visemesOf(cue.spoken ?? cue.text); // #164 : texte PARLÉ (lexique) quand il est fourni
   const position = (frame - cue.start) / Math.max(1, cue.end - cue.start);
   const index = Math.min(visemes.length - 1, Math.floor(position * visemes.length));
   return visemes[index];

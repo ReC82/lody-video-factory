@@ -28,6 +28,14 @@ ainsi que l'existence des fichiers liés.
   palette, proportions, rig SVG en calques, expressions, visèmes, gestes, accessoires BNC et catalogue importable.
 - [Moteur de scène Remotion](lody-animation-remotion.md) — adaptateur `lody.animation-scene/1` → MP4,
   rig `lody.rig/1`, synchro labiale, mixage voix + musique ; démo [Voltix #150](animation/voltix-150/README.md).
+- [Worker 2D Remotion en Docker — pilote DEV](lody-animation-worker-docker.md) — image reproductible,
+  compose DEV isolé, préflight (licence Remotion comprise), atelier 2D, mesures CPU/RAM.
+- [Réédition ciblée et contrôle qualité du rendu 2D](lody-animation-reedit.md) — cache de scène par
+  empreinte des dépendances, plan d'une V2, prévisualisation basse résolution, contrôles automatiques du MP4 ; écran « Nouvelle version » scène par scène (#159).
+- [Voix ElevenLabs du rendu 2D](lody-animation-voix.md) — voix de la fiche personnage, lexique de
+  prononciation, cache, piste calée et repères recalés pour la bouche et les sous-titres (#164).
+- [Recette contrôlée du rendu 2D parlé](lody-recette-dev-2d.md) — prérequis DEV, jeu de test 2 scènes
+  Voltix V1/V2/V3, coût ElevenLabs estimé et plafonné, autorisation écrite, critères PASS/FAIL (#187).
 - [Épisode « Voltix explique le câble SDI »](animation/voltix-137/README.md) (#137) — script chronométré,
   storyboard 9 scènes, schémas SVG coaxial / BNC, preset, estimation des coûts, MP4 provisoire.
 
@@ -35,6 +43,8 @@ ainsi que l'existence des fichiers liés.
 
 - [Catalogue des voix ElevenLabs](lody-elevenlabs-voices.md) — choix d'une voix ElevenLabs
   depuis l'interface sans recopier son `voice_id`, à partir d'un catalogue généré côté hôte.
+- [Choisir la voix d'un personnage](lody-voix-personnage.md) — comparer 2 à 3 voix ElevenLabs
+  sur le même dialogue, budget visible avant tout appel, voix mémorisée pour tous les épisodes.
 
 ## Sécurité
 
@@ -43,7 +53,25 @@ ainsi que l'existence des fichiers liés.
 - [Authentification administrateur](lody-auth.md) — authentification qui protège la page
   « Paramètres système » et le remplacement des clés d'API depuis l'interface.
 
+## Exploitation
+
+- [Rétention Docker, versions reproductibles et worktrees](lody-retention.md) — livraison tracée par SHA
+  (`scripts/lody-deploy.sh`), journal des releases et retour arrière vérifié, rétention des images en simulation
+  par défaut, alertes disque 75/85 %, nettoyage sûr des worktrees LODYORCH (#209).
+
+## Intégration continue
+
+- [CI ciblée par PR](lody-ci.md) — quel changement déclenche quels tests, Python 3.12, check
+  obligatoire « CI result », parallélisme borné, mesures avant/après et recette (#198).
+
 ## Orchestrateur
 
 - [LODYORCH](lodyorch.md) — orchestrateur autonome qui traite un ticket GitHub à la fois et
   livre une pull request, sans jamais fusionner ni déployer.
+- [Fusion automatique des PR — politique](lody-fusion-auto.md) — label `merge:auto`, critères
+  cumulatifs, exclusions ; fusion par le superviseur après CI verte (#200), à blanc par défaut.
+- [Fusion automatique — mise en service AWS](lody-fusion-auto-mise-en-service.md) — constat du
+  13/11, identité GitHub unique (décision propriétaire), risque résiduel, procédure propriétaire pas à pas et livraison #189/#191/#202 (#205).
+- [Isolation des permissions LODYORCH](lody-isolation-permissions.md) — application GitHub pour
+  les sessions, broker de fusion sous un utilisateur Unix dédié, ruleset de `main`, procédure root
+  courte, rollback et kill switch, sans second compte GitHub (#207).

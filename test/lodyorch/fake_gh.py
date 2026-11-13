@@ -64,11 +64,46 @@ def main(argv):
         return 0
     data["requests"] = data.get("requests", 0) + 1
     save(data)
-    m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)/(files|commits)", base)
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)/merge", base)
+    if m and method == "PUT":
+        # Fusion (#200) : `sha` attendu obligatoire ; 409 si la tête a bougé, 405 si non fusionnable.
+        pr = data.get("pulls", {}).get(m.group(1))
+        values = dict(f.split("=", 1) for f in fields[1::2])
+        data.setdefault("merges", []).append({"pr": int(m.group(1)), **values})
+        if data.get("merge_error"):
+            save(data)
+            print(f"gh: {data['merge_error']}", file=sys.stderr)
+            return 1
+        if not pr or pr.get("merged") or pr.get("state") != "open":
+            save(data)
+            print("gh: Pull Request is not mergeable (HTTP 405)", file=sys.stderr)
+            return 1
+        if values.get("sha") != pr["head"]["sha"]:
+            save(data)
+            print("gh: Head branch was modified. Review and try the merge again. (HTTP 409)", file=sys.stderr)
+            return 1
+        pr.update(merged=True, state="closed", merge_commit_sha="m" * 40)
+        if data.get("merge_closes_issue"):  # comme GitHub : « Closes #N » ferme le ticket à la fusion
+            for num in re.findall(r"(?i)closes\s+#(\d+)", pr.get("body") or ""):
+                if num in data["issues"]:
+                    data["issues"][num]["state"] = "closed"
+        save(data)
+        print(json.dumps({"sha": "m" * 40, "merged": True, "message": "Pull Request successfully merged"}))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)/(files|commits|reviews)", base)
     if m:
         pr = data.get("pulls", {}).get(m.group(1)) or {}
         page = int(query.get("page", ["1"])[0])
         print(json.dumps(pr.get(m.group(2), []) if page == 1 else []))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/compare/([^.]+)\.\.\.(.+)", base)
+    if m:
+        print(json.dumps(data.get("compare", {}).get(m.group(1), {"ahead_by": 0, "files": []})))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/issues/(\d+)/events", base)
+    if m:
+        page = int(query.get("page", ["1"])[0])
+        print(json.dumps(data.get("events", {}).get(m.group(1), []) if page == 1 else []))
         return 0
     m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/(\d+)", base)
     if m:
@@ -123,6 +158,9 @@ def main(argv):
         it = data["issues"].get(m.group(1))
         if not it:
             return 1
+        if method == "PATCH":
+            it.update(dict(f.split("=", 1) for f in fields[1::2]))
+            save(data)
         print(json.dumps(issue_json(it)))
         return 0
     if base.endswith("/issues/comments"):

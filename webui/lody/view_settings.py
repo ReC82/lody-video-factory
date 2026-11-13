@@ -32,6 +32,8 @@ def _transfer_prefix(project_id: str) -> str:
 def _submit(repo: ProjectRepository, project_id: str) -> None:
     ss = st.session_state
     p = _prefix(project_id)
+    # #191 : la voix choisie dans le catalogue doit être reportée AVANT de lire les champs (voir voice_picker).
+    voice_picker.apply_pending_selection(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_voice_id")
     duration = ss.get(f"{p}_duration") or (45, 60)
     scenes = ss.get(f"{p}_scenes") or (6, 8)
     try:

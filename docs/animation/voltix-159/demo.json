@@ -1,0 +1,62 @@
+{
+ "plan": "2 scène(s) réutilisée(s), 1 à refaire (≈ 41 s de rendu, ≈ 171 s évitées, mesurées).\n  =  1. accueil : inchangée\n  ↻  2. coaxial : geste, expression\n  =  3. bnc : inchangée\nAucun appel externe : le rendu 2D est local et gratuit.",
+ "changes": {
+  "gestures": {
+   "('personnages/voltix', 0)": "saluer"
+  },
+  "expressions": {
+   "('personnages/voltix', 0)": "surprise"
+  }
+ },
+ "preview": {
+  "state": "done",
+  "error": "",
+  "width": 540,
+  "height": 960,
+  "audit": {
+   "scenes_rendered": 3,
+   "scenes_reused": 0,
+   "reused_scenes": [],
+   "rendered_scenes": [
+    1,
+    2,
+    3
+   ],
+   "render_ms_spent": 71438,
+   "render_ms_saved": 0,
+   "steps_ms": {
+    "scenes_ms": 71461,
+    "soundtrack_ms": 599,
+    "assembly_ms": 9005,
+    "qa_ms": 2083
+   },
+   "external_calls": 0,
+   "external_cost": 0.0
+  }
+ },
+ "ok": true,
+ "checks": {
+  "v2_scenes_reused": 2,
+  "v2_scenes_rendered": 1,
+  "v2_render_ms_saved": 170623,
+  "v2_rendered_scenes": [
+   2
+  ],
+  "v1_video_unchanged": true,
+  "v1_storyboard_unchanged": true,
+  "qa": {
+   "status": "ok",
+   "counts": {
+    "info": 0,
+    "warning": 0,
+    "error": 0
+   }
+  },
+  "qa_problems": []
+ },
+ "timings_s": {
+  "anim-b0d140578639ddc407eb": 241.4,
+  "anim-8e0c9a7c156e012d2068": 83.5,
+  "anim-f011e31e9c4779ad518e": 87.0
+ }
+}

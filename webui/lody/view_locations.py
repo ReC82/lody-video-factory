@@ -14,7 +14,16 @@ import streamlit as st
 from lody import nav, reference_images, resource_transfer
 from lody.components import EMPTY_ICON_SVG
 from lody.generation.publication import slugify
-from lody.locations import Location, LocationNotFound, LocationRepository, LocationValidationError
+from lody.locations import (
+    CONTINUITY_NOTES_MAX,
+    DESCRIPTION_MAX,
+    REFERENCE_PROMPT_MAX,
+    Location,
+    format_count,
+    LocationNotFound,
+    LocationRepository,
+    LocationValidationError,
+)
 from lody.projects import Project
 from lody.theme import esc
 
@@ -152,7 +161,7 @@ def _row(repo: LocationRepository, project: Project, location: Location) -> None
         badges.append('<span class="pill pill-muted">Inactif</span>')
     details = [esc(location.location_type)] if location.location_type else []
     if location.continuity_notes:
-        note = location.continuity_notes
+        note = " ".join(location.continuity_notes.split())  # aperçu sur une ligne ; le texte stocké garde ses sauts (#202)
         details.append(esc(note if len(note) <= 80 else note[:79] + "…"))
     meta_text = " · ".join(details) or "Type non précisé"
     with st.container(horizontal=True, vertical_alignment="center", key=f"item_row_{location.id}"):
@@ -198,15 +207,26 @@ def _render_form(repo: LocationRepository, project: Project, target: str | None,
                               key=f"{p}_location_type", placeholder="Ex. Extérieur, intérieur, studio…")
             _error_under("name")
             _error_under("location_type")
-            st.text_area("Description", value=current.description if current else "", height=90, max_chars=500,
-                         key=f"{p}_description", placeholder="Ambiance, éléments visuels stables…")
+            st.caption(
+                "Un lieu se décrit une fois puis sert dans plusieurs épisodes : sois aussi précis que nécessaire. "
+                "Tu peux aller à la ligne pour organiser le texte en zones — identité, agencement et position "
+                "des caméras, lumière et couleurs, équipements et accessoires, ce qui ne change jamais. "
+                f"Capacité : {format_count(DESCRIPTION_MAX)} caractères pour la description, "
+                f"{format_count(CONTINUITY_NOTES_MAX)} pour les notes de continuité, "
+                f"{format_count(REFERENCE_PROMPT_MAX)} pour le prompt de référence. Le texte est toujours "
+                "conservé en entier ; seule sa reprise dans les prompts d’une vidéo est résumée, avec une "
+                "marque « […] » visible."
+            )
+            st.text_area("Description", value=current.description if current else "", height=180,
+                         max_chars=DESCRIPTION_MAX, key=f"{p}_description",
+                         placeholder="Identité du lieu, agencement, lumière, couleurs, équipements…")
             _error_under("description")
-            st.text_area("Prompt de référence", value=current.reference_prompt if current else "", height=90,
-                         max_chars=500, key=f"{p}_reference_prompt",
+            st.text_area("Prompt de référence", value=current.reference_prompt if current else "", height=120,
+                         max_chars=REFERENCE_PROMPT_MAX, key=f"{p}_reference_prompt",
                          help="Utilisé plus tard, uniquement si ce lieu est sélectionné dans une production.")
             _error_under("reference_prompt")
-            st.text_area("Notes de continuité", value=current.continuity_notes if current else "", height=90,
-                         max_chars=500, key=f"{p}_continuity_notes",
+            st.text_area("Notes de continuité", value=current.continuity_notes if current else "", height=140,
+                         max_chars=CONTINUITY_NOTES_MAX, key=f"{p}_continuity_notes",
                          placeholder="Ce qu’il faut retenir pour rester cohérent d’une vidéo à l’autre.")
             _error_under("continuity_notes")
 
@@ -328,9 +348,7 @@ def render(repo: LocationRepository, project: Project) -> None:
                   on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         return
 
-    with st.container(horizontal=True, key="project_actions"):
-        st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="loc_back",
-                  on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
+    # « Retour au projet » est affiché en tête de page par app.render (#212).
 
     is_open, target = _form_target(project.id)
     current: Location | None = None

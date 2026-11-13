@@ -13,7 +13,7 @@ from lody.characters import CharacterRepository
 from lody.generation.kit_service import KitService
 from lody.generation.runtime import DEFAULT_PROVIDER, build_kit_service, build_service
 from lody.generation.service import ProductionService
-from lody.components import accent_for, render_flash, render_footer, render_header
+from lody.components import accent_for, render_flash, render_footer, render_header, render_project_back
 from lody.locations import LocationRepository
 from lody.projects import ProjectNotFound, ProjectRepository
 from lody.seeds import SEED_PROJECTS
@@ -98,6 +98,7 @@ def render() -> None:
 
     inject_theme(accent_for(project))
     render_header(with_home_link=route.view != nav.VIEW_HOME)
+    render_project_back(project, route.view)
     render_flash()
 
     if route.view == nav.VIEW_HOME:

@@ -156,7 +156,7 @@ def estimate_cost(request: GenerationRequest, units: SceneUnits, book: PriceBook
     lines = [
         _line("text", request.text_provider if units.text_calls else "manual", text_qty, 1, book),
         _line("visual", request.visual_provider, units.images, 1, book),
-        _line("voice", request.voice.provider or "elevenlabs", units.characters, 1000, book),
+        _line("voice", units.voice_provider or request.voice.provider or "elevenlabs", units.characters, 1000, book),
         _line("music", request.music_provider, (units.music_tracks, units.music_tracks), 1, book),
     ]
     if units.thumbnails:  # fond de miniature dédié : même tarif que les images, ligne distincte et visible

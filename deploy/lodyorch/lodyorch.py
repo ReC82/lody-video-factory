@@ -134,6 +134,30 @@ CI_POLL_SECONDS = int(os.environ.get("LQ_CI_POLL", 300))
 CI_MAX_FIXES = int(os.environ.get("LQ_CI_MAX_FIXES", 2))
 CI_TIMEOUT_SECONDS = int(os.environ.get("LQ_CI_TIMEOUT", 3 * 3600))
 CI_FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
+# Fusion automatique sécurisée (#200) par le SUPERVISEUR, jamais par une session Claude.
+# Modes : off (aucun appel), dry-run (verdict journalisé, rien n'est fusionné), on (fusion des PR
+# éligibles). LQ_AUTO_MERGE est un PLAFOND posé dans lodyorch.env (fichier root, hors de portée des
+# sessions) ; le mode effectif est le plus bas entre ce plafond et `lodyorch automerge <mode>`.
+MERGE_MODES = ("off", "dry-run", "on")
+AUTO_MERGE_CEILING = os.environ.get("LQ_AUTO_MERGE", "off").strip().lower()
+if AUTO_MERGE_CEILING not in MERGE_MODES:
+    AUTO_MERGE_CEILING = "off"
+# Isolation des permissions (#207) : la fusion réelle passe par le BROKER (utilisateur Unix
+# lodyorch-merge, seul détenteur du jeton du propriétaire), qui revalide toute la politique. Le
+# superviseur ne fait que déposer une demande dans <LQ_MERGE_BROKER>/requests et lire la réponse.
+# Sans broker, le mode `on` est plafonné à `dry-run` ; LQ_MERGE_DIRECT=1 (fusion par le gh du
+# superviseur, ancien comportement #200) n'est destiné qu'aux tests et à un retour arrière explicite.
+MERGE_BROKER = os.environ.get("LQ_MERGE_BROKER", "").strip()
+MERGE_DIRECT = os.environ.get("LQ_MERGE_DIRECT", "0") == "1"
+MERGE_BROKER_WAIT = int(os.environ.get("LQ_MERGE_BROKER_WAIT", 120))
+# Variables jamais transmises aux sessions Claude : jetons et secrets (par leur nom). Les chemins
+# (…_FILE, …_DIR, …_PATH) ne sont pas des secrets. LQ_SESSION_ENV_KEEP : exceptions explicites
+# (ex. l'authentification de Claude Code elle-même, si elle passe par l'environnement).
+SESSION_ENV_SECRET = re.compile(r"(?i)(TOKEN|SECRET|PASSW(OR)?D|API_?KEY|PRIVATE_?KEY|CREDENTIAL|ACCESS_?KEY|SMTP_)")
+SESSION_ENV_ALWAYS_DROP = {"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN",
+                           "GH_HOST", "GH_CONFIG_DIR", "SSH_AUTH_SOCK", "LQ_REAL_GH"}
+SESSION_ENV_KEEP = {x.strip() for x in os.environ.get("LQ_SESSION_ENV_KEEP", "CLAUDE_CODE_OAUTH_TOKEN").split(",")
+                    if x.strip()}
 PRIORITY_RE = re.compile(r"(?i)^priority\s*:\s*(.*)$")
 TRUSTED_AUTHORS = {"OWNER", "MEMBER", "COLLABORATOR"}
 DEPS_RE = re.compile(r"(?:d[ée]pend(?:ance)?s?\s+(?:de|du|des|d'|on)|bloqu[ée]e?\s+par|blocked\s+by|"
@@ -162,6 +186,10 @@ SETTINGS = {
     "max_sessions_per_day": ("LQ_MAX_SESSIONS_PER_DAY", 24, 0, 500,
                              "Sessions lancées au plus par jour (fuseau LQ_DAY_TZ, UTC par défaut). 0 = sans plafond, accepté seulement si un "
                              "garde-fou de budget ou de quota fournisseur est actif."),
+    "max_prep_sessions_per_day": ("LQ_MAX_PREP_SESSIONS_PER_DAY", 3, 0, 50,
+                                  "File de préparation (#165) : sessions lancées au plus par jour sur un ticket dont "
+                                  "les dépendances ont une PR en revue non fusionnée (contrats, tests, maquettes). "
+                                  "Comptées aussi dans max_sessions_per_day. 0 = désactivé."),
     "max_cost_usd_per_day": ("LQ_MAX_COST_USD_PER_DAY", 0.0, 0.0, 10000.0,
                              "Plafond du coût estimé du jour (total_cost_usd de Claude Code, prix catalogue : "
                              "une estimation, pas une facture). 0 = désactivé."),
@@ -278,6 +306,23 @@ def db():
                       ("ci_checked_at", "TEXT DEFAULT ''"), ("ci_fixes", "INTEGER NOT NULL DEFAULT 0")):
         try:
             con.execute(f"ALTER TABLE tasks ADD COLUMN {col} {decl}")
+        except sqlite3.OperationalError:
+            pass
+    # #165 : clé de l'état des dépendances au moment de la dernière préparation (une seule
+    # préparation par état) et mode de chaque session (« prepare » pour la file de préparation).
+    # #200 : fusion automatique — journal d'audit des verdicts et des fusions (idempotent).
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS merge_audit(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, issue INTEGER, pr INTEGER, head_sha TEXT, mode TEXT,
+        eligible INTEGER, signature TEXT, refusals TEXT DEFAULT '[]', matrix TEXT DEFAULT '');
+    CREATE TABLE IF NOT EXISTS merge_ops(
+        pr INTEGER, head_sha TEXT, issue INTEGER, state TEXT, started_at TEXT, finished_at TEXT DEFAULT '',
+        merge_sha TEXT DEFAULT '', error TEXT DEFAULT '', PRIMARY KEY(pr, head_sha));
+    """)
+    for table, col, decl in (("tasks", "prep_key", "TEXT DEFAULT ''"), ("sessions", "mode", "TEXT DEFAULT ''"),
+                             ("tasks", "merge_checked_at", "TEXT DEFAULT ''")):
+        try:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
             pass
     return con
@@ -421,6 +466,159 @@ def actionable_dependency(con, missing):
         if not deps_satisfied(con, d["deps"]):
             return d
     return None
+
+
+# ---------------------------------------------------------------- file de préparation (#165)
+#
+# Quand aucun ticket n'est exécutable, un ticket dont TOUTES les dépendances ouvertes ont déjà une
+# PR en revue (ticket WAITING_OWNER avec PR) peut avancer en « préparation » : contrats, tests,
+# maquettes, sur sa propre branche partie d'origin/main, PR en brouillon. Jamais de fusion, jamais
+# un ticket bloqué ou suspendu (ils ne sont pas dans la file), une seule préparation par état des
+# dépendances, et un plafond quotidien dédié : pas de sessions de remplissage.
+
+def review_pr(con, n):
+    """Lien de la PR en revue du ticket n (WAITING_OWNER avec PR), sinon ''."""
+    d = task(con, n)
+    return str(d["pr"] or "").strip() if d and d["status"] == "WAITING_OWNER" else ""
+
+
+def prep_key(con, missing):
+    """État des dépendances ouvertes : la même préparation n'est jamais relancée pour le même état."""
+    return ",".join(f"{n}:{pr_number(review_pr(con, n)) or '?'}" for n in sorted(missing))
+
+
+def prep_sessions_today(con):
+    return con.execute("SELECT COUNT(*) c FROM sessions WHERE mode='prepare' AND started_at >= ?",
+                       (iso(day_start(con)),)).fetchone()["c"]
+
+
+def preparation_candidates(con, missing_of=None):
+    """[(ticket, dépendances_ouvertes)] préparables, dans l'ordre de la file. `missing_of` calcule les
+    dépendances ouvertes (par défaut deps_satisfied, avec GitHub ; local_missing pour la lecture seule)."""
+    missing_of = missing_of or (lambda deps: deps_satisfied(con, deps))
+    out = []
+    for t in con.execute("""SELECT * FROM tasks WHERE status IN ('RUNNING','TESTING','READY') AND issue != ?
+                            AND COALESCE(deps,'') != ''
+                            ORDER BY CASE status WHEN 'READY' THEN 1 ELSE 0 END, priority, issue""",
+                         (TRIAGE,)).fetchall():
+        if t["not_before"] and t["not_before"] > iso():
+            continue
+        missing = missing_of(t["deps"])
+        if not missing or not all(review_pr(con, n) for n in missing):
+            continue
+        if (t["prep_key"] or "") == prep_key(con, missing):
+            continue  # déjà préparé pour cet état des dépendances
+        out.append((t, missing))
+    return out
+
+
+def next_preparation(con):
+    """Le ticket à préparer quand rien n'est exécutable : (ticket, dépendances_ouvertes) ou None."""
+    cap = setting(con, "max_prep_sessions_per_day")[0]
+    if not cap or prep_sessions_today(con) >= cap:
+        return None
+    found = preparation_candidates(con)
+    return found[0] if found else None
+
+
+def local_missing(con, deps):
+    """Dépendances ouvertes d'après la seule base locale (lecture seule, sans réseau)."""
+    done = {r["issue"] for r in con.execute(
+        f"SELECT issue FROM tasks WHERE status IN ({','.join('?' * len(DEPS_DONE_STATES))})", DEPS_DONE_STATES)}
+    return [int(d) for d in re.findall(r"\d+", deps or "") if int(d) not in done]
+
+
+def queue_overview(con):
+    """Synthèse de la file, sans réseau : pourquoi on attend, ce qui reste à faire."""
+    rows = con.execute("""SELECT * FROM tasks WHERE status IN ('RUNNING','TESTING','READY') AND issue != ?
+                          ORDER BY CASE status WHEN 'READY' THEN 1 ELSE 0 END, priority, issue""",
+                       (TRIAGE,)).fetchall()
+    ov = {"executable": [], "waiting_deps": [], "delayed": [], "preparable": [], "prepared": []}
+    for t in rows:
+        missing = local_missing(con, t["deps"])
+        if t["not_before"] and t["not_before"] > iso():
+            ov["delayed"].append((t["issue"], t["not_before"]))
+        elif not missing:
+            ov["executable"].append(t["issue"])
+        else:
+            ov["waiting_deps"].append((t["issue"], missing))
+            if t["prep_key"] and all(review_pr(con, n) for n in missing) and t["prep_key"] == prep_key(con, missing):
+                ov["prepared"].append(t["issue"])
+    ov["preparable"] = [t["issue"] for t, _ in preparation_candidates(con, lambda deps: local_missing(con, deps))]
+    ov["in_review"] = [(r["issue"], r["pr"], r["ci_state"]) for r in con.execute(
+        "SELECT issue, pr, ci_state FROM tasks WHERE status='WAITING_OWNER' ORDER BY priority, issue")]
+    ov["blocked"] = [r["issue"] for r in con.execute(
+        "SELECT issue FROM tasks WHERE status IN ('BLOCKED','FAILED') ORDER BY priority, issue")]
+    cap = setting(con, "max_prep_sessions_per_day")[0]
+    ov["prep_used"], ov["prep_cap"] = prep_sessions_today(con), cap
+    return ov
+
+
+def _nums(items, limit=8):
+    items = list(items)
+    text = ", ".join(f"#{n}" for n in items[:limit])
+    return text + (f" (+{len(items) - limit})" if len(items) > limit else "")
+
+
+def overview_text(ov):
+    """Motif d'attente lisible : exécutable, préparation, PR en revue, bloqués, dépendances."""
+    parts = []
+    if ov["executable"]:
+        parts.append(f"{len(ov['executable'])} ticket(s) exécutable(s) : {_nums(ov['executable'])}")
+    else:
+        parts.append("aucun ticket exécutable")
+    if ov["preparable"]:
+        if ov["prep_cap"] and ov["prep_used"] < ov["prep_cap"]:
+            parts.append(f"prochain à préparer : #{ov['preparable'][0]} "
+                         f"(préparations du jour {ov['prep_used']}/{ov['prep_cap']})")
+        else:
+            parts.append(f"{len(ov['preparable'])} ticket(s) préparable(s) ({_nums(ov['preparable'])}) mais "
+                         + ("file de préparation désactivée" if not ov["prep_cap"] else
+                            f"plafond de préparation atteint ({ov['prep_used']}/{ov['prep_cap']})"))
+    ci = {"pending": "CI en cours", "failed": "CI en échec", "success": "CI verte"}
+    if ov["in_review"]:
+        detail = ", ".join(f"#{n}" + (f" PR #{pr_number(pr)}" if pr_number(pr) else "")
+                           + (f" {ci[c]}" if c in ci else "") for n, pr, c in ov["in_review"][:8])
+        more = f" (+{len(ov['in_review']) - 8})" if len(ov["in_review"]) > 8 else ""
+        parts.append(f"{len(ov['in_review'])} PR en revue chez le propriétaire : {detail}{more}")
+    if ov["blocked"]:
+        parts.append(f"{len(ov['blocked'])} bloqué(s) en attente de réponse : {_nums(ov['blocked'])}")
+    if ov["waiting_deps"]:
+        parts.append("attendent une dépendance non fusionnée : "
+                     + ", ".join(f"#{n}→{_nums(m, 4)}" for n, m in ov["waiting_deps"][:6])
+                     + (f" ({len(ov['prepared'])} déjà préparé(s) : {_nums(ov['prepared'])})" if ov["prepared"] else ""))
+    if ov["delayed"]:
+        parts.append("en délai de reprise : " + ", ".join(f"#{n} après {nb}" for n, nb in ov["delayed"][:4]))
+    return " ; ".join(parts) + "."
+
+
+def notify_idle(con, ov):
+    """Un seul email quand la file est réellement à l'arrêt (rien d'exécutable ni de préparable) et
+    que le propriétaire peut la débloquer (PR à relire, tickets bloqués). Dédoublonné sur l'état de la
+    file et espacé d'au moins 12 h : jamais de boucle d'emails identiques."""
+    if not NOTIFY_SMTP_ENV or ov["executable"] or ov["delayed"]:
+        return
+    if ov["preparable"] and ov["prep_cap"] and ov["prep_used"] < ov["prep_cap"]:
+        return
+    if not ov["in_review"] and not ov["blocked"]:
+        return
+    state = json.dumps([[n for n, *_ in ov["in_review"]], ov["blocked"], ov["waiting_deps"]])
+    digest = hashlib.sha256(state.encode()).hexdigest()[:16]
+    last = ctl_get(con, "idle_notice_at")
+    if ctl_get(con, "idle_notice_key") == digest or (last and time.time() - float(last) < 12 * 3600):
+        return
+    ctl_set(con, "idle_notice_key", digest)
+    ctl_set(con, "idle_notice_at", time.time())
+    lines = [f"{INSTANCE} n'a plus de travail utile : aucune session n'est lancée tant que rien ne change.", "",
+             "Synthèse :", overview_text(ov), "", "PR en attente de revue :"]
+    lines += [f"- #{n} : {pr or '(PR non renseignée)'}" for n, pr, _ in ov["in_review"]] or ["- aucune"]
+    if ov["blocked"]:
+        lines += ["", "Tickets bloqués (une réponse dans le ticket les relance) :"]
+        lines += [f"- https://github.com/{REPO}/issues/{n}" for n in ov["blocked"]]
+    lines += ["", "Aucune fusion automatique : la file reprend dès qu'une PR est fusionnée, qu'un ticket est "
+              "débloqué ou qu'un nouveau ticket agent:auto arrive."]
+    queue_notification(con, f"idle:{digest}", None, "File à l'arrêt",
+                       f"{NOTIFY_PREFIX} File à l'arrêt — {len(ov['in_review'])} PR en revue", "\n".join(lines))
 
 
 # ---------------------------------------------------------------- quota
@@ -635,7 +833,23 @@ def start_blocker(con):
 
 # ---------------------------------------------------------------- session
 
-def build_prompt(con, t, session_id, status_file):
+PREPARE_TEXT = """## Mode PRÉPARATION (#165) — à respecter strictement
+
+Ce ticket dépend de {deps}, dont la PR est en revue mais **non fusionnée** ({prs}). Rien d'autre
+n'est exécutable : le superviseur te confie une **préparation**, qui remplace la règle 5 ci-dessous.
+- Avance uniquement ce qui ne dépend pas du code non fusionné : contrats, schémas, tests (marqués
+  `skip` si besoin), maquettes, documentation de conception. Si rien d'utile n'est possible, ne
+  produis rien et explique-le.
+- Branche du ticket partie d'`origin/main`, dans ton worktree : n'empile jamais sur la branche
+  d'une dépendance, ne la modifie pas, ne fusionne, n'approuve et ne ferme aucune PR.
+- PR en **brouillon** (`gh pr create --draft`), avec la mention « Préparation : à compléter après
+  la fusion de {deps} ».
+- Rapport de fin : `"status": "READY"`, `"deps": "{deps_csv}"`, la branche et la PR brouillon.
+  Le superviseur reprendra le ticket en entier dès la fusion des dépendances.
+"""
+
+
+def build_prompt(con, t, session_id, status_file, prepare=None):
     base = PROMPT_FILE.read_text(encoding="utf-8")
     history = con.execute("""SELECT started_at, outcome, detail FROM sessions WHERE issue=?
                              ORDER BY started_at DESC LIMIT 5""", (t["issue"],)).fetchall()
@@ -643,6 +857,14 @@ def build_prompt(con, t, session_id, status_file):
     state = {k: t[k] for k in t.keys()}
     queue = [dict(issue=r["issue"], status=r["status"], title=r["title"]) for r in con.execute(
         "SELECT issue,status,title FROM tasks ORDER BY priority, issue").fetchall()]
+    mode = ""
+    if prepare:
+        mode = PREPARE_TEXT.format(deps=", ".join(f"#{n}" for n in prepare), deps_csv=",".join(map(str, prepare)),
+                                   prs=", ".join(review_pr(con, n) or f"#{n}" for n in prepare))
+    if "{{MODE}}" in base:
+        base = base.replace("{{MODE}}", mode)
+    elif mode:
+        base = mode + "\n" + base
     return (base.replace("{{ISSUE}}", str(t["issue"]))
             .replace("{{TITLE}}", t["title"] or "")
             .replace("{{STATE_JSON}}", json.dumps(state, ensure_ascii=False, indent=2))
@@ -681,26 +903,46 @@ def classify(exit_code, result, rate_events, killed):
     return "COMPLETED", text[:500], ""
 
 
-def run_session(con, t):
+def session_env(base, **extra):
+    """Environnement d'une session Claude (#207) : celui du superviseur SANS aucun jeton ni secret
+    (GH_TOKEN, mots de passe, clés…) ni moyen de choisir un autre gh. Le gh des sessions lit le
+    jeton de l'application GitHub lui-même, à chaque appel (bin/gh)."""
+    env = {}
+    for key, value in base.items():
+        if key in SESSION_ENV_KEEP:
+            env[key] = value
+            continue
+        if key in SESSION_ENV_ALWAYS_DROP:
+            continue
+        if SESSION_ENV_SECRET.search(key) and not key.endswith(("_FILE", "_DIR", "_PATH", "_ENV")):
+            continue
+        env[key] = value
+    env.update(extra)
+    return env
+
+
+def run_session(con, t, prepare=None):
     session_id = str(uuid.uuid4())
     log_path = LOG_DIR / f"{iso().replace(':', '')}-{t['issue']}-{session_id[:8]}.jsonl"
     status_file = LOG_DIR / f"{session_id}.status.json"
     # Présent = le propriétaire a repris la main : lu par le crochet de garde de la session.
     yield_file = LOG_DIR / f"{session_id}.yield"
     yield_at = 0.0
-    prompt = build_prompt(con, t, session_id, status_file)
-    con.execute("INSERT INTO sessions(id,issue,started_at,log_path) VALUES(?,?,?,?)",
-                (session_id, t["issue"], iso(), str(log_path)))
+    prompt = build_prompt(con, t, session_id, status_file, prepare)
+    key = prep_key(con, prepare) if prepare else ""
+    con.execute("INSERT INTO sessions(id,issue,started_at,log_path,mode) VALUES(?,?,?,?,?)",
+                (session_id, t["issue"], iso(), str(log_path), "prepare" if prepare else ""))
     update_task(con, t["issue"], status="RUNNING", last_session=session_id, last_activity=iso(),
                 attempts=t["attempts"] + 1)
-    event(con, t["issue"], "session_start", f"Session {session_id} (tentative {t['attempts'] + 1})")
+    event(con, t["issue"], "session_start", f"Session {session_id} (tentative {t['attempts'] + 1})"
+          + (f" — préparation : dépendances {', '.join(f'#{n}' for n in prepare)} en revue" if prepare else ""))
     if GH_SYNC and t["issue"] != TRIAGE:
         set_status_label(con, t["issue"], "RUNNING")
         if CLAIM_COMMENT:
             claim_issue(con, t["issue"], session_id)
     session_started = iso()
-    env = dict(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
-               LQ_YIELD_FILE=str(yield_file))
+    env = session_env(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
+                      LQ_YIELD_FILE=str(yield_file))
     cmd = [CLAUDE, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--dangerously-skip-permissions", "--session-id", session_id]
     if CLAUDE_SETTINGS:
@@ -830,6 +1072,8 @@ def run_session(con, t):
                 (iso(), outcome, proc.returncode, (report.get("summary") or detail)[:2000], cost, session_id))
     con.commit()
     apply_outcome(con, t["issue"], outcome, detail, reset, report)
+    if prepare and report.get("status") in STATUSES:
+        settle_preparation(con, t["issue"], prepare, key)
     if GH_SYNC and t["issue"] != TRIAGE:
         after_outcome(con, t["issue"], session_id, session_started, report)
     if t["issue"] != TRIAGE:
@@ -838,6 +1082,22 @@ def run_session(con, t):
     if outcome != "COMPLETED" or not report:
         ctl_set(con, "last_error", redact(f"{iso()} #{t['issue']} {outcome} — {detail}")[:500])
     return outcome
+
+
+def settle_preparation(con, issue, missing, key):
+    """Après une préparation rendue : le ticket ne part pas en revue (sa PR est un brouillon) ; il
+    garde ses dépendances et redevient READY pour être repris en entier dès leur fusion. La clé
+    empêche toute nouvelle préparation tant que l'état des dépendances ne change pas."""
+    t = task(con, issue)
+    known = {int(x) for x in re.findall(r"\d+", t["deps"] or "")}
+    fields = {"prep_key": key, "deps": ",".join(map(str, sorted(known | set(missing))))}
+    if t["status"] in ("WAITING_OWNER", "RUNNING", "READY"):
+        fields.update(status="READY", ci_state="", attempts=0, not_before="",
+                      next_action=f"Préparé ({t['pr'] or 'sans PR'}) : reprise complète après la fusion de "
+                                  + ", ".join(f"#{n}" for n in missing) + ".")
+    update_task(con, issue, **fields)
+    event(con, issue, "prepared", f"Préparation rendue ({t['status']}) : attend la fusion de "
+                                  + ", ".join(f"#{n}" for n in missing) + ".")
 
 
 def claim_issue(con, issue, session_id):
@@ -1238,6 +1498,8 @@ def watch_ci(con):
             set_status_label(con, n, "WAITING_OWNER")
             after_outcome(con, n, t["last_session"], t["gh_since"] or iso(), {})
             finalize_pending_runs(con, n)
+            if auto_merge_mode(con)[0] != "off":
+                update_task(con, n, merge_checked_at="")  # évaluée tout de suite par watch_merges
         elif verdict == "failure":
             fixes = t["ci_fixes"] + 1
             if fixes <= CI_MAX_FIXES:
@@ -1269,6 +1531,268 @@ def watch_ci(con):
             finalize_pending_runs(con, n)
         else:
             update_task(con, n, ci_detail=detail)
+
+
+# ---------------------------------------------------------------- fusion automatique (#200)
+
+def auto_merge_mode(con):
+    """(mode effectif, explication). Plafond LQ_AUTO_MERGE ∧ choix `lodyorch automerge`. Le mode `on`
+    exige en plus un horodatage d'activation (les autorisations antérieures ne valent rien)."""
+    chosen = ctl_get(con, "automerge.mode", "") or "dry-run"
+    if chosen not in MERGE_MODES:
+        chosen = "off"
+    mode = MERGE_MODES[min(MERGE_MODES.index(chosen), MERGE_MODES.index(AUTO_MERGE_CEILING))]
+    if mode == "on" and not ctl_get(con, "automerge.enabled_at"):
+        mode = "dry-run"
+    why = f"choisi {chosen}, plafond LQ_AUTO_MERGE={AUTO_MERGE_CEILING}"
+    if mode == "on" and not MERGE_BROKER and not MERGE_DIRECT:
+        mode = "dry-run"
+        why += " ; isolation absente (LQ_MERGE_BROKER vide) : fusion réelle réservée au broker (#207)"
+    return mode, why
+
+
+def merge_policy():
+    """Module de politique installé à côté de lodyorch.py (import différé : son absence coupe la
+    fusion automatique sans arrêter la file)."""
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import merge_policy as mp  # noqa: PLC0415
+    return mp
+
+
+def merge_audit(con, issue, decision, mode):
+    """Journalise le verdict UNE fois par (PR, SHA, mode, critères refusés) : rien de neuf, rien d'écrit.
+    Rend True si le verdict est nouveau."""
+    refusals = [{"code": c.code, "detail": c.detail} for c in decision.refusals]
+    signature = hashlib.sha256(json.dumps([decision.pr, decision.head_sha, mode, sorted(r["code"] for r in refusals)])
+                               .encode()).hexdigest()[:20]
+    last = con.execute("SELECT signature FROM merge_audit WHERE pr=? ORDER BY id DESC LIMIT 1", (decision.pr,)).fetchone()
+    if last and last["signature"] == signature:
+        return False
+    mp = merge_policy()
+    con.execute("""INSERT INTO merge_audit(at,issue,pr,head_sha,mode,eligible,signature,refusals,matrix)
+                   VALUES(?,?,?,?,?,?,?,?,?)""",
+                (iso(), issue, decision.pr, decision.head_sha, mode, int(decision.eligible), signature,
+                 json.dumps(refusals, ensure_ascii=False), redact(mp.render(decision))))
+    con.commit()
+    reasons = "; ".join(f"{r['code']} ({r['detail']})" if r["detail"] else r["code"] for r in refusals)
+    verdict = ("éligible" + (" — simulation, rien fusionné" if mode == "dry-run" else "")) if decision.eligible \
+        else f"refusée — {reasons}"
+    event(con, issue, "merge", f"[{mode}] PR #{decision.pr} @ {decision.head_sha[:10]} : {verdict}")
+    return True
+
+
+def merge_comment(con, issue, decision, mode, headline):
+    """Commentaire de ticket (verdict lisible + matrice) — seulement si `merge:auto` est demandé."""
+    mp = merge_policy()
+    body = (f"{BOT_MARKER}\n{headline}\n\nMode `{mode}`, politique v{decision.policy_version}.\n\n"
+            f"<details><summary>Matrice de décision</summary>\n\n{mp.render(decision)}\n\n</details>")
+    gh_call("-X", "POST", f"repos/{REPO}/issues/{issue}/comments", "-f", f"body={redact(body)}")
+
+
+def recover_merges(con):
+    """Fusion interrompue (arrêt brutal entre l'intention et la réponse GitHub) : on CONSTATE l'état
+    réel de la PR au lieu de rejouer la requête — fusionnée → suites normales, sinon intention close."""
+    done = []
+    for op in con.execute("SELECT * FROM merge_ops WHERE state='intent'").fetchall():
+        pr = gh_json(f"repos/{REPO}/pulls/{op['pr']}")
+        if pr is None:
+            continue  # GitHub injoignable : on réessaiera au prochain tour, sans rien refaire
+        if pr.get("merged") and (pr.get("head") or {}).get("sha") == op["head_sha"]:
+            con.execute("UPDATE merge_ops SET state='merged', finished_at=?, merge_sha=? WHERE pr=? AND head_sha=?",
+                        (iso(), pr.get("merge_commit_sha") or "", op["pr"], op["head_sha"]))
+            con.commit()
+            event(con, op["issue"], "merge", f"Reprise : PR #{op['pr']} constatée fusionnée.")
+            done.append(after_auto_merge(con, op["issue"], op["pr"], op["head_sha"], pr.get("merge_commit_sha") or ""))
+        else:
+            con.execute("UPDATE merge_ops SET state='interrupted', finished_at=? WHERE pr=? AND head_sha=?",
+                        (iso(), op["pr"], op["head_sha"]))
+            con.commit()
+            event(con, op["issue"], "merge", f"Reprise : fusion de PR #{op['pr']} non effectuée, réévaluation.")
+    return [d for d in done if d]
+
+
+def after_auto_merge(con, issue, num, head_sha, merge_sha):
+    """Suites d'une fusion automatique : ticket gardé « à tester » (rouvert si `Closes #N` l'a fermé),
+    commentaire, rapport. Aucun déploiement. Rend la ligne de notification groupée."""
+    t = task(con, issue)
+    update_task(con, issue, ci_state="merged", status="WAITING_OWNER",
+                ci_detail=f"Fusionnée automatiquement (merge:auto), commit {merge_sha[:10]} — non déployée.",
+                next_action="Tester la fonctionnalité (fusionnée, non déployée) puis fermer le ticket.")
+    it = gh_json(f"repos/{REPO}/issues/{issue}")
+    if it and it.get("state") == "closed":
+        if gh_call("-X", "PATCH", f"repos/{REPO}/issues/{issue}", "-f", "state=open"):
+            event(con, issue, "merge", "Ticket rouvert après la fusion (fermé par « Closes ») : test humain requis.")
+        else:
+            event(con, issue, "gh_error", "Ticket fermé par la fusion et non rouvert : le rouvrir pour le test.")
+    set_status_label(con, issue, "WAITING_OWNER")
+    gh_call("-X", "POST", f"repos/{REPO}/issues/{issue}/comments", "-f",
+            f"body={BOT_MARKER}\n**PR #{num} fusionnée automatiquement** dans `main` (tête `{head_sha[:10]}`, "
+            f"fusion `{merge_sha[:10]}`) : CI verte, `merge:auto`, politique revalidée juste avant.\n\n"
+            "**Non déployée.** Le ticket reste `à tester` : la fermeture suit votre vérification.")
+    finalize_pending_runs(con, issue)
+    title = t["title"] if t else ""
+    return f"#{issue} — PR #{num} fusionnée ({merge_sha[:10]}) — {title} — test à faire"
+
+
+def try_auto_merge(con, t, mode):
+    """Évalue la PR d'un ticket (CI verte) ; en mode `on`, revalide puis fusionne avec le SHA attendu.
+    Rend une ligne de notification si une fusion a eu lieu."""
+    mp = merge_policy()
+    n, num = t["issue"], pr_number(t["pr"])
+    if not num:
+        return None
+    since = ctl_get(con, "automerge.enabled_at") if mode == "on" else ""
+    pr = gh_json(f"repos/{REPO}/pulls/{num}")
+    it = gh_json(f"repos/{REPO}/issues/{n}")
+    if not pr or not it:
+        return None  # GitHub injoignable : nouvel essai au prochain intervalle
+    if pr.get("merged"):
+        update_task(con, n, ci_state="merged", ci_detail="PR fusionnée par le propriétaire.")
+        event(con, n, "ci", "PR fusionnée : suivi terminé.")
+        finalize_pending_runs(con, n)
+        return None
+    if pr.get("state") != "open":
+        return None
+    asked = mp.AUTHORIZE_LABEL in mp._labels(it)
+    head = (pr.get("head") or {}).get("sha", "")
+    if not asked and con.execute("SELECT 1 FROM merge_audit WHERE pr=? AND head_sha=? AND mode=?",
+                                 (num, head, mode)).fetchone():
+        return None  # sans autorisation, un seul verdict complet par SHA : pas de collecte répétée
+    try:
+        facts = mp.collect(num)
+    except Exception as exc:  # noqa: BLE001 — erreur API : aucun verdict, nouvel essai plus tard
+        event(con, n, "merge_error", f"PR #{num} : collecte impossible ({type(exc).__name__}: {exc})"[:400])
+        return None
+    if since:
+        facts["authorized_after"] = since
+    decision = mp.evaluate(facts)
+    decision.dry_run = mode != "on"
+    new = merge_audit(con, n, decision, mode)
+    if not decision.eligible:
+        if new and asked:
+            reasons = "\n".join(f"- `{c.code}` : {c.detail or 'non satisfait'}" for c in decision.refusals)
+            merge_comment(con, n, decision, mode, f"**Fusion automatique refusée** pour la PR #{num} "
+                          f"(`{decision.head_sha[:10]}`) — revue manuelle :\n{reasons}")
+        return None
+    if mode != "on":
+        if new and asked:
+            merge_comment(con, n, decision, mode, f"**Simulation** : la PR #{num} (`{decision.head_sha[:10]}`) "
+                          "serait fusionnée automatiquement. Rien n'a été fusionné (mode à blanc).")
+        return None
+    # Revalidation immédiate : nouvelle collecte complète, même SHA, mode toujours `on`.
+    if auto_merge_mode(con)[0] != "on":
+        return None
+    try:
+        fresh = mp.collect(num)
+    except Exception as exc:  # noqa: BLE001
+        event(con, n, "merge_error", f"PR #{num} : revalidation impossible ({type(exc).__name__}) — pas de fusion.")
+        return None
+    fresh["authorized_after"] = since
+    again = mp.revalidate(decision, fresh)
+    again.dry_run = False
+    if not again.eligible:
+        merge_audit(con, n, again, mode)
+        return None
+    if con.execute("""SELECT 1 FROM merge_ops WHERE pr=? AND (state IN ('intent','merged')
+                      OR (head_sha=? AND state='failed'))""", (num, again.head_sha)).fetchone():
+        return None  # fusion engagée, faite, ou déjà refusée par GitHub pour ce SHA : jamais de nouvelle requête
+    # Intention écrite AVANT la requête : un arrêt brutal est repris par recover_merges, sans rejouer.
+    con.execute("INSERT OR REPLACE INTO merge_ops(pr,head_sha,issue,state,started_at) VALUES(?,?,?,?,?)",
+                (num, again.head_sha, n, "intent", iso()))
+    con.commit()
+    try:
+        if MERGE_BROKER:
+            merge_sha = broker_merge(mp, again, n, since)
+            if merge_sha is None:
+                event(con, n, "merge", f"PR #{num} : demande transmise au broker, réponse attendue "
+                                       "(constatée au prochain tour, jamais rejouée).")
+                return None
+        else:
+            merge_sha = mp.merge(again, title=f"Merge pull request #{num} (fusion automatique lodyorch, #{n})")
+    except mp.MergeError as exc:
+        con.execute("UPDATE merge_ops SET state='failed', finished_at=?, error=? WHERE pr=? AND head_sha=?",
+                    (iso(), redact(str(exc))[:300], num, again.head_sha))
+        con.commit()
+        why = {405: "PR non fusionnable", 409: "tête modifiée depuis l'évaluation (course de SHA)"}.get(exc.status, "erreur API")
+        event(con, n, "merge_error", f"PR #{num} : fusion refusée par GitHub ({why}) : {exc}"[:500])
+        return None
+    con.execute("UPDATE merge_ops SET state='merged', finished_at=?, merge_sha=? WHERE pr=? AND head_sha=?",
+                (iso(), merge_sha, num, again.head_sha))
+    con.commit()
+    event(con, n, "merge", f"PR #{num} fusionnée automatiquement ({again.head_sha[:10]} → {merge_sha[:10]}).")
+    return after_auto_merge(con, n, num, again.head_sha, merge_sha)
+
+
+def broker_merge(mp, decision, issue, since, wait=None):
+    """Demande de fusion au broker (#207) : fichier `<pr>-<sha>-<nonce>.json` déposé atomiquement,
+    réponse lue dans results/. Rend le SHA de fusion, None si pas de réponse dans le délai (l'intention
+    reste ouverte : recover_merges constate l'état réel), ou lève MergeError (refus, échec GitHub)."""
+    base = Path(MERGE_BROKER)
+    name = f"{decision.pr}-{decision.head_sha}-{uuid.uuid4().hex[:16]}.json"
+    req = {"pr": decision.pr, "head_sha": decision.head_sha, "issue": issue, "mode": "on",
+           "authorized_after": since or "", "requested_at": iso()}
+    tmp = base / "requests" / f".{name}.tmp"
+    try:
+        tmp.write_text(json.dumps(req), encoding="utf-8")
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, base / "requests" / name)
+    except OSError as exc:
+        raise mp.MergeError(None, f"broker injoignable ({type(exc).__name__}) : aucune fusion") from None
+    deadline = time.time() + (MERGE_BROKER_WAIT if wait is None else wait)
+    answer = base / "results" / name
+    while True:
+        if answer.is_file():
+            try:
+                res = json.loads(answer.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                res = {"state": "error", "detail": "réponse illisible"}
+            break
+        if time.time() >= deadline:
+            return None
+        time.sleep(1)
+    if res.get("state") == "merged":
+        return str(res.get("merge_sha") or "")
+    if res.get("state") == "refused":
+        why = "; ".join(f"{r.get('code')} ({r.get('detail')})" for r in res.get("refusals") or [])
+        raise mp.MergeError(None, f"refus du broker : {why or 'politique'}")
+    raise mp.MergeError(res.get("status"), f"broker : {res.get('state')} — {res.get('detail') or ''}")
+
+
+def watch_merges(con):
+    """Évalue les PR « prêtes pour revue » (CI verte) à intervalle LQ_CI_POLL : un `merge:auto` posé après
+    la CI est pris en compte sans session Claude. Au plus UNE fusion par tour (main bouge ensuite)."""
+    mode, _ = auto_merge_mode(con)
+    if mode == "off":
+        return []
+    try:
+        merged = recover_merges(con)
+    except Exception as exc:  # noqa: BLE001
+        event(con, None, "merge_error", f"reprise des fusions : {type(exc).__name__}: {exc}"[:400])
+        return []
+    limit = iso(datetime.fromtimestamp(time.time() - CI_POLL_SECONDS, timezone.utc))
+    for t in con.execute("""SELECT * FROM tasks WHERE status='WAITING_OWNER' AND ci_state='success' AND pr != ''
+                            AND (merge_checked_at='' OR merge_checked_at <= ?) ORDER BY priority, issue""",
+                         (limit,)).fetchall():
+        update_task(con, t["issue"], merge_checked_at=iso())
+        line = try_auto_merge(con, t, mode)
+        if line:
+            merged.append(line)
+            break
+    if merged:
+        notify_merges(con, merged)
+    return merged
+
+
+def notify_merges(con, lines):
+    """Notification concise et groupée : ce qui a été fusionné, et le test humain qui reste à faire."""
+    key = "automerge:" + hashlib.sha256("\n".join(lines).encode()).hexdigest()[:16]
+    body = "\n".join(["Fusion automatique (non déployée) :", *[f"- {x}" for x in lines], "",
+                      "Chaque ticket reste « à tester » : vérifier puis fermer. Aucun déploiement n'a été fait.",
+                      f"Arrêt immédiat : {CLI_NAME} automerge off"])
+    queue_notification(con, key, None, "Fusion automatique", f"{NOTIFY_PREFIX} {len(lines)} PR fusionnée(s) — à tester",
+                       body)
 
 
 CI_TEXT = {"pending": "CI en attente", "success": "CI validée", "failed": "CI en échec", "merged": "fusionnée",
@@ -1828,6 +2352,10 @@ def supervise():
                 watch_ci(con)
             except Exception as exc:  # noqa: BLE001 — un suivi de CI raté ne doit jamais arrêter la file
                 event(con, None, "ci_error", f"{type(exc).__name__}: {exc}"[:500])
+            try:
+                watch_merges(con)
+            except Exception as exc:  # noqa: BLE001 — idem pour la fusion automatique
+                event(con, None, "merge_error", f"{type(exc).__name__}: {exc}"[:500])
         if RUN_REPORTS:
             flush_reports(con)
         if NOTIFY_SMTP_ENV:
@@ -1839,6 +2367,11 @@ def supervise():
             pause_for(con, POLL_SECONDS)
             continue
         t = next_task(con)
+        prepare = None
+        if t is None:
+            found = next_preparation(con)
+            if found:
+                t, prepare = found
         if t is None:
             last = ctl_get(con, "last_triage")
             if TRIAGE_ENABLED and (not last or time.time() - float(last) > TRIAGE_EVERY_SECONDS):
@@ -1851,8 +2384,13 @@ def supervise():
                 continue
             later = con.execute("""SELECT issue, not_before FROM tasks WHERE status IN ('READY','RUNNING','TESTING')
                                    AND not_before > ? ORDER BY not_before LIMIT 1""", (iso(),)).fetchone()
-            ctl_set(con, "idle_reason", f"En attente : #{later['issue']} reprend après {later['not_before']}." if later
-                    else "Aucun ticket éligible : tous terminés, bloqués ou en attente du propriétaire.")
+            ov = queue_overview(con)
+            ctl_set(con, "idle_reason", (f"En attente : #{later['issue']} reprend après {later['not_before']}. " if later
+                                         else "File à l'arrêt, aucune session lancée : ") + overview_text(ov))
+            try:
+                notify_idle(con, ov)
+            except Exception as exc:  # noqa: BLE001 — un email raté ne doit jamais arrêter la file
+                event(con, None, "notify", f"Email de file à l'arrêt non mis en file : {type(exc).__name__}: {exc}"[:500])
             pause_for(con, POLL_SECONDS * 10)
             continue
         refused = session_preflight()
@@ -1867,7 +2405,7 @@ def supervise():
             continue
         ctl_set(con, "preflight_error", "")
         ctl_set(con, "idle_reason", "")
-        run_session(con, t)
+        run_session(con, t, prepare)
         if GH_SYNC:
             ctl_set(con, "sync_requested", "1")
 
@@ -1933,6 +2471,7 @@ def cmd_status(con, _):
               "le quota restant réel n'est pas connu.")
     else:
         print("Fournisseur : aucune donnée de quota observée (rien n'est déduit de l'interface claude.ai).")
+    print(f"File : {overview_text(queue_overview(con))}")
     counts = con.execute("SELECT status, COUNT(*) c FROM tasks GROUP BY status").fetchall()
     print("Tickets : " + ", ".join(f"{r['status']} {r['c']}" for r in counts))
     if GH_SYNC:
@@ -2145,6 +2684,9 @@ def observe(con):
         if all(int(d) in local_ok for d in re.findall(r"\d+", t["deps"] or "")):
             o["next"] = t
             break
+    o["overview"] = ov = queue_overview(con)
+    o["prepare_next"] = (task(con, ov["preparable"][0]) if not o["next"] and ov["preparable"] and ov["prep_cap"]
+                         and ov["prep_used"] < ov["prep_cap"] else None)
 
     # État et catégorie d'inactivité (pulse) : repos normal, quota, session bloquée, erreur, validation.
     if not alive and mode in ("STOP", "STOP_NOW") and not cur:
@@ -2169,9 +2711,12 @@ def observe(con):
     elif mode != "RUNNING":
         state, why, cat = "BLOQUÉ", f"mode {mode} — " + (ctl_get(con, "pause_reason") or f"{CLI_NAME} resume pour reprendre."), \
             "en pause"
-    elif not queue_rows and (blocked or o["waiting"]):
-        state, why, cat = "BLOQUÉ", (f"aucun ticket traitable : {len(blocked)} bloqué(s) et {o['waiting']} livré(s) "
-                                     f"attendent votre réponse ou validation."), "attente de validation"
+    elif o["prepare_next"]:
+        state, why, cat = "AU REPOS", ("rien d'exécutable, préparation au prochain tour — " + overview_text(ov)), \
+            "repos normal"
+    elif not o["next"] and not ov["delayed"] and (blocked or o["waiting"]):
+        state, why, cat = "BLOQUÉ", ("en attente du propriétaire, aucune session lancée — " + overview_text(ov)), \
+            "attente de validation"
     elif blocker:
         state, why, cat = "AU REPOS", blocker[0], "repos normal"
     elif not queue_rows:
@@ -2227,6 +2772,8 @@ def cmd_pulse(con, _):
         ticket = f"#{cur['issue']} {ptitle(t)[:58]}"
     elif o["next"]:
         ticket = f"prochain : #{o['next']['issue']} {ptitle(o['next'])[:52]}"
+    elif o["prepare_next"]:
+        ticket = f"préparation : #{o['prepare_next']['issue']} {ptitle(o['prepare_next'])[:48]}"
     else:
         ticket = "aucun ticket traitable"
     usage = freshest_usage(con)
@@ -2492,6 +3039,11 @@ def cmd_status_tickets(con, _):
     print("Prochain ticket prévu : " + (f"#{nxt['issue']} {ptitle(nxt)[:75]} "
                                         "(estimé sur l'état local, sans appel GitHub)" if nxt else
                                         "indéterminé (file vide ou dépendances à vérifier sur GitHub)"))
+    ov = o["overview"]
+    if o["prepare_next"]:
+        print(f"Prochain ticket à préparer (#165) : #{o['prepare_next']['issue']} {ptitle(o['prepare_next'])[:60]} "
+              f"— préparations du jour {ov['prep_used']}/{ov['prep_cap']}")
+    print(f"Synthèse de la file : {overview_text(ov)}")
     later = [t for t in queue_rows if t is not nxt]
     if later:
         print("Ensuite : " + ", ".join(f"#{t['issue']} P{t['priority'] // 10}" for t in later[:12])
@@ -2784,6 +3336,35 @@ def cmd_notify(con, args):
     return 1
 
 
+def cmd_automerge(con, args):
+    """Mode de la fusion automatique (#200) et derniers verdicts. `off` = arrêt immédiat (kill switch)."""
+    if args.mode:
+        previous = ctl_get(con, "automerge.mode", "") or "dry-run"
+        ctl_set(con, "automerge.mode", args.mode)
+        if args.mode == "on" and previous != "on":
+            # Toute autorisation `merge:auto` antérieure à cet instant est ignorée : rien de rétroactif.
+            ctl_set(con, "automerge.enabled_at", iso())
+        if args.mode != "on":
+            ctl_set(con, "automerge.enabled_at", "")
+        event(con, None, "control", f"automerge {args.mode}")
+    mode, why = auto_merge_mode(con)
+    print(f"Fusion automatique : {mode} ({why})")
+    if ctl_get(con, "automerge.enabled_at"):
+        print(f"Activée le {ctl_get(con, 'automerge.enabled_at')} : seules les autorisations `merge:auto` "
+              "posées après comptent.")
+    if args.mode == "on" and mode != "on":
+        print("Plafond LQ_AUTO_MERGE plus bas dans lodyorch.env : le mode reste limité (voir docs/lody-fusion-auto.md).")
+    rows = con.execute("SELECT * FROM merge_audit ORDER BY id DESC LIMIT ?", (args.limit,)).fetchall()
+    for r in rows:
+        refusals = [x["code"] for x in json.loads(r["refusals"] or "[]")]
+        print(f"  {local(r['at'])}  #{r['issue']:<4} PR #{r['pr']:<4} {r['head_sha'][:8]} [{r['mode']}] "
+              + ("éligible" if r["eligible"] else "refusée : " + ", ".join(refusals))[:160])
+    for op in con.execute("SELECT * FROM merge_ops ORDER BY started_at DESC LIMIT 5").fetchall():
+        print(f"  fusion PR #{op['pr']} {op['head_sha'][:8]} : {op['state']}"
+              + (f" → {op['merge_sha'][:10]}" if op["merge_sha"] else "") + (f" ({op['error'][:100]})" if op["error"] else ""))
+    return 0
+
+
 def cmd_labels(con, args):
     """Compare les labels du dépôt au référentiel (labels.json). Lecture seule, sauf --apply qui
     crée les labels manquants et aligne couleur/description (jamais de suppression)."""
@@ -2928,6 +3509,59 @@ def cmd_phase(con, args):
     return 0
 
 
+ROOT_SOCKETS = ("/run/docker.sock", "/var/run/docker.sock", "/run/containerd/containerd.sock",
+                "/var/snap/lxd/common/lxd/unix.socket")
+BROKER_SECRETS = ("/etc/lodyorch/merge-token", "/etc/lodyorch/app-key.pem")
+
+
+def isolation_checks(environ=None, sockets=ROOT_SOCKETS, secrets=BROKER_SECRETS, proc_status="/proc/self/status",
+                     real_gh=None):
+    """Contrôles de séparation des privilèges (#207), lecture seule, aucune valeur secrète affichée.
+    Rend des (ok, libellé, détail) ; ok=None = information. Les points ne sont bloquants (✗) qu'une
+    fois le broker configuré (LQ_MERGE_BROKER) : avant, ils décrivent la migration restante."""
+    env = os.environ if environ is None else environ
+    strict = bool(MERGE_BROKER)
+    out = []
+
+    def add(ok, label, detail=""):
+        out.append((ok if (strict or ok) else None, label, detail))
+
+    leaked = sorted(k for k in env if k in SESSION_ENV_ALWAYS_DROP and k.endswith("TOKEN"))
+    add(not leaked, "aucun jeton GitHub dans l'environnement du superviseur", ", ".join(leaked) or "aucun")
+    try:
+        nnp = any(x.split()[-1] == "1" for x in Path(proc_status).read_text().splitlines() if x.startswith("NoNewPrivs"))
+    except OSError:
+        nnp = False
+    add(nnp, "NoNewPrivileges (sudo et setuid inopérants)", "actif" if nnp else "inactif hors du service systemd")
+    open_sockets = [s for s in sockets if os.path.exists(s) and os.access(s, os.W_OK)]
+    add(not open_sockets, "aucun socket donnant root (Docker, containerd, LXD)", ", ".join(open_sockets) or "aucun")
+    readable = [s for s in secrets if os.access(s, os.R_OK)]
+    add(not readable, "secrets du broker illisibles", ", ".join(readable) or "illisibles ou absents")
+    token_file = Path(env.get("LQ_AGENT_TOKEN_FILE", "/var/lib/lodyorch-merge/agent/token"))
+    try:
+        head = token_file.read_text(encoding="utf-8")[:4]
+        age = time.time() - token_file.stat().st_mtime
+        add(head == "ghs_" and age < 3600, "jeton d'agent = jeton d'installation de l'application, récent",
+            f"âge {int(age)} s" + ("" if head == "ghs_" else ", préfixe inattendu"))
+    except OSError:
+        add(False, "jeton d'agent de l'application GitHub", f"{token_file} absent ou illisible")
+    gh = real_gh or env.get("LQ_REAL_GH", "/usr/bin/gh")
+    clean = {k: v for k, v in env.items() if k not in SESSION_ENV_ALWAYS_DROP}
+    try:
+        rc = subprocess.run([gh, "auth", "status", "--hostname", "github.com"], env=clean, capture_output=True,
+                            timeout=20).returncode
+    except (OSError, subprocess.SubprocessError):
+        rc = None
+    add(rc != 0, "aucun identifiant gh enregistré pour le compte de service (jeton du propriétaire retiré)",
+        "gh auth status sans jeton d'agent : " + ("identifiant présent — gh auth logout" if rc == 0 else "aucun"))
+    if MERGE_BROKER:
+        req = Path(MERGE_BROKER) / "requests"
+        add(req.is_dir() and os.access(req, os.W_OK), "file des demandes au broker", str(req))
+    else:
+        out.append((None, "broker de fusion non configuré (LQ_MERGE_BROKER vide)", "mode `on` plafonné à dry-run"))
+    return out
+
+
 def cmd_check(con, _):
     """Contrôles d'installation, en lecture seule : rien n'est démarré, aucun secret n'est affiché.
     Code de sortie 1 si une session serait refusée."""
@@ -2974,6 +3608,12 @@ def cmd_check(con, _):
         _, state = ro_run(["systemctl", "is-active", f"{SERVICE}-notify.timer"])
         print(f"  · envoi des emails : {SERVICE}-notify.timer {state or 'absent'}"
               + ("" if state == "active" else f" (sudo systemctl enable --now {SERVICE}-notify.timer)"))
+    print("  Isolation des permissions (#207) :")
+    for ok, label, detail in isolation_checks():
+        if ok is None:
+            print(f"  · {label}" + (f" — {detail}" if detail else ""))
+        else:
+            line(ok, label, detail)
     hooks = CONSOLE_SETTINGS.read_text(encoding="utf-8") if CONSOLE_SETTINGS.is_file() else ""
     line(f"{CLI_NAME} human busy" in hooks and f"{CLI_NAME} human idle" in hooks,
          "crochets de la console (priorité humaine)", str(CONSOLE_SETTINGS))
@@ -3008,6 +3648,9 @@ def main():
     sub.add_parser("check")
     s = sub.add_parser("labels")
     s.add_argument("--apply", action="store_true")
+    s = sub.add_parser("automerge")
+    s.add_argument("mode", nargs="?", choices=MERGE_MODES)
+    s.add_argument("--limit", type=int, default=10)
     sub.add_parser("console")
     sub.add_parser("statusline")
     s = sub.add_parser("human")
@@ -3041,6 +3684,7 @@ def main():
             "skip": cmd_skip, "add": cmd_add, "set": cmd_set, "log": cmd_log, "sessions": cmd_sessions,
             "config": cmd_config, "reload": cmd_reload, "sync": cmd_sync,
             "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "labels": cmd_labels,
+            "automerge": cmd_automerge,
             "report": cmd_report, "reports": cmd_reports,
             "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
             "check": cmd_check}[args.cmd](con, args)

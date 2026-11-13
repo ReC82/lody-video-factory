@@ -109,7 +109,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.lody-auth
-    image: lody-auth:${LODY_IMAGE_TAG:-local}
+    # Tag propre (#209) : scripts/lody-deploy.sh le fixe à « src-<empreinte de lody_auth/> », si bien qu'une
+    # livraison sans changement de lody-auth ne reconstruit ni ne recrée ce conteneur. Sans lui : LODY_IMAGE_TAG.
+    image: lody-auth:${LODY_AUTH_IMAGE_TAG:-${LODY_IMAGE_TAG:-local}}
     pull_policy: never
     container_name: lody-video-factory-auth
     environment:

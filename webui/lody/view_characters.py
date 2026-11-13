@@ -12,16 +12,17 @@ import json
 import streamlit as st
 
 from lody import brief as brief_lib
-from lody import catalog, nav, reference_images, resource_transfer, voice_picker
+from lody import catalog, nav, reference_images, resource_transfer, voice_casting, voice_picker
 from lody.characters import Character, CharacterNotFound, CharacterRepository, CharacterValidationError
 from lody.components import EMPTY_ICON_SVG
-from lody.generation import mpt_connector
+from lody.generation import elevenlabs_voices, mpt_connector
 from lody.generation.models import ProviderError
 from lody.generation.publication import slugify
 from lody.generation.runtime import DEFAULT_PROVIDER
 from lody.generation.service import ProductionService
 from lody.projects import Project
 from lody.theme import esc
+from lody.view_home import label_text
 
 FORM_KEY = "_char_form"  # (project_id, character_id ou None) tant que le formulaire est ouvert ; absent = fermé.
 CONFIRM_KEY = "_char_confirm_deactivate"
@@ -99,6 +100,8 @@ def _activate(repo: CharacterRepository, project_id: str, character_id: str) -> 
 def _submit(repo: CharacterRepository, project_id: str, target: str | None) -> None:
     p = _prefix(project_id, target)
     ss = st.session_state
+    # #191 : la voix choisie dans le catalogue doit être reportée AVANT de lire les champs (voir voice_picker).
+    voice_picker.apply_pending_selection(p, name_key=f"{p}_voice_name", voice_id_key=f"{p}_external_voice_id")
     fields = dict(
         name=ss.get(f"{p}_name", ""), role=ss.get(f"{p}_role", ""), personality=ss.get(f"{p}_personality", ""),
         visual_description=ss.get(f"{p}_visual_description", ""), reference_prompt=ss.get(f"{p}_reference_prompt", ""),
@@ -159,7 +162,25 @@ def _voice_summary(character: Character) -> str:
     return " · ".join(filter(None, [label, character.voice_name]))
 
 
+def row_label(character: Character) -> str:
+    """Libellé d'une ligne compacte (#212) : nom, puis rôle et statut en mini-indication.
+
+    Échappé comme les noms de projet (#195) : un libellé d'expander Streamlit interprète le Markdown."""
+    parts = [label_text(character.name)]
+    if character.role:
+        parts.append(label_text(character.role))
+    if character.is_primary:
+        parts.append("principal")
+    if not character.is_active:
+        parts.append("inactif")
+    return " · ".join(parts)
+
+
 def _row(repo: CharacterRepository, project: Project, character: Character) -> None:
+    """Une ligne par personnage (#212) : le détail et les actions s'ouvrent au toucher, jamais en grande carte.
+
+    La désactivation reste en deux temps (bouton tertiaire puis confirmation explicite) : jamais d'action
+    destructive sur un tap involontaire."""
     badges = []
     if character.is_primary:
         badges.append('<span class="pill pill-ok">Principal</span>')
@@ -170,33 +191,35 @@ def _row(repo: CharacterRepository, project: Project, character: Character) -> N
     if voice:
         details.append(esc(voice))
     meta_text = " · ".join(details) or "Rôle non précisé"
-    with st.container(horizontal=True, vertical_alignment="center", key=f"item_row_{character.id}"):
-        st.markdown(
-            f'<div class="prod-info"><p class="prod-title">{esc(character.name)}</p>'
-            f'<p class="prod-meta"><span>{meta_text}</span>{"".join(badges)}</p></div>',
-            unsafe_allow_html=True,
-        )
-        with st.container(horizontal=True, key=f"item_actions_{character.id}"):
-            st.button("Modifier", key=f"edit_{character.id}", icon=":material/edit:",
-                      on_click=_start_edit, args=(project.id, character.id))
-            if character.is_active:
-                st.button("Désactiver", key=f"deactivate_{character.id}", type="tertiary",
-                          on_click=_ask_deactivate, args=(character.id,))
-            else:
-                st.button("Réactiver", key=f"activate_{character.id}", type="tertiary",
-                          on_click=_activate, args=(repo, project.id, character.id))
-    if st.session_state.get(CONFIRM_KEY) == character.id:
-        with st.container(key=f"confirm_deactivate_{character.id}"):
+    confirming = st.session_state.get(CONFIRM_KEY) == character.id
+    state = "active" if character.is_active else "inactive"
+    with st.container(key=f"crow_{state}_{character.id}"):
+        with st.expander(row_label(character), expanded=confirming, key=f"cexp_{character.id}"):
             st.markdown(
-                f'<p class="confirm-title">Désactiver « {esc(character.name)} » ?</p>'
-                '<p class="confirm-text">Il n’apparaîtra plus dans les choix d’une prochaine production, '
-                "mais reste modifiable et peut être réactivé à tout moment.</p>",
+                f'<div class="prod-info"><p class="prod-meta"><span>{meta_text}</span>{"".join(badges)}</p></div>',
                 unsafe_allow_html=True,
             )
-            with st.container(horizontal=True, key=f"confirm_deactivate_actions_{character.id}"):
-                st.button("Oui, désactiver", type="primary", key=f"confirm_deactivate_yes_{character.id}",
-                          on_click=_deactivate, args=(repo, project.id, character.id))
-                st.button("Annuler", key=f"cancel_deactivate_{character.id}", on_click=_cancel_deactivate)
+            with st.container(horizontal=True, key=f"item_actions_{character.id}"):
+                st.button("Modifier", key=f"edit_{character.id}", icon=":material/edit:", type="primary",
+                          on_click=_start_edit, args=(project.id, character.id))
+                if character.is_active:
+                    st.button("Désactiver", key=f"deactivate_{character.id}", type="tertiary",
+                              on_click=_ask_deactivate, args=(character.id,))
+                else:
+                    st.button("Réactiver", key=f"activate_{character.id}", type="tertiary",
+                              on_click=_activate, args=(repo, project.id, character.id))
+            if confirming:
+                with st.container(key=f"confirm_deactivate_{character.id}"):
+                    st.markdown(
+                        f'<p class="confirm-title">Désactiver « {esc(character.name)} » ?</p>'
+                        '<p class="confirm-text">Il n’apparaîtra plus dans les choix d’une prochaine production, '
+                        "mais reste modifiable et peut être réactivé à tout moment.</p>",
+                        unsafe_allow_html=True,
+                    )
+                    with st.container(horizontal=True, key=f"confirm_deactivate_actions_{character.id}"):
+                        st.button("Oui, désactiver", type="primary", key=f"confirm_deactivate_yes_{character.id}",
+                                  on_click=_deactivate, args=(repo, project.id, character.id))
+                        st.button("Annuler", key=f"cancel_deactivate_{character.id}", on_click=_cancel_deactivate)
 
 
 # Contraintes GÉNÉRIQUES (jamais spécifiques à un personnage, donc jamais un codage en dur de nom/trait) :
@@ -291,6 +314,140 @@ def _render_reference_proposal(repo: CharacterRepository, project: Project, serv
             st.button("Générer une proposition de référence", icon=":material/auto_awesome:",
                       key=f"{p}_generate_proposal", on_click=_generate_reference_proposal,
                       args=(service, p, current))
+
+
+# -- choix de la voix par écoute comparative (#153) --------------------------------------------------------------
+
+def _cast_generate(service: ProductionService, p: str, samples: list, token: str) -> None:
+    """Génère les extraits manquants — seulement si la case d'accord de CE plan est cochée (voir
+    ``voice_casting.approval_token``). Les extraits déjà en cache ne sont jamais refacturés."""
+    ss = st.session_state
+    approved = bool(ss.get(f"{p}_cast_ok_{token}"))
+    provider = service.provider(DEFAULT_PROVIDER)
+    try:
+        outcome = voice_casting.generate_missing(samples, voice_casting.AudioCache(),
+                                                 provider.generate_voice_preview, approved=approved)
+    except PermissionError:
+        ss[f"{p}_cast_errors"] = {"_": "Coche d’abord l’accord de dépense pour générer les extraits."}
+        return
+    ss[f"{p}_cast_errors"] = outcome.errors
+    ss[f"{p}_cast_ok_{token}"] = False  # un accord ne vaut que pour un lancement
+
+
+def _cast_assign(repo: CharacterRepository, project_id: str, character_id: str, p: str,
+                 voice: elevenlabs_voices.VoiceInfo, profile_key: str, model_id: str) -> None:
+    try:
+        updated = voice_casting.assign_default_voice(repo, project_id, character_id, voice,
+                                                     voice_casting.profile(profile_key), model_id)
+    except CharacterValidationError as error:
+        nav.flash("error", "Voix non enregistrée : " + "; ".join(error.errors.values()))
+        return
+    except CharacterNotFound:
+        nav.flash("error", "Ce personnage n’existe plus.")
+        return
+    # Aligne le formulaire ouvert sur la voix enregistrée : un « Enregistrer » ultérieur ne la remplace pas
+    # par l'ancienne valeur restée dans les champs.
+    ss = st.session_state
+    ss[f"{p}_voice_provider"] = "elevenlabs"
+    ss[f"{p}_voice_name"] = updated.voice_name
+    ss[f"{p}_external_voice_id"] = updated.external_voice_id
+    for key in (f"{p}_ev_select", f"{p}_ev_last_applied"):
+        ss.pop(key, None)
+    nav.flash("success", f"Voix « {voice.name} » ({voice_casting.profile(profile_key).label}) enregistrée par "
+                         f"défaut pour {updated.name} : elle sera reprise dans tous ses épisodes.")
+
+
+def _voice_option_label(voice: elevenlabs_voices.VoiceInfo) -> str:
+    details = ", ".join(str(value) for key, value in voice.labels.items()
+                        if key in ("language", "accent", "gender", "age", "descriptive", "use_case"))
+    return f"{voice.name} — {details}" if details else voice.name
+
+
+def _render_voice_casting(repo: CharacterRepository, service: ProductionService, project: Project,
+                          current: Character | None) -> None:
+    """Comparer 2–3 voix réelles du catalogue sur le même court dialogue, puis en valider UNE comme voix par
+    défaut du personnage (#153). Hors du formulaire (boutons simples). Rien n'est facturé sans estimation
+    affichée et case d'accord cochée ; rien n'est attribué sans clic explicite."""
+    if current is None:
+        return
+    p = _prefix(project.id, current.id)
+    ss = st.session_state
+    with st.container(key="voice_casting"):
+        st.markdown('<p class="card-eyebrow">Choisir la voix du personnage</p>', unsafe_allow_html=True)
+        saved = voice_casting.character_voice_settings(current)
+        if saved:
+            direction = current.voice_direction
+            st.caption(f"Voix par défaut actuelle : {esc(current.voice_name or saved[0])} — modèle "
+                       f"{esc(direction.get('model_id', voice_casting.DEFAULT_MODEL))}, vitesse "
+                       f"{direction.get('speed', 1.0)}×. Reprise automatiquement dans chaque épisode.")
+        else:
+            st.caption("Aucune voix ElevenLabs choisie : les rendus utilisent une voix provisoire.")
+
+        result = elevenlabs_voices.resolve_catalog()
+        if result.error or result.empty:
+            message = result.error or "Le catalogue ElevenLabs ne contient aucune voix pour ce compte."
+            st.markdown(f'<div class="banner banner-info" role="status">{esc(message)}</div>', unsafe_allow_html=True)
+            return
+        by_id = {voice.voice_id: voice for voice in result.voices}
+        suggested = voice_casting.suggest_candidates(result.voices, current_voice_id=current.external_voice_id)
+        if not suggested:
+            st.caption("Aucune voix française ou multilingue repérée dans les libellés du catalogue : choisis "
+                       "les voix à comparer ci-dessous.")
+        voice_ids = st.multiselect(
+            f"Voix à comparer ({voice_casting.MAX_CANDIDATES} au maximum)", options=list(by_id),
+            default=[voice.voice_id for voice in suggested], max_selections=voice_casting.MAX_CANDIDATES,
+            format_func=lambda voice_id: _voice_option_label(by_id[voice_id]), key=f"{p}_cast_voices")
+        with st.container(horizontal=True, key=f"{p}_cast_options"):
+            model_id = st.selectbox("Modèle", options=list(voice_casting.MODELS),
+                                    format_func=voice_casting.MODELS.get, key=f"{p}_cast_model")
+            profile_keys = st.multiselect(
+                "Variantes de rythme et d’énergie", options=[item.key for item in voice_casting.PROFILES],
+                default=[voice_casting.DEFAULT_PROFILE], key=f"{p}_cast_profiles",
+                format_func=lambda key: voice_casting.profile(key).label)
+        text = st.text_area("Dialogue de comparaison (le même pour toutes les voix)", max_chars=600, height=90,
+                            value=voice_casting.SAMPLE_DIALOGUE, key=f"{p}_cast_text")
+        if not voice_ids or not profile_keys or not " ".join(text.split()):
+            st.caption("Choisis au moins une voix, une variante et un texte.")
+            return
+        samples = voice_casting.comparison_plan([by_id[v] for v in voice_ids], profile_keys,
+                                                model_id=model_id, text=text)
+        cache = voice_casting.AudioCache()
+        errors = ss.get(f"{p}_cast_errors") or {}
+
+        for voice in [by_id[v] for v in voice_ids]:
+            st.markdown(f"**{esc(voice.name)}**")
+            if voice.preview_url:
+                st.caption("Extrait public du catalogue ElevenLabs (gratuit, texte imposé par ElevenLabs) :")
+                st.audio(voice.preview_url)
+            for sample in [s for s in samples if s.voice.voice_id == voice.voice_id]:
+                st.caption(f"{sample.profile.label} — {sample.profile.detail} (vitesse {sample.profile.speed}×)")
+                audio = cache.get(sample.key)
+                if errors.get(sample.key):
+                    st.markdown(f'<p class="field-error" role="alert">{esc(errors[sample.key])}</p>',
+                                unsafe_allow_html=True)
+                if audio:
+                    st.audio(audio, format="audio/mp3")
+                    st.button(f"Utiliser {voice.name} ({sample.profile.label}) par défaut",
+                              key=f"{p}_cast_assign_{sample.key[:16]}", on_click=_cast_assign,
+                              args=(repo, project.id, current.id, p, voice, sample.profile.key, model_id))
+                else:
+                    st.caption("Pas encore généré.")
+
+        estimate = voice_casting.estimate_samples(samples, cache)
+        st.markdown(f"**Budget** — {esc(estimate.describe())}")
+        if errors.get("_"):
+            st.markdown(f'<p class="field-error" role="alert">{esc(errors["_"])}</p>', unsafe_allow_html=True)
+        if estimate.free:
+            return
+        provider = service.provider(DEFAULT_PROVIDER)
+        if not provider.supports_voice_preview:
+            st.caption("Le moteur configuré ne sait pas encore générer un extrait isolé.")
+            return
+        token = voice_casting.approval_token(samples)
+        approved = st.checkbox("J’autorise cette dépense ElevenLabs pour ces extraits", key=f"{p}_cast_ok_{token}")
+        st.button(f"Générer {estimate.to_generate} extrait(s) manquant(s)", type="primary",
+                  key=f"{p}_cast_generate", disabled=not approved,
+                  on_click=_cast_generate, args=(service, p, samples, token))
 
 
 # -- essai vocal comparatif (#92, diagnostic du jeu vocal) --------------------------------------------------------
@@ -633,12 +790,10 @@ def _render_import_export(repo: CharacterRepository, project: Project) -> None:
 
 
 def render(repo: CharacterRepository, project: Project, service: ProductionService) -> None:
+    # #212 : titre compact (le nom du projet en sur-titre), aide repliée au lieu d'un pavé introductif.
     st.markdown(
-        '<section class="hero"><p class="eyebrow">Personnages</p>'
-        f'<h1 class="hero-title">{esc(project.name)}</h1>'
-        '<p class="hero-sub">Facultatif : décris les personnages récurrents de ce projet pour les retrouver '
-        "plus tard dans une production. Sans personnage, tes vidéos se génèrent exactement comme aujourd’hui."
-        "</p></section>",
+        f'<section class="hero hero-compact"><p class="eyebrow">{esc(project.name)}</p>'
+        '<h1 class="hero-title">Personnages</h1></section>',
         unsafe_allow_html=True,
     )
 
@@ -651,10 +806,6 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
         st.button("Retour au projet", icon=":material/arrow_back:", key="char_back_archived",
                   on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         return
-
-    with st.container(horizontal=True, key="project_actions"):
-        st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="char_back",
-                  on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
 
     is_open, target = _form_target(project.id)
     current: Character | None = None
@@ -675,6 +826,18 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
             unsafe_allow_html=True,
         )
 
+    if is_open:
+        # #212 : le formulaire remplace la liste, en haut de page — jamais à atteindre par défilement.
+        # « Annuler » referme sans rien enregistrer et rend la liste.
+        _render_form(repo, project, target, current)
+        _render_reference_proposal(repo, project, service, current)
+        _render_voice_casting(repo, service, project, current)
+        _render_voice_lab(repo, service, project, current)
+        return
+
+    st.button("Ajouter un personnage", type="primary", icon=":material/add:", key="add_character",
+              on_click=_start_create, args=(project.id,))
+
     characters = repo.list_for_project(project.id)
     if not characters:
         with st.container(key="empty_state"):
@@ -685,17 +848,16 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
                 unsafe_allow_html=True,
             )
     else:
-        with st.container(key="characters"):
-            st.markdown('<p class="card-eyebrow">Personnages du projet</p>', unsafe_allow_html=True)
+        with st.container(key="char_list"):
             for character in characters:
                 _row(repo, project, character)
 
-    if not is_open:
-        st.button("Ajouter un personnage", type="primary", icon=":material/add:", key="add_character",
-                  on_click=_start_create, args=(project.id,))
-    else:
-        _render_reference_proposal(repo, project, service, current)
-        _render_voice_lab(repo, service, project, current)
-        _render_form(repo, project, target, current)
-
-    _render_import_export(repo, project)
+    with st.expander("À quoi servent les personnages ?", icon=":material/help:"):
+        st.markdown(
+            '<p class="row-desc">Facultatif : décris les personnages récurrents de ce projet pour les retrouver '
+            "d’une vidéo à l’autre. Sans personnage, tes vidéos se génèrent exactement comme aujourd’hui. Un "
+            "personnage n’est utilisé par une production que s’il y est explicitement sélectionné.</p>",
+            unsafe_allow_html=True,
+        )
+    with st.expander("Import / Export", icon=":material/import_export:"):
+        _render_import_export(repo, project)

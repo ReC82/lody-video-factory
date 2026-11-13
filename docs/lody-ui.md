@@ -80,6 +80,10 @@ docker cp lody-video-factory-ui:/data/sauvegarde.sqlite3 ./sauvegarde-lody.sqlit
 
 ## Retour arrière
 
+Depuis #209, la livraison et le retour arrière passent par `scripts/lody-deploy.sh` (journal des releases,
+sauvegarde SQLite, contrôle du schéma) : voir [`lody-retention.md`](lody-retention.md). Commandes manuelles
+historiques :
+
 ```bash
 docker image ls lody-video-factory                                   # tags disponibles
 LODY_IMAGE_TAG=<ancien-tag> docker compose -f docker-compose.lody.yml up -d --no-build

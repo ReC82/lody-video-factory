@@ -62,6 +62,7 @@ from lody.generation.narrative_context import (
 from lody.generation.provider import VideoGenerationProvider
 from lody.generation.safety import new_image_asset_scope, sanitize
 from lody.generation.script_guard import validate_spoken_script
+from lody.generation.animation_connector import narration_of
 from lody.generation.storyboard import MAX_SCENES, build_storyboard
 from lody.generation.store import Production, ProductionRepository
 from lody.locations import LocationRepository
@@ -159,8 +160,11 @@ def request_of(production: Production) -> GenerationRequest:
     request = GenerationRequest.from_dict(production.params.get("request", {}))
     if production.animation:
         # #120 : liaison au storyboard animé FIGÉ de cette production (sa propre colonne, jamais ``params``).
-        request = request.with_updates(animation={"project_id": production.project_id,
-                                                  "storyboard": production.animation})
+        animation = {"project_id": production.project_id, "storyboard": production.animation}
+        lexicon = (production.snapshot or {}).get("pronunciation")
+        if isinstance(lexicon, dict) and lexicon.get("entries"):
+            animation["pronunciation"] = lexicon  # #164 : lexique figé par #162/#163, lu par la voix 2D
+        request = request.with_updates(animation=animation)
     return request
 
 
@@ -405,6 +409,34 @@ class ProductionService:
             "params": {"request": stored_request(request), "engine": provider.describe_params(request)},
             "storyboard": [scene.to_dict() for scene in scenes],
             "visual_prompts": [scene.prompt for scene in scenes],
+            "current_step": "En attente de confirmation", "error_code": "", "error_message": "", **cost,
+        }
+        if not self.repo.transition(draft.id, EDITABLE_STATUSES, status=ProductionStatus.EN_ATTENTE_CONFIRMATION, **fields):
+            raise LaunchError("Cette version vient d’être lancée ou modifiée ailleurs.")
+        return self.repo.get(draft.id)
+
+    def prepare_animation_v2(self, production_id: str, storyboard: dict[str, Any]) -> Production:
+        """#159 : enregistre le storyboard animé MODIFIÉ d'une nouvelle version (brouillon), regelé dans le
+        catalogue du projet ; la version précédente et son storyboard figé restent intacts.
+
+        Le script devient la narration du nouveau storyboard ; durée et coût sont recalculés et une NOUVELLE
+        confirmation est attendue (comme ``prepare_v2``). Aucun rendu, aucun appel externe."""
+        draft = self.repo.get(production_id)
+        if draft.status not in EDITABLE_STATUSES or not draft.parent_production_id:
+            raise LaunchError("Cette version ne peut plus être modifiée.")
+        if not draft.is_animated:
+            raise LaunchError("Cette version n'a pas de storyboard animé à modifier.")
+        frozen = self._freeze_animation(draft.project_id, storyboard)
+        provider = self.provider(draft.provider)
+        script = narration_of(frozen) or draft.script
+        request = request_of(draft).with_updates(script=script, visual_prompts=(),
+                                                 animation={"project_id": draft.project_id, "storyboard": frozen})
+        _, cost = self._plan(provider, request)
+        parent = self.repo.get(draft.parent_production_id)
+        fields = {
+            "animation": frozen, "script": script,
+            "script_source": "previous" if script == parent.script.strip() else "manual",
+            "params": {"request": stored_request(request), "engine": provider.describe_params(request)},
             "current_step": "En attente de confirmation", "error_code": "", "error_message": "", **cost,
         }
         if not self.repo.transition(draft.id, EDITABLE_STATUSES, status=ProductionStatus.EN_ATTENTE_CONFIRMATION, **fields):

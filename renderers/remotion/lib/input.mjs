@@ -71,5 +71,11 @@ export function buildProps(inputPath, {captions = true} = {}) {
       throw new InputError(`voix illisible pour la synchro labiale (${error.message})`);
     }
   }
-  return {canvas, scene, assets, envelope: env, captions};
+  return {canvas, scene, assets, envelope: env, captions, scale: renderScale(data)};
+}
+
+/** Échelle de rendu (#121) : `render.scale` dans [0.25, 1[ = prévisualisation basse résolution ; 1 sinon. */
+export function renderScale(data) {
+  const value = Number(data?.render?.scale);
+  return Number.isFinite(value) && value >= 0.25 && value < 1 ? value : 1;
 }

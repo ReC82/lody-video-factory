@@ -9,9 +9,13 @@ service dans ``GenerationRequest.animation = {"project_id", "storyboard"}``. Ce 
 travail isolé par projet et par tâche (``<données>/animation/<projet>/<tâche>/``, voir ``lody.animation.worker``),
 rendu par un processus worker séparé, à priorité basse, un seul rendu à la fois sur la machine.
 
-Aucun appel payant : pas d'appel texte (la narration vient du storyboard), pas d'image générée, pas de TTS
-(la voix off du rendu 2D viendra avec la piste audio du storyboard ; la vidéo est muette en attendant, ce que
-le préflight annonce). Le coût fournisseur est donc nul ; seule la durée de rendu est estimée.
+Pas d'appel texte (la narration vient du storyboard), pas d'image générée. **Voix (#164)** : chaque scène
+parlée dont le locuteur est relié à une fiche personnage est dite par la voix ElevenLabs de CETTE fiche (voir
+``lody.animation.voiceover``) ; la synthèse a lieu ICI, au lancement (``submit``), par l'endpoint du moteur qui
+détient la clé — jamais dans le worker, qui ne reçoit que ``voice.wav`` et ``voice-timing.json``. Le coût
+(caractères absents du cache) entre dans l'estimation, donc dans l'accord de dépense du service. Une fiche
+reliée SANS voix ElevenLabs bloque le préflight : jamais de voix de remplacement (Piper ou autre), jamais de
+vidéo muette en douce. Un locuteur sans fiche reliée garde le comportement historique (muet, annoncé).
 """
 
 from __future__ import annotations
@@ -28,7 +32,8 @@ from pathlib import Path
 from typing import Any
 
 from lody import settings
-from lody.animation import modes
+from lody.animation import modes, scene_cache, voiceover
+from lody.animation import preflight as animation_preflight
 from lody.animation import worker as animation_worker
 from lody.animation.assets import FILE_EXTENSIONS, AnimationAssetRepository, AssetNotFound
 from lody.animation.contract import (
@@ -80,7 +85,8 @@ def spawn_worker(directory: Path) -> None:
     """
     env = animation_worker.minimal_env()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
-    for key in (animation_worker.RENDERER_ENV, animation_worker.SCENE_TIMEOUT_ENV):
+    for key in (animation_worker.RENDERER_ENV, animation_worker.SCENE_TIMEOUT_ENV,
+                animation_worker.RENDERER_REVISION_ENV, scene_cache.MAX_CACHE_BYTES_ENV):
         if os.environ.get(key):
             env[key] = os.environ[key]
     with (directory / "worker.stderr").open("ab") as stderr:
@@ -97,6 +103,11 @@ def binding(request: GenerationRequest) -> tuple[str, dict[str, Any]] | None:
     if not isinstance(project_id, str) or not isinstance(storyboard, dict) or not storyboard:
         return None
     return project_id, storyboard
+
+
+def preview_scale_of(request: GenerationRequest) -> float:
+    """Échelle de prévisualisation demandée (``animation.preview_scale``, #121) ; 1 = rendu final."""
+    return animation_worker.preview_scale({"preview": {"scale": (request.animation or {}).get("preview_scale", 1.0)}})
 
 
 def narration_of(storyboard: dict[str, Any]) -> str:
@@ -118,9 +129,13 @@ class AnimationConnector(VideoGenerationProvider):
 
     def __init__(self, root: Path | None = None, asset_repo: AnimationAssetRepository | None = None,
                  launcher: Launcher = spawn_worker, renderer: str | None = None, ffmpeg: str | None = None,
-                 clock: Callable[[], float] = time.time):
+                 clock: Callable[[], float] = time.time, character_repo: Any = None,
+                 synthesize: voiceover.Synthesize | None = None, voice_cache: voiceover.VoiceCache | None = None):
         self._root = Path(root) if root else None
         self._asset_repo = asset_repo
+        self._character_repo = character_repo
+        self._synthesize = synthesize
+        self._voice_cache = voice_cache
         self._launcher = launcher
         self._renderer = renderer
         self._ffmpeg = ffmpeg
@@ -136,6 +151,38 @@ class AnimationConnector(VideoGenerationProvider):
             self._asset_repo = AnimationAssetRepository(settings.db_path())
         return self._asset_repo
 
+    def characters(self) -> Any:
+        if self._character_repo is None:
+            self._character_repo = voiceover.default_character_repo()
+        return self._character_repo
+
+    def voice_cache(self) -> voiceover.VoiceCache:
+        if self._voice_cache is None:
+            self._voice_cache = voiceover.VoiceCache(self.root / "voice-samples")
+        return self._voice_cache
+
+    def _synthesizer(self) -> voiceover.Synthesize:
+        """Appel payant : essai vocal isolé du moteur (la clé ElevenLabs ne quitte jamais le moteur)."""
+        if self._synthesize is None:
+            from lody.generation import mpt_connector
+
+            self._synthesize = mpt_connector.build_from_environment().generate_voice_preview
+        return self._synthesize
+
+    # -- voix (#164) -------------------------------------------------------------------------------------------
+    def voice_plan(self, request: GenerationRequest) -> voiceover.VoicePlan | None:
+        """Plan de voix du storyboard (aucun appel), ou ``None`` sans storyboard valide."""
+        bound = binding(request)
+        if not bound:
+            return None
+        project_id, storyboard = bound
+        lexicon = (request.animation or {}).get("pronunciation")
+        try:
+            resolve = voiceover.speaker_resolver(self.assets(), self.characters(), project_id)
+            return voiceover.plan_voiceover(storyboard, resolve, lexicon if isinstance(lexicon, dict) else None)
+        except (KeyError, TypeError, ValueError):
+            return None
+
     def _renderer_command(self) -> list[str]:
         return animation_worker.renderer_command(self._renderer)
 
@@ -150,8 +197,12 @@ class AnimationConnector(VideoGenerationProvider):
     def plan_units(self, request: GenerationRequest) -> SceneUnits:
         bound = binding(request)
         scenes = len(bound[1].get("scenes") or []) if bound else 1
-        return SceneUnits(text_calls=0, scenes=(max(1, scenes),) * 2, images=(0, 0), characters=(0, 0),
-                          music_tracks=0, audio_seconds=(0, 0))
+        plan = self.voice_plan(request)
+        billable = voiceover.billable_characters(plan, self.voice_cache()) if plan and plan.scenes else 0
+        # #164 : seuls les caractères ABSENTS du cache sont facturés (une reprise ou un second rendu coûte 0).
+        return SceneUnits(text_calls=0, scenes=(max(1, scenes),) * 2, images=(0, 0), characters=(billable, billable),
+                          music_tracks=0, audio_seconds=(0, 0),
+                          voice_provider=voiceover.PROVIDER if plan and plan.scenes else "")
 
     def describe_script_request(self, request: GenerationRequest, narrative_block: str = "",
                                 dialogue_character: str = "") -> dict:
@@ -220,9 +271,7 @@ class AnimationConnector(VideoGenerationProvider):
         items = [
             CapabilityStatus(Capability.TEXT, CapabilityState.NOT_NEEDED, requested="storyboard animé",
                              message="La narration vient du storyboard animé : aucun appel texte."),
-            CapabilityStatus(Capability.VOICE, CapabilityState.DISABLED, requested="aucune",
-                             message="Rendu 2D : pas encore de voix off, la vidéo est muette ; les répliques du "
-                                     "storyboard deviennent les sous-titres."),
+            self._voice_status(request),
             CapabilityStatus(Capability.MUSIC, CapabilityState.DISABLED, requested="aucune",
                              message="Rendu 2D : pas de musique pour l'instant."),
         ]
@@ -273,10 +322,15 @@ class AnimationConnector(VideoGenerationProvider):
                 Capability.ENGINE, CapabilityState.UNAVAILABLE, requested="moteur 2D",
                 message="L'outil d'assemblage vidéo (ffmpeg) est introuvable sur ce serveur.", fix="platform",
                 admin="ffmpeg absent du PATH et imageio-ffmpeg indisponible."))
+        elif not (licence := animation_preflight.license_allows_render())[0]:
+            # #154 : la licence Remotion n'est jamais supposée gratuite — décision écrite du propriétaire requise.
+            items.append(CapabilityStatus(
+                Capability.ENGINE, CapabilityState.UNAVAILABLE, requested="moteur 2D", message=licence[1],
+                fix="platform", admin=f"{animation_preflight.LICENSE_ENV} : voir docs/lody-animation-worker-docker.md."))
         else:
             items.append(CapabilityStatus(
                 Capability.ENGINE, CapabilityState.READY, requested="moteur 2D", configured="worker 2D",
-                message="Worker 2D disponible : un rendu à la fois, priorité basse."))
+                message="Worker 2D disponible : un rendu à la fois, priorité basse. " + licence[1]))
         # Stockage : place libre pour les rendus de scène et la vidéo finale.
         seconds = duration_seconds(bound[1]) if storyboard_ok and bound else 60
         need = int(seconds * DISK_PER_SECOND + DISK_MARGIN)
@@ -307,6 +361,58 @@ class AnimationConnector(VideoGenerationProvider):
                 Capability.SETTINGS, CapabilityState.READY, requested=modes.RENDER_MODES[mode],
                 configured=modes.RENDER_MODES[mode], message=modes.DESCRIPTIONS[mode] + estimate))
         return PreflightReport(tuple(items))
+
+    def _voice_status(self, request: GenerationRequest) -> CapabilityStatus:
+        plan = self.voice_plan(request)
+        if plan is not None and plan.missing:
+            names = ", ".join(sorted(plan.missing))
+            scenes = sorted({index for indexes in plan.missing.values() for index in indexes})
+            return CapabilityStatus(
+                Capability.VOICE, CapabilityState.NOT_CONFIGURED, requested="voix ElevenLabs des personnages",
+                message=f"Aucune voix ElevenLabs n'est choisie sur la fiche de {names} (scène(s) "
+                        f"{', '.join(map(str, scenes))}) : choisis-la dans Personnages. Aucune voix de "
+                        "remplacement n'est utilisée.", fix="project")
+        if plan is not None and plan.scenes:
+            cache = self.voice_cache()
+            cached = sum(1 for scene in plan.scenes if cache.has(scene.key))
+            billable = voiceover.billable_characters(plan, cache)
+            voices = ", ".join(dict.fromkeys(f"{s.spec.character} ({s.spec.voice_name or s.spec.voice_id})"
+                                             for s in plan.scenes))
+            unlinked = (f" {len(plan.unlinked)} scène(s) au locuteur sans fiche restent muettes (Atelier 2D → "
+                        "« Voix des marionnettes »)."
+                        if plan.unlinked else "")
+            return CapabilityStatus(
+                Capability.VOICE, CapabilityState.READY, requested="voix ElevenLabs des personnages",
+                configured=f"ElevenLabs — {voices}"[:200],
+                message=f"{len(plan.scenes)} scène(s) parlée(s) : {cached} déjà en cache (gratuit), "
+                        f"{billable} caractère(s) à synthétiser au lancement.{unlinked}")
+        return CapabilityStatus(Capability.VOICE, CapabilityState.DISABLED, requested="aucune",
+                                message="Rendu 2D : aucun locuteur relié à une fiche personnage, la vidéo est "
+                                        "muette ; les répliques du storyboard deviennent les sous-titres. Pour la "
+                                        "faire parler : Atelier 2D → « Voix des marionnettes ».")
+
+    def _prepare_voice(self, request: GenerationRequest, storyboard: dict[str, Any], staging: Path) -> None:
+        """Synthèse (scènes absentes du cache seulement) puis piste ``voice.wav`` + repères recalés. Lève
+        ``ProviderError`` : jamais de bascule vers une autre voix ni de vidéo muette en cas d'échec."""
+        plan = self.voice_plan(request)
+        if plan is None or (not plan.scenes and not plan.missing):
+            return
+        if plan.missing:
+            raise ProviderError(ErrorKind.REJECTED, "Voix ElevenLabs absente de la fiche de "
+                                + ", ".join(sorted(plan.missing)) + " : choisis-la dans Personnages.", stage="voice")
+        ffmpeg = self._ffmpeg_exe()
+        if not ffmpeg:
+            raise ProviderError(ErrorKind.UNAVAILABLE, "ffmpeg est introuvable : voix impossible à préparer.",
+                                stage="voice")
+        cache = self.voice_cache()
+        try:
+            outcome = voiceover.synthesize_missing(plan, cache, self._synthesizer(), ffmpeg)
+            voiceover.build_track(plan, cache, ffmpeg, staging, storyboard)
+        except voiceover.VoiceoverError as error:
+            raise ProviderError(ErrorKind.PROVIDER, "Voix ElevenLabs : " + sanitize(error.message, 300),
+                                stage="voice") from None
+        logger.info("voix 2D : %d scène(s) synthétisée(s) (%d caractères), %d reprise(s) du cache",
+                    len(outcome.generated), outcome.characters, len(outcome.reused))
 
     # -- tâche -------------------------------------------------------------------------------------------------
     @staticmethod
@@ -352,6 +458,14 @@ class AnimationConnector(VideoGenerationProvider):
         job = {"schema": animation_worker.JOB_SCHEMA, "task_id": task_id, "project_id": project_id,
                "mode": self.mode_of(request), "storyboard": storyboard, "assets": job_assets,
                "asset_info": self._asset_info(project_id, files), "created_at": self._clock()}
+        scale = preview_scale_of(request)
+        if scale < 1.0:  # #121 : prévisualisation basse résolution, cache de scène séparé du rendu final
+            job["preview"] = {"scale": scale}
+        try:
+            self._prepare_voice(request, storyboard, staging)  # #164 : avant publication du dossier
+        except BaseException:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
         animation_worker.write_json(staging / "job.json", job)
         animation_worker.write_json(staging / "state.json", {"state": "queued", "step": "En attente du worker",
                                                              "heartbeat_at": self._clock(), "restarts": 0})
