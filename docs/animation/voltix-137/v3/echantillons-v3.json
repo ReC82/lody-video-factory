@@ -1,0 +1,926 @@
+{
+ "schema": "lody.animation/1",
+ "canvas": {
+  "fps": 30,
+  "width": 1080,
+  "height": 1920
+ },
+ "scenes": [
+  {
+   "id": "maison",
+   "duration_frames": 508,
+   "intent": {
+    "narration": "Vous connaissez sûrement le câble HDMI qui relie votre box à votre télé. Ou le DisplayPort de votre écran d'ordinateur. Et avant, il y avait le VGA, pour l'image analogique.",
+    "purpose": "Du connu : HDMI, DisplayPort, VGA",
+    "mood": "complice"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "salon",
+      "objects": [
+       {
+        "id": "box",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a69934a8e59e",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 880
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.85
+         }
+        ],
+        "end": 215
+       },
+       {
+        "id": "tv",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8041d0e31cc6",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 640
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.0
+         }
+        ],
+        "end": 215
+       },
+       {
+        "id": "hdmi",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f5388def1731",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 620,
+          "y": 810
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.06
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": -11
+         }
+        ],
+        "end": 215,
+        "start": 46,
+        "opacity": [
+         {
+          "frame": 46,
+          "value": 0
+         },
+         {
+          "frame": 54,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "image-tv",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0ec4e0f39d01",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 610
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.519
+         }
+        ],
+        "start": 100,
+        "opacity": [
+         {
+          "frame": 100,
+          "value": 0
+         },
+         {
+          "frame": 108,
+          "value": 1
+         }
+        ],
+        "end": 215
+       }
+      ]
+     },
+     {
+      "id": "bureau",
+      "objects": [
+       {
+        "id": "pc",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1e4b991e1de0",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 760
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "start": 215,
+        "opacity": [
+         {
+          "frame": 215,
+          "value": 0
+         },
+         {
+          "frame": 223,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_b551baa0ce3a",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 640
+         }
+        ],
+        "start": 215,
+        "opacity": [
+         {
+          "frame": 215,
+          "value": 0
+         },
+         {
+          "frame": 223,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "dp",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f5388def1731",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 360,
+          "y": 726
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.53
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": -2
+         }
+        ],
+        "start": 221,
+        "opacity": [
+         {
+          "frame": 221,
+          "value": 0
+         },
+         {
+          "frame": 231,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "image-moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0ec4e0f39d01",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 614
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.291
+         }
+        ],
+        "start": 279,
+        "opacity": [
+         {
+          "frame": 279,
+          "value": 0
+         },
+         {
+          "frame": 287,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "fiches",
+      "objects": [
+       {
+        "id": "f-hdmi",
+        "type": "asset",
+        "asset": {
+         "id": "ast_4d437d31a582",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 360
+         }
+        ],
+        "end": 215,
+        "start": 66,
+        "scale": [
+         {
+          "frame": 66,
+          "value": 0.36
+         },
+         {
+          "frame": 78,
+          "value": 0.9
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-dp",
+        "type": "asset",
+        "asset": {
+         "id": "ast_c7742b198b66",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 360
+         }
+        ],
+        "end": 351,
+        "start": 253,
+        "scale": [
+         {
+          "frame": 253,
+          "value": 0.36
+         },
+         {
+          "frame": 265,
+          "value": 0.9
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-vga",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8d7bc1ae1a5f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 330
+         }
+        ],
+        "start": 355,
+        "scale": [
+         {
+          "frame": 355,
+          "value": 0.44
+         },
+         {
+          "frame": 367,
+          "value": 1.1
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "t-hdmi",
+        "type": "text",
+        "text": {
+         "content": "HDMI",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 620,
+          "y": 300
+         }
+        ],
+        "end": 215,
+        "start": 66,
+        "scale": [
+         {
+          "frame": 66,
+          "value": 0.4
+         },
+         {
+          "frame": 78,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "t-dp",
+        "type": "text",
+        "text": {
+         "content": "DisplayPort",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 640,
+          "y": 300
+         }
+        ],
+        "end": 351,
+        "start": 253,
+        "scale": [
+         {
+          "frame": 253,
+          "value": 0.4
+         },
+         {
+          "frame": 265,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "t-vga",
+        "type": "text",
+        "text": {
+         "content": "VGA",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 180
+         }
+        ],
+        "start": 355,
+        "scale": [
+         {
+          "frame": 355,
+          "value": 0.4
+         },
+         {
+          "frame": 367,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "t-analogique",
+        "type": "text",
+        "text": {
+         "content": "image analogique",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1000
+         }
+        ],
+        "start": 439,
+        "opacity": [
+         {
+          "frame": 439,
+          "value": 0
+         },
+         {
+          "frame": 449,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_c9f8348a5fa4",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.52
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 351,
+          "name": "concentration"
+         },
+         {
+          "frame": 498,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 0,
+          "end": 26,
+          "name": "saluer"
+         },
+         {
+          "start": 66,
+          "end": 207,
+          "name": "montrer"
+         },
+         {
+          "start": 240,
+          "end": 343,
+          "name": "montrer"
+         },
+         {
+          "start": 351,
+          "end": 498,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.04,
+       "rotation": 0
+      },
+      {
+       "frame": 207,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 508,
+       "x": 540,
+       "y": 940,
+       "zoom": 1.03,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Vous connaissez sûrement le câble HDMI",
+       "start": 6,
+       "end": 112
+      },
+      {
+       "text": "qui relie votre box à votre télé.",
+       "start": 114,
+       "end": 207
+      },
+      {
+       "text": "Ou le DisplayPort de votre écran d'ordinateur.",
+       "start": 215,
+       "end": 343
+      },
+      {
+       "text": "Et avant, il y avait le VGA, pour l'image analogique.",
+       "start": 351,
+       "end": 498
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 166
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "studio",
+   "duration_frames": 228,
+   "intent": {
+    "narration": "Mais dans les studios télé, on utilise souvent une autre connexion : le SDI.",
+    "purpose": "Au studio : le SDI",
+    "mood": "curieux"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "plateau",
+      "objects": [
+       {
+        "id": "plateau",
+        "type": "asset",
+        "asset": {
+         "id": "ast_6c210650a6b1",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 720
+         }
+        ]
+       },
+       {
+        "id": "projecteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_02900d6e5613",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.8
+         }
+        ]
+       },
+       {
+        "id": "camera",
+        "type": "asset",
+        "asset": {
+         "id": "ast_9f76a3e8cf68",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 1400,
+          "y": 900
+         },
+         {
+          "frame": 69,
+          "x": 760,
+          "y": 900
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "sdi",
+        "type": "text",
+        "text": {
+         "content": "SDI",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 250
+         }
+        ],
+        "start": 186,
+        "scale": [
+         {
+          "frame": 186,
+          "value": 0.48
+         },
+         {
+          "frame": 198,
+          "value": 1.2
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "studio",
+        "type": "text",
+        "text": {
+         "content": "studio de télévision",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1150
+         }
+        ],
+        "start": 37,
+        "opacity": [
+         {
+          "frame": 37,
+          "value": 0
+         },
+         {
+          "frame": 47,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_c9f8348a5fa4",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "surprise"
+         },
+         {
+          "frame": 186,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 48,
+          "end": 154,
+          "name": "montrer"
+         },
+         {
+          "start": 186,
+          "end": 214,
+          "name": "rebond"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 900,
+       "zoom": 1.08,
+       "rotation": 0
+      },
+      {
+       "frame": 228,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Mais dans les studios télé,",
+       "start": 6,
+       "end": 82
+      },
+      {
+       "text": "on utilise souvent une autre connexion : le SDI.",
+       "start": 84,
+       "end": 218
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 196
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 10
+    }
+   }
+  }
+ ],
+ "frozen": {
+  "at": "2026-11-13T19:01:27+00:00",
+  "assets": [
+   {
+    "id": "ast_02900d6e5613",
+    "version": 1,
+    "sha256": "8ea5b0e96dc749b6346808d2134475b7abe6e88b94119308f48f9ce6a76c42e6",
+    "kind": "prop",
+    "name": "Projecteur de plateau"
+   },
+   {
+    "id": "ast_0ec4e0f39d01",
+    "version": 1,
+    "sha256": "d29ce7221cade4aa8a1fe3325deab793b2a717fed3d9bc40e5b5591099f50b7b",
+    "kind": "prop",
+    "name": "Image affichée"
+   },
+   {
+    "id": "ast_1e4b991e1de0",
+    "version": 1,
+    "sha256": "238ac8dc6c3a6d6ae3df44551e3879a78f3ebb31efacaad8b6a85984c094eb4f",
+    "kind": "prop",
+    "name": "Ordinateur"
+   },
+   {
+    "id": "ast_4d437d31a582",
+    "version": 1,
+    "sha256": "ca688c15c434e4698c6490939a93efff7f73c24a51f9a47dd0b4ab98e57b448c",
+    "kind": "prop",
+    "name": "Fiche HDMI — vue de face"
+   },
+   {
+    "id": "ast_6c210650a6b1",
+    "version": 1,
+    "sha256": "da9c1dd045bcb6fefeda8962907407c466b1e0a0a7e913dbe25e5d6531600d76",
+    "kind": "prop",
+    "name": "Plateau TV"
+   },
+   {
+    "id": "ast_8041d0e31cc6",
+    "version": 1,
+    "sha256": "0b5dbb6d35905ab18d74a688e5b7bf973be622f2a9ab32f72a912eefe7358d9c",
+    "kind": "prop",
+    "name": "Téléviseur"
+   },
+   {
+    "id": "ast_8d7bc1ae1a5f",
+    "version": 1,
+    "sha256": "03559686d23c85b65f266b80697e7a9f78ed9330267e399ca5dc3761f204f684",
+    "kind": "prop",
+    "name": "Fiche VGA — vue de face"
+   },
+   {
+    "id": "ast_9f76a3e8cf68",
+    "version": 1,
+    "sha256": "a2acb5b47fd85b79d6473eea38770309556418f3c85c9f3b01d699abd6aa4b80",
+    "kind": "prop",
+    "name": "Caméra de plateau"
+   },
+   {
+    "id": "ast_a69934a8e59e",
+    "version": 1,
+    "sha256": "5612cf80e13b8baa20ec155fa86f346a0478a158bcb71193eae3ba81bb47cfd8",
+    "kind": "prop",
+    "name": "Box TV"
+   },
+   {
+    "id": "ast_b551baa0ce3a",
+    "version": 1,
+    "sha256": "49afc499e0c88bc72db5b4be96e1f1021ef7d0485c1d52db7d8a1c7704f296b9",
+    "kind": "prop",
+    "name": "Moniteur d'ordinateur"
+   },
+   {
+    "id": "ast_c7742b198b66",
+    "version": 1,
+    "sha256": "0d9cbfb3eeba579618960cbd013cdb5c8edaf0f6e05f9d9201ac1f61e6748f06",
+    "kind": "prop",
+    "name": "Fiche DisplayPort — vue de face"
+   },
+   {
+    "id": "ast_c9f8348a5fa4",
+    "version": 1,
+    "sha256": "ddf8a04d0177474ab09335994ced9f825e05ade1630a8157760e1afee31dce97",
+    "kind": "character",
+    "name": "Voltix — marionnette"
+   },
+   {
+    "id": "ast_f5388def1731",
+    "version": 1,
+    "sha256": "06907655ef0dbcd8b5b8e1cba8c5cfbabbd586fb0e187b23e82ae27e45a9fc1a",
+    "kind": "prop",
+    "name": "Câble domestique HDMI / DP"
+   }
+  ],
+  "sha256": "9a301125414fc9d2cac3802b293f387831f4f5e32e59942464dab475b5dc066c"
+ }
+}

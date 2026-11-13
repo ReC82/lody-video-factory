@@ -1,0 +1,170 @@
+{
+ "task": "anim-352897cc3eb3f921018c",
+ "tts_seconds": 82.8,
+ "render_seconds": 387.1,
+ "duration_seconds": 64.5,
+ "voice_plan": {
+  "status": "provisional",
+  "provider": "",
+  "voice_id": "",
+  "needs_cost_approval": false,
+  "message": "Aucune voix choisie dans la fiche Voltix : voix de test provisoire, à remplacer."
+ },
+ "catalog_warnings": [],
+ "scenes": {
+  "accroche": {
+   "offset": 0,
+   "duration": 165,
+   "cues": [
+    {
+     "text": "Tu vois ce câble ?",
+     "start": 10,
+     "end": 43
+    },
+    {
+     "text": "En régie, il peut relier une caméra à un mélangeur vidéo.",
+     "start": 49,
+     "end": 157
+    }
+   ]
+  },
+  "liaison": {
+   "offset": 165,
+   "duration": 136,
+   "cues": [
+    {
+     "text": "C'est une liaison SDI :",
+     "start": 10,
+     "end": 61
+    },
+    {
+     "text": "de la vidéo numérique professionnelle.",
+     "start": 67,
+     "end": 126
+    }
+   ]
+  },
+  "coupe": {
+   "offset": 301,
+   "duration": 252,
+   "cues": [
+    {
+     "text": "Regarde à l'intérieur.",
+     "start": 10,
+     "end": 44
+    },
+    {
+     "text": "Ce câble coaxial possède un conducteur central, un isolant…",
+     "start": 50,
+     "end": 164
+    },
+    {
+     "text": "… et un blindage, protégés par une gaine.",
+     "start": 170,
+     "end": 240
+    }
+   ]
+  },
+  "bnc": {
+   "offset": 553,
+   "duration": 222,
+   "cues": [
+    {
+     "text": "Et cette fiche métallique ? C'est un connecteur BNC.",
+     "start": 10,
+     "end": 121
+    },
+    {
+     "text": "On l'insère, on le tourne, et il se verrouille !",
+     "start": 127,
+     "end": 209
+    }
+   ]
+  },
+  "distinction": {
+   "offset": 775,
+   "duration": 184,
+   "cues": [
+    {
+     "text": "Attention : le BNC, c'est le connecteur.",
+     "start": 10,
+     "end": 103
+    },
+    {
+     "text": "Le SDI, c'est le signal.",
+     "start": 109,
+     "end": 172
+    }
+   ]
+  },
+  "audio": {
+   "offset": 959,
+   "duration": 89,
+   "cues": [
+    {
+     "text": "Et le son peut aussi voyager avec l'image.",
+     "start": 10,
+     "end": 76
+    }
+   ]
+  },
+  "debits": {
+   "offset": 1048,
+   "duration": 419,
+   "cues": [
+    {
+     "text": "Tu entendras parler de HD-SDI, de 3G-SDI et de 12G-SDI.",
+     "start": 10,
+     "end": 193
+    },
+    {
+     "text": "Selon le format, on transporte plus de données…",
+     "start": 199,
+     "end": 281
+    },
+    {
+     "text": "… par exemple de la 4K à 60 images par seconde en 12G.",
+     "start": 287,
+     "end": 406
+    }
+   ]
+  },
+  "limites": {
+   "offset": 1467,
+   "duration": 243,
+   "cues": [
+    {
+     "text": "Mais attention : ce n'est pas magique !",
+     "start": 10,
+     "end": 70
+    },
+    {
+     "text": "La qualité du câble, de ses connecteurs…",
+     "start": 76,
+     "end": 157
+    },
+    {
+     "text": "… et sa longueur comptent énormément.",
+     "start": 163,
+     "end": 230
+    }
+   ]
+  },
+  "conclusion": {
+   "offset": 1710,
+   "duration": 225,
+   "cues": [
+    {
+     "text": "Voilà : le signal SDI, un bon coaxial et des BNC adaptés.",
+     "start": 10,
+     "end": 155
+    },
+    {
+     "text": "Et la régie retrouve son image !",
+     "start": 161,
+     "end": 212
+    }
+   ]
+  }
+ }
+}

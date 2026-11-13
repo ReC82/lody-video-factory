@@ -1,0 +1,4039 @@
+{
+ "schema": "lody.animation/1",
+ "canvas": {
+  "fps": 30,
+  "width": 1080,
+  "height": 1920
+ },
+ "scenes": [
+  {
+   "id": "maison",
+   "duration_frames": 382,
+   "intent": {
+    "narration": "Vous connaissez sûrement le câble HDMI qui relie votre box à votre télé. Ou le DisplayPort de votre écran d'ordinateur. Et avant, il y avait le VGA, pour l'image analogique.",
+    "purpose": "Du connu : HDMI, DisplayPort, VGA",
+    "mood": "complice"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "salon",
+      "objects": [
+       {
+        "id": "box",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1820e0445322",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 880
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.85
+         }
+        ],
+        "end": 162
+       },
+       {
+        "id": "tv",
+        "type": "asset",
+        "asset": {
+         "id": "ast_9de03eaf0b1c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 640
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.0
+         }
+        ],
+        "end": 162
+       },
+       {
+        "id": "hdmi",
+        "type": "asset",
+        "asset": {
+         "id": "ast_cd5cb31ca13f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 620,
+          "y": 810
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.06
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": -11
+         }
+        ],
+        "end": 162,
+        "start": 35,
+        "opacity": [
+         {
+          "frame": 35,
+          "value": 0
+         },
+         {
+          "frame": 43,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "image-tv",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8f8fbfdbb763",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 610
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.519
+         }
+        ],
+        "start": 76,
+        "opacity": [
+         {
+          "frame": 76,
+          "value": 0
+         },
+         {
+          "frame": 84,
+          "value": 1
+         }
+        ],
+        "end": 162
+       }
+      ]
+     },
+     {
+      "id": "bureau",
+      "objects": [
+       {
+        "id": "pc",
+        "type": "asset",
+        "asset": {
+         "id": "ast_e97b00859ef8",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 760
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "start": 162,
+        "opacity": [
+         {
+          "frame": 162,
+          "value": 0
+         },
+         {
+          "frame": 170,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_ea94187ca0fb",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 640
+         }
+        ],
+        "start": 162,
+        "opacity": [
+         {
+          "frame": 162,
+          "value": 0
+         },
+         {
+          "frame": 170,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "dp",
+        "type": "asset",
+        "asset": {
+         "id": "ast_cd5cb31ca13f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 360,
+          "y": 726
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.53
+         }
+        ],
+        "rotation": [
+         {
+          "frame": 0,
+          "value": -2
+         }
+        ],
+        "start": 168,
+        "opacity": [
+         {
+          "frame": 168,
+          "value": 0
+         },
+         {
+          "frame": 178,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "image-moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8f8fbfdbb763",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 700,
+          "y": 614
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 1.291
+         }
+        ],
+        "start": 209,
+        "opacity": [
+         {
+          "frame": 209,
+          "value": 0
+         },
+         {
+          "frame": 217,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "fiches",
+      "objects": [
+       {
+        "id": "f-hdmi",
+        "type": "asset",
+        "asset": {
+         "id": "ast_2520cd50f3de",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 360
+         }
+        ],
+        "end": 162,
+        "start": 50,
+        "scale": [
+         {
+          "frame": 50,
+          "value": 0.36
+         },
+         {
+          "frame": 62,
+          "value": 0.9
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-dp",
+        "type": "asset",
+        "asset": {
+         "id": "ast_26c2a5f8c4da",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 250,
+          "y": 360
+         }
+        ],
+        "end": 264,
+        "start": 190,
+        "scale": [
+         {
+          "frame": 190,
+          "value": 0.36
+         },
+         {
+          "frame": 202,
+          "value": 0.9
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "f-vga",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a79a8b64fb17",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 330
+         }
+        ],
+        "start": 268,
+        "scale": [
+         {
+          "frame": 268,
+          "value": 0.44
+         },
+         {
+          "frame": 280,
+          "value": 1.1
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "t-hdmi",
+        "type": "text",
+        "text": {
+         "content": "HDMI",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 620,
+          "y": 300
+         }
+        ],
+        "end": 162,
+        "start": 50,
+        "scale": [
+         {
+          "frame": 50,
+          "value": 0.4
+         },
+         {
+          "frame": 62,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "t-dp",
+        "type": "text",
+        "text": {
+         "content": "DisplayPort",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 640,
+          "y": 300
+         }
+        ],
+        "end": 264,
+        "start": 190,
+        "scale": [
+         {
+          "frame": 190,
+          "value": 0.4
+         },
+         {
+          "frame": 202,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "t-vga",
+        "type": "text",
+        "text": {
+         "content": "VGA",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 180
+         }
+        ],
+        "start": 268,
+        "scale": [
+         {
+          "frame": 268,
+          "value": 0.4
+         },
+         {
+          "frame": 280,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "t-analogique",
+        "type": "text",
+        "text": {
+         "content": "image analogique",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1000
+         }
+        ],
+        "start": 328,
+        "opacity": [
+         {
+          "frame": 328,
+          "value": 0
+         },
+         {
+          "frame": 338,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.52
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 264,
+          "name": "concentration"
+         },
+         {
+          "frame": 372,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 0,
+          "end": 26,
+          "name": "saluer"
+         },
+         {
+          "start": 50,
+          "end": 154,
+          "name": "montrer"
+         },
+         {
+          "start": 180,
+          "end": 256,
+          "name": "montrer"
+         },
+         {
+          "start": 264,
+          "end": 372,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.04,
+       "rotation": 0
+      },
+      {
+       "frame": 154,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 382,
+       "x": 540,
+       "y": 940,
+       "zoom": 1.03,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Vous connaissez sûrement le câble HDMI",
+       "start": 6,
+       "end": 84
+      },
+      {
+       "text": "qui relie votre box à votre télé.",
+       "start": 86,
+       "end": 154
+      },
+      {
+       "text": "Ou le DisplayPort de votre écran d'ordinateur.",
+       "start": 162,
+       "end": 256
+      },
+      {
+       "text": "Et avant, il y avait le VGA, pour l'image analogique.",
+       "start": 264,
+       "end": 372
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 124
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "studio",
+   "duration_frames": 172,
+   "intent": {
+    "narration": "Mais dans les studios télé, on utilise souvent une autre connexion : le SDI.",
+    "purpose": "Au studio : le SDI",
+    "mood": "curieux"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "plateau",
+      "objects": [
+       {
+        "id": "plateau",
+        "type": "asset",
+        "asset": {
+         "id": "ast_7941ca8e5aab",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 720
+         }
+        ]
+       },
+       {
+        "id": "projecteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_6d3fc46bfd5f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.8
+         }
+        ]
+       },
+       {
+        "id": "camera",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 1400,
+          "y": 900
+         },
+         {
+          "frame": 52,
+          "x": 760,
+          "y": 900
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "sdi",
+        "type": "text",
+        "text": {
+         "content": "SDI",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 250
+         }
+        ],
+        "start": 138,
+        "scale": [
+         {
+          "frame": 138,
+          "value": 0.48
+         },
+         {
+          "frame": 150,
+          "value": 1.2
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "studio",
+        "type": "text",
+        "text": {
+         "content": "studio de télévision",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1150
+         }
+        ],
+        "start": 29,
+        "opacity": [
+         {
+          "frame": 29,
+          "value": 0
+         },
+         {
+          "frame": 39,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "surprise"
+         },
+         {
+          "frame": 138,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 37,
+          "end": 115,
+          "name": "montrer"
+         },
+         {
+          "start": 138,
+          "end": 166,
+          "name": "rebond"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 900,
+       "zoom": 1.08,
+       "rotation": 0
+      },
+      {
+       "frame": 172,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Mais dans les studios télé,",
+       "start": 6,
+       "end": 62
+      },
+      {
+       "text": "on utilise souvent une autre connexion : le SDI.",
+       "start": 64,
+       "end": 162
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 148
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 10
+    }
+   }
+  },
+  {
+   "id": "distance",
+   "duration_frames": 208,
+   "intent": {
+    "narration": "Pourquoi ? D'abord, parce qu'on peut transporter l'image plus loin, avec un câble adapté.",
+    "purpose": "Pourquoi ? Plus loin, avec un câble adapté",
+    "mood": "explicatif"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "chaine",
+      "objects": [
+       {
+        "id": "camera",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 190,
+          "y": 480
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ]
+       },
+       {
+        "id": "cable",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a43bdc8e8d70",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 580
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.48
+         }
+        ]
+       },
+       {
+        "id": "moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 480
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ]
+       },
+       {
+        "id": "image",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8f8fbfdbb763",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 463
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 40,
+        "opacity": [
+         {
+          "frame": 40,
+          "value": 0
+         },
+         {
+          "frame": 48,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "flux",
+      "objects": [
+       {
+        "id": "paquet-0",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 6,
+          "x": 360,
+          "y": 580
+         },
+         {
+          "frame": 24,
+          "x": 720,
+          "y": 580
+         }
+        ],
+        "start": 6,
+        "end": 24,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.6
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-1",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 16,
+          "x": 360,
+          "y": 580
+         },
+         {
+          "frame": 34,
+          "x": 720,
+          "y": 580
+         }
+        ],
+        "start": 16,
+        "end": 34,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.6
+         }
+        ],
+        "easing": "linear"
+       }
+      ]
+     },
+     {
+      "id": "comparaison",
+      "objects": [
+       {
+        "id": "court",
+        "type": "asset",
+        "asset": {
+         "id": "ast_cd5cb31ca13f",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 330,
+          "y": 820
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.55
+         }
+        ],
+        "start": 60,
+        "opacity": [
+         {
+          "frame": 60,
+          "value": 0
+         },
+         {
+          "frame": 70,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "long",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a43bdc8e8d70",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 990
+         }
+        ],
+        "scale": [
+         {
+          "frame": 108,
+          "value": 0.3
+         },
+         {
+          "frame": 126,
+          "value": 1.25
+         }
+        ],
+        "start": 108,
+        "easing": "ease_out"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "pourquoi",
+        "type": "text",
+        "text": {
+         "content": "Pourquoi ?",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "end": 42,
+        "start": 6,
+        "scale": [
+         {
+          "frame": 6,
+          "value": 0.4
+         },
+         {
+          "frame": 18,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "maison",
+        "type": "text",
+        "text": {
+         "content": "HDMI à la maison",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 330,
+          "y": 740
+         }
+        ],
+        "start": 60,
+        "opacity": [
+         {
+          "frame": 60,
+          "value": 0
+         },
+         {
+          "frame": 70,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "plus-loin",
+        "type": "text",
+        "text": {
+         "content": "SDI : plus loin…",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 910
+         }
+        ],
+        "start": 114,
+        "opacity": [
+         {
+          "frame": 114,
+          "value": 0
+         },
+         {
+          "frame": 124,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "adapte",
+        "type": "text",
+        "text": {
+         "content": "… avec un câble adapté",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "start": 164,
+        "opacity": [
+         {
+          "frame": 164,
+          "value": 0
+         },
+         {
+          "frame": 174,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "confusion"
+         },
+         {
+          "frame": 36,
+          "name": "concentration"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 36,
+          "end": 196,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 760,
+       "zoom": 1.08,
+       "rotation": 0
+      },
+      {
+       "frame": 36,
+       "x": 540,
+       "y": 900,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 208,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Pourquoi ?",
+       "start": 6,
+       "end": 28
+      },
+      {
+       "text": "D'abord, parce qu'on peut transporter l'image plus loin,",
+       "start": 36,
+       "end": 150
+      },
+      {
+       "text": "avec un câble adapté.",
+       "start": 152,
+       "end": 196
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 180
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 10
+    }
+   }
+  },
+  {
+   "id": "son",
+   "duration_frames": 176,
+   "intent": {
+    "narration": "Et le SDI peut aussi transporter le son avec l'image, sans câble audio séparé.",
+    "purpose": "Image et son dans le même câble",
+    "mood": "léger"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "canal",
+      "objects": [
+       {
+        "id": "cable",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a43bdc8e8d70",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 720
+         }
+        ]
+       },
+       {
+        "id": "video",
+        "type": "asset",
+        "asset": {
+         "id": "ast_90219e731075",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 260,
+          "y": 470
+         },
+         {
+          "frame": 66,
+          "x": 260,
+          "y": 470
+         },
+         {
+          "frame": 86,
+          "x": 470,
+          "y": 720
+         }
+        ],
+        "scale": [
+         {
+          "frame": 66,
+          "value": 1.0
+         },
+         {
+          "frame": 86,
+          "value": 0.45
+         }
+        ],
+        "easing": "ease_in_out",
+        "start": 6,
+        "opacity": [
+         {
+          "frame": 6,
+          "value": 0
+         },
+         {
+          "frame": 16,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "audio",
+        "type": "asset",
+        "asset": {
+         "id": "ast_34dbc729b004",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 820,
+          "y": 470
+         },
+         {
+          "frame": 74,
+          "x": 820,
+          "y": 470
+         },
+         {
+          "frame": 94,
+          "x": 610,
+          "y": 720
+         }
+        ],
+        "scale": [
+         {
+          "frame": 74,
+          "value": 1.0
+         },
+         {
+          "frame": 94,
+          "value": 0.45
+         }
+        ],
+        "easing": "ease_in_out",
+        "start": 46,
+        "opacity": [
+         {
+          "frame": 46,
+          "value": 0
+         },
+         {
+          "frame": 56,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "flux",
+      "objects": [
+       {
+        "id": "paquet-0",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 96,
+          "x": 220,
+          "y": 720
+         },
+         {
+          "frame": 120,
+          "x": 860,
+          "y": 720
+         }
+        ],
+        "start": 96,
+        "end": 120,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-1",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 108,
+          "x": 220,
+          "y": 720
+         },
+         {
+          "frame": 132,
+          "x": 860,
+          "y": 720
+         }
+        ],
+        "start": 108,
+        "end": 132,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-2",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 120,
+          "x": 220,
+          "y": 720
+         },
+         {
+          "frame": 144,
+          "x": 860,
+          "y": 720
+         }
+        ],
+        "start": 120,
+        "end": 144,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-3",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 132,
+          "x": 220,
+          "y": 720
+         },
+         {
+          "frame": 156,
+          "x": 860,
+          "y": 720
+         }
+        ],
+        "start": 132,
+        "end": 156,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-4",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 144,
+          "x": 220,
+          "y": 720
+         },
+         {
+          "frame": 168,
+          "x": 860,
+          "y": 720
+         }
+        ],
+        "start": 144,
+        "end": 168,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.9
+         }
+        ],
+        "easing": "linear"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "meme",
+        "type": "text",
+        "text": {
+         "content": "Image + son, même câble",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "start": 38,
+        "opacity": [
+         {
+          "frame": 38,
+          "value": 0
+         },
+         {
+          "frame": 48,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "possible",
+        "type": "text",
+        "text": {
+         "content": "son intégré possible",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 880
+         }
+        ],
+        "start": 96,
+        "opacity": [
+         {
+          "frame": 96,
+          "value": 0
+         },
+         {
+          "frame": 106,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "sans",
+        "type": "text",
+        "text": {
+         "content": "✗ câble audio séparé",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 980
+         }
+        ],
+        "start": 142,
+        "opacity": [
+         {
+          "frame": 142,
+          "value": 0
+         },
+         {
+          "frame": 152,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 6,
+          "end": 166,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Et le SDI peut aussi transporter le son avec l'image,",
+       "start": 6,
+       "end": 114
+      },
+      {
+       "text": "sans câble audio séparé.",
+       "start": 116,
+       "end": 166
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 102
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 10
+    }
+   }
+  },
+  {
+   "id": "coaxial",
+   "duration_frames": 322,
+   "intent": {
+    "narration": "Physiquement, il utilise souvent un câble coaxial, comme ceux des antennes de télé. Mais attention : tous les câbles coaxiaux ne conviennent pas !",
+    "purpose": "Coaxial, comme l'antenne… mais pas n'importe lequel",
+    "mood": "prudent"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "cables",
+      "objects": [
+       {
+        "id": "sdi",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a43bdc8e8d70",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 900
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.85
+         }
+        ],
+        "start": 10,
+        "opacity": [
+         {
+          "frame": 10,
+          "value": 0
+         },
+         {
+          "frame": 20,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "antenne",
+        "type": "asset",
+        "asset": {
+         "id": "ast_5af57f67f897",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 200,
+          "y": 470
+         }
+        ],
+        "start": 99,
+        "scale": [
+         {
+          "frame": 99,
+          "value": 0.32
+         },
+         {
+          "frame": 111,
+          "value": 0.8
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cable-antenne",
+        "type": "asset",
+        "asset": {
+         "id": "ast_5edaf081ffd0",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 560,
+          "y": 640
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.8
+         }
+        ],
+        "start": 105,
+        "opacity": [
+         {
+          "frame": 105,
+          "value": 0
+         },
+         {
+          "frame": 115,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "l-sdi",
+        "type": "text",
+        "text": {
+         "content": "câble SDI (vidéo pro)",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 990
+         }
+        ],
+        "start": 16,
+        "opacity": [
+         {
+          "frame": 16,
+          "value": 0
+         },
+         {
+          "frame": 26,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "l-antenne",
+        "type": "text",
+        "text": {
+         "content": "câble d'antenne TV",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 620,
+          "y": 560
+         }
+        ],
+        "start": 105,
+        "opacity": [
+         {
+          "frame": 105,
+          "value": 0
+         },
+         {
+          "frame": 115,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "famille",
+        "type": "text",
+        "text": {
+         "content": "Même famille : le coaxial",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "end": 184,
+        "start": 125,
+        "opacity": [
+         {
+          "frame": 125,
+          "value": 0
+         },
+         {
+          "frame": 135,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "attention",
+        "type": "text",
+        "text": {
+         "content": "Pas n'importe lequel !",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "start": 184,
+        "scale": [
+         {
+          "frame": 184,
+          "value": 0.4
+         },
+         {
+          "frame": 196,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "exigences",
+        "type": "text",
+        "text": {
+         "content": "pas les mêmes exigences",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 760
+         }
+        ],
+        "start": 248,
+        "opacity": [
+         {
+          "frame": 248,
+          "value": 0
+         },
+         {
+          "frame": 258,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "neutre"
+         },
+         {
+          "frame": 184,
+          "name": "confusion"
+         },
+         {
+          "frame": 273,
+          "name": "concentration"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 6,
+          "end": 176,
+          "name": "montrer"
+         },
+         {
+          "start": 184,
+          "end": 194,
+          "name": "cligner"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 184,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 322,
+       "x": 540,
+       "y": 900,
+       "zoom": 1.05,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Physiquement, il utilise souvent un câble coaxial,",
+       "start": 6,
+       "end": 108
+      },
+      {
+       "text": "comme ceux des antennes de télé.",
+       "start": 110,
+       "end": 176
+      },
+      {
+       "text": "Mais attention :",
+       "start": 184,
+       "end": 218
+      },
+      {
+       "text": "tous les câbles coaxiaux ne conviennent pas !",
+       "start": 220,
+       "end": 312
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 286
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "ohms",
+   "duration_frames": 190,
+   "intent": {
+    "narration": "Pour le SDI, on utilise une liaison à soixante-quinze ohms, avec du matériel adapté.",
+    "purpose": "Une liaison 75 ohms, matériel adapté",
+    "mood": "net"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "liaison",
+      "objects": [
+       {
+        "id": "tag-75",
+        "type": "asset",
+        "asset": {
+         "id": "ast_98b776558642",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 520
+         }
+        ],
+        "start": 57,
+        "scale": [
+         {
+          "frame": 57,
+          "value": 0.6
+         },
+         {
+          "frame": 69,
+          "value": 1.5
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cable",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a43bdc8e8d70",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 800
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.85
+         }
+        ],
+        "start": 6,
+        "opacity": [
+         {
+          "frame": 6,
+          "value": 0
+         },
+         {
+          "frame": 16,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "bnc-male",
+        "type": "asset",
+        "asset": {
+         "id": "ast_3bb7d1617029",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 330,
+          "y": 1010
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 126,
+        "opacity": [
+         {
+          "frame": 126,
+          "value": 0
+         },
+         {
+          "frame": 136,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "bnc-femelle",
+        "type": "asset",
+        "asset": {
+         "id": "ast_4cf70f8b68fa",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 620,
+          "y": 1010
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "start": 130,
+        "opacity": [
+         {
+          "frame": 130,
+          "value": 0
+         },
+         {
+          "frame": 140,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "liaison",
+        "type": "text",
+        "text": {
+         "content": "Liaison 75 Ω de bout en bout",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "start": 63,
+        "opacity": [
+         {
+          "frame": 63,
+          "value": 0
+         },
+         {
+          "frame": 73,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "materiel",
+        "type": "text",
+        "text": {
+         "content": "matériel adapté",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 420,
+          "y": 1150
+         }
+        ],
+        "start": 132,
+        "opacity": [
+         {
+          "frame": 132,
+          "value": 0
+         },
+         {
+          "frame": 142,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "concentration"
+         },
+         {
+          "frame": 126,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 57,
+          "end": 178,
+          "name": "montrer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 69,
+       "x": 540,
+       "y": 900,
+       "zoom": 1.05,
+       "rotation": 0
+      },
+      {
+       "frame": 190,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Pour le SDI, on utilise une liaison à soixante-quinze ohms,",
+       "start": 6,
+       "end": 126
+      },
+      {
+       "text": "avec du matériel adapté.",
+       "start": 128,
+       "end": 178
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 136
+    },
+    "transition_in": {
+     "type": "slide_left",
+     "frames": 10
+    }
+   }
+  },
+  {
+   "id": "conclusion",
+   "duration_frames": 172,
+   "intent": {
+    "narration": "Voilà pourquoi on trouve tant de connexions SDI en vidéo professionnelle !",
+    "purpose": "Voilà pourquoi le SDI en vidéo pro",
+    "mood": "victorieux"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "chaine",
+      "objects": [
+       {
+        "id": "plateau",
+        "type": "asset",
+        "asset": {
+         "id": "ast_7941ca8e5aab",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 720
+         }
+        ],
+        "opacity": [
+         {
+          "frame": 0,
+          "value": 0.45
+         }
+        ]
+       },
+       {
+        "id": "camera",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 190,
+          "y": 560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.75
+         }
+        ]
+       },
+       {
+        "id": "cable",
+        "type": "asset",
+        "asset": {
+         "id": "ast_a43bdc8e8d70",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 660
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ]
+       },
+       {
+        "id": "moniteur",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 560
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.75
+         }
+        ]
+       },
+       {
+        "id": "image",
+        "type": "asset",
+        "asset": {
+         "id": "ast_8f8fbfdbb763",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 541
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.75
+         }
+        ],
+        "start": 74,
+        "opacity": [
+         {
+          "frame": 74,
+          "value": 0
+         },
+         {
+          "frame": 82,
+          "value": 1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "flux",
+      "objects": [
+       {
+        "id": "paquet-0",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 6,
+          "x": 370,
+          "y": 660
+         },
+         {
+          "frame": 24,
+          "x": 710,
+          "y": 660
+         }
+        ],
+        "start": 6,
+        "end": 24,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-1",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 16,
+          "x": 370,
+          "y": 660
+         },
+         {
+          "frame": 34,
+          "x": 710,
+          "y": 660
+         }
+        ],
+        "start": 16,
+        "end": 34,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-2",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 26,
+          "x": 370,
+          "y": 660
+         },
+         {
+          "frame": 44,
+          "x": 710,
+          "y": 660
+         }
+        ],
+        "start": 26,
+        "end": 44,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-3",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 36,
+          "x": 370,
+          "y": 660
+         },
+         {
+          "frame": 54,
+          "x": 710,
+          "y": 660
+         }
+        ],
+        "start": 36,
+        "end": 54,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-4",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 46,
+          "x": 370,
+          "y": 660
+         },
+         {
+          "frame": 64,
+          "x": 710,
+          "y": 660
+         }
+        ],
+        "start": 46,
+        "end": 64,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "easing": "linear"
+       },
+       {
+        "id": "paquet-5",
+        "type": "asset",
+        "asset": {
+         "id": "ast_0f62fc7c6b78",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 56,
+          "x": 370,
+          "y": 660
+         },
+         {
+          "frame": 74,
+          "x": 710,
+          "y": 660
+         }
+        ],
+        "start": 56,
+        "end": 74,
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.7
+         }
+        ],
+        "easing": "linear"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "pro",
+        "type": "text",
+        "text": {
+         "content": "SDI : la connexion vidéo pro",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 260
+         }
+        ],
+        "start": 97,
+        "scale": [
+         {
+          "frame": 97,
+          "value": 0.4
+         },
+         {
+          "frame": 109,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.62
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "sourire"
+         },
+         {
+          "frame": 74,
+          "name": "surprise"
+         },
+         {
+          "frame": 84,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 6,
+          "end": 74,
+          "name": "montrer"
+         },
+         {
+          "start": 74,
+          "end": 102,
+          "name": "rebond"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 172,
+       "x": 540,
+       "y": 940,
+       "zoom": 1.04,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Voilà pourquoi on trouve tant de",
+       "start": 6,
+       "end": 72
+      },
+      {
+       "text": "connexions SDI en vidéo professionnelle !",
+       "start": 74,
+       "end": 158
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 94
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 8
+    }
+   }
+  },
+  {
+   "id": "teaser",
+   "duration_frames": 320,
+   "intent": {
+    "narration": "Mais maintenant, imaginez dix caméras et vingt écrans… Comment envoyer la bonne image au bon endroit ? Réponse dans la prochaine vidéo !",
+    "purpose": "Teaser : 10 caméras, 20 écrans",
+    "mood": "intrigué"
+   },
+   "render": {
+    "layers": [
+     {
+      "id": "cameras",
+      "objects": [
+       {
+        "id": "cam-0",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 330
+         }
+        ],
+        "start": 28,
+        "scale": [
+         {
+          "frame": 28,
+          "value": 0.112
+         },
+         {
+          "frame": 40,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-1",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 340,
+          "y": 330
+         }
+        ],
+        "start": 30,
+        "scale": [
+         {
+          "frame": 30,
+          "value": 0.112
+         },
+         {
+          "frame": 42,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-2",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 330
+         }
+        ],
+        "start": 32,
+        "scale": [
+         {
+          "frame": 32,
+          "value": 0.112
+         },
+         {
+          "frame": 44,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-3",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 740,
+          "y": 330
+         }
+        ],
+        "start": 34,
+        "scale": [
+         {
+          "frame": 34,
+          "value": 0.112
+         },
+         {
+          "frame": 46,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-4",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 940,
+          "y": 330
+         }
+        ],
+        "start": 36,
+        "scale": [
+         {
+          "frame": 36,
+          "value": 0.112
+         },
+         {
+          "frame": 48,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-5",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 480
+         }
+        ],
+        "start": 38,
+        "scale": [
+         {
+          "frame": 38,
+          "value": 0.112
+         },
+         {
+          "frame": 50,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-6",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 340,
+          "y": 480
+         }
+        ],
+        "start": 40,
+        "scale": [
+         {
+          "frame": 40,
+          "value": 0.112
+         },
+         {
+          "frame": 52,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-7",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 480
+         }
+        ],
+        "start": 42,
+        "scale": [
+         {
+          "frame": 42,
+          "value": 0.112
+         },
+         {
+          "frame": 54,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-8",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 740,
+          "y": 480
+         }
+        ],
+        "start": 44,
+        "scale": [
+         {
+          "frame": 44,
+          "value": 0.112
+         },
+         {
+          "frame": 56,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "cam-9",
+        "type": "asset",
+        "asset": {
+         "id": "ast_f6cd8ffd19c2",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 940,
+          "y": 480
+         }
+        ],
+        "start": 46,
+        "scale": [
+         {
+          "frame": 46,
+          "value": 0.112
+         },
+         {
+          "frame": 58,
+          "value": 0.28
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "ecrans",
+      "objects": [
+       {
+        "id": "ecran-0",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 720
+         }
+        ],
+        "start": 72,
+        "scale": [
+         {
+          "frame": 72,
+          "value": 0.088
+         },
+         {
+          "frame": 84,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-1",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 340,
+          "y": 720
+         }
+        ],
+        "start": 73,
+        "scale": [
+         {
+          "frame": 73,
+          "value": 0.088
+         },
+         {
+          "frame": 85,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-2",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 720
+         }
+        ],
+        "start": 74,
+        "scale": [
+         {
+          "frame": 74,
+          "value": 0.088
+         },
+         {
+          "frame": 86,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-3",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 740,
+          "y": 720
+         }
+        ],
+        "start": 75,
+        "scale": [
+         {
+          "frame": 75,
+          "value": 0.088
+         },
+         {
+          "frame": 87,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-4",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 940,
+          "y": 720
+         }
+        ],
+        "start": 76,
+        "scale": [
+         {
+          "frame": 76,
+          "value": 0.088
+         },
+         {
+          "frame": 88,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-5",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 830
+         }
+        ],
+        "start": 77,
+        "scale": [
+         {
+          "frame": 77,
+          "value": 0.088
+         },
+         {
+          "frame": 89,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-6",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 340,
+          "y": 830
+         }
+        ],
+        "start": 78,
+        "scale": [
+         {
+          "frame": 78,
+          "value": 0.088
+         },
+         {
+          "frame": 90,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-7",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 830
+         }
+        ],
+        "start": 79,
+        "scale": [
+         {
+          "frame": 79,
+          "value": 0.088
+         },
+         {
+          "frame": 91,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-8",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 740,
+          "y": 830
+         }
+        ],
+        "start": 80,
+        "scale": [
+         {
+          "frame": 80,
+          "value": 0.088
+         },
+         {
+          "frame": 92,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-9",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 940,
+          "y": 830
+         }
+        ],
+        "start": 81,
+        "scale": [
+         {
+          "frame": 81,
+          "value": 0.088
+         },
+         {
+          "frame": 93,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-10",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 940
+         }
+        ],
+        "start": 82,
+        "scale": [
+         {
+          "frame": 82,
+          "value": 0.088
+         },
+         {
+          "frame": 94,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-11",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 340,
+          "y": 940
+         }
+        ],
+        "start": 83,
+        "scale": [
+         {
+          "frame": 83,
+          "value": 0.088
+         },
+         {
+          "frame": 95,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-12",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 940
+         }
+        ],
+        "start": 84,
+        "scale": [
+         {
+          "frame": 84,
+          "value": 0.088
+         },
+         {
+          "frame": 96,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-13",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 740,
+          "y": 940
+         }
+        ],
+        "start": 85,
+        "scale": [
+         {
+          "frame": 85,
+          "value": 0.088
+         },
+         {
+          "frame": 97,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-14",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 940,
+          "y": 940
+         }
+        ],
+        "start": 86,
+        "scale": [
+         {
+          "frame": 86,
+          "value": 0.088
+         },
+         {
+          "frame": 98,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-15",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 140,
+          "y": 1050
+         }
+        ],
+        "start": 87,
+        "scale": [
+         {
+          "frame": 87,
+          "value": 0.088
+         },
+         {
+          "frame": 99,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-16",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 340,
+          "y": 1050
+         }
+        ],
+        "start": 88,
+        "scale": [
+         {
+          "frame": 88,
+          "value": 0.088
+         },
+         {
+          "frame": 100,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-17",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1050
+         }
+        ],
+        "start": 89,
+        "scale": [
+         {
+          "frame": 89,
+          "value": 0.088
+         },
+         {
+          "frame": 101,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-18",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 740,
+          "y": 1050
+         }
+        ],
+        "start": 90,
+        "scale": [
+         {
+          "frame": 90,
+          "value": 0.088
+         },
+         {
+          "frame": 102,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "ecran-19",
+        "type": "asset",
+        "asset": {
+         "id": "ast_496bdca7a9dd",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 940,
+          "y": 1050
+         }
+        ],
+        "start": 91,
+        "scale": [
+         {
+          "frame": 91,
+          "value": 0.088
+         },
+         {
+          "frame": 103,
+          "value": 0.22
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "textes",
+      "objects": [
+       {
+        "id": "dix",
+        "type": "text",
+        "text": {
+         "content": "10 caméras",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 200
+         }
+        ],
+        "start": 28,
+        "opacity": [
+         {
+          "frame": 28,
+          "value": 0
+         },
+         {
+          "frame": 38,
+          "value": 1
+         }
+        ],
+        "end": 228
+       },
+       {
+        "id": "vingt",
+        "type": "text",
+        "text": {
+         "content": "20 écrans",
+         "style": "label"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 600
+         }
+        ],
+        "start": 72,
+        "opacity": [
+         {
+          "frame": 72,
+          "value": 0
+         },
+         {
+          "frame": 82,
+          "value": 1
+         }
+        ],
+        "end": 124
+       },
+       {
+        "id": "question",
+        "type": "text",
+        "text": {
+         "content": "?",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 600
+         }
+        ],
+        "start": 124,
+        "scale": [
+         {
+          "frame": 124,
+          "value": 0.64
+         },
+         {
+          "frame": 136,
+          "value": 1.6
+         }
+        ],
+        "easing": "spring"
+       },
+       {
+        "id": "bon-ecran",
+        "type": "text",
+        "text": {
+         "content": "La bonne image au bon endroit ?",
+         "style": "subtitle"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 1150
+         }
+        ],
+        "start": 152,
+        "opacity": [
+         {
+          "frame": 152,
+          "value": 0
+         },
+         {
+          "frame": 162,
+          "value": 1
+         }
+        ]
+       },
+       {
+        "id": "suite",
+        "type": "text",
+        "text": {
+         "content": "Prochain épisode !",
+         "style": "title"
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 540,
+          "y": 200
+         }
+        ],
+        "start": 228,
+        "scale": [
+         {
+          "frame": 228,
+          "value": 0.4
+         },
+         {
+          "frame": 240,
+          "value": 1.0
+         }
+        ],
+        "easing": "spring"
+       }
+      ]
+     },
+     {
+      "id": "personnages",
+      "objects": [
+       {
+        "id": "voltix",
+        "type": "asset",
+        "asset": {
+         "id": "ast_1c58f330043c",
+         "version": 1
+        },
+        "position": [
+         {
+          "frame": 0,
+          "x": 880,
+          "y": 1500
+         }
+        ],
+        "scale": [
+         {
+          "frame": 0,
+          "value": 0.5
+         }
+        ],
+        "expressions": [
+         {
+          "frame": 0,
+          "name": "surprise"
+         },
+         {
+          "frame": 124,
+          "name": "confusion"
+         },
+         {
+          "frame": 228,
+          "name": "sourire"
+         }
+        ],
+        "gestures": [
+         {
+          "start": 6,
+          "end": 116,
+          "name": "montrer"
+         },
+         {
+          "start": 262,
+          "end": 302,
+          "name": "saluer"
+         }
+        ],
+        "lipsync": true
+       }
+      ]
+     }
+    ],
+    "camera": {
+     "keyframes": [
+      {
+       "frame": 0,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.0,
+       "rotation": 0
+      },
+      {
+       "frame": 320,
+       "x": 540,
+       "y": 960,
+       "zoom": 1.04,
+       "rotation": 0
+      }
+     ]
+    },
+    "speech": {
+     "speaker": "voltix",
+     "cues": [
+      {
+       "text": "Mais maintenant, imaginez dix caméras et vingt écrans…",
+       "start": 6,
+       "end": 116
+      },
+      {
+       "text": "Comment envoyer la bonne image au bon endroit ?",
+       "start": 124,
+       "end": 220
+      },
+      {
+       "text": "Réponse dans la prochaine vidéo !",
+       "start": 228,
+       "end": 296
+      }
+     ]
+    },
+    "fallback": {
+     "type": "still",
+     "frame": 144
+    },
+    "transition_in": {
+     "type": "fade",
+     "frames": 8
+    },
+    "transition_out": {
+     "type": "fade",
+     "frames": 12
+    }
+   }
+  }
+ ],
+ "frozen": {
+  "at": "2026-11-13T19:01:26+00:00",
+  "assets": [
+   {
+    "id": "ast_0f62fc7c6b78",
+    "version": 1,
+    "sha256": "3ac0a45fb9f497d4567d0920465008ff8a67730e592d528fd00d9b0c8e01484f",
+    "kind": "prop",
+    "name": "Paquet numérique"
+   },
+   {
+    "id": "ast_1820e0445322",
+    "version": 1,
+    "sha256": "5612cf80e13b8baa20ec155fa86f346a0478a158bcb71193eae3ba81bb47cfd8",
+    "kind": "prop",
+    "name": "Box TV"
+   },
+   {
+    "id": "ast_1c58f330043c",
+    "version": 1,
+    "sha256": "ddf8a04d0177474ab09335994ced9f825e05ade1630a8157760e1afee31dce97",
+    "kind": "character",
+    "name": "Voltix — marionnette"
+   },
+   {
+    "id": "ast_2520cd50f3de",
+    "version": 1,
+    "sha256": "ca688c15c434e4698c6490939a93efff7f73c24a51f9a47dd0b4ab98e57b448c",
+    "kind": "prop",
+    "name": "Fiche HDMI — vue de face"
+   },
+   {
+    "id": "ast_26c2a5f8c4da",
+    "version": 1,
+    "sha256": "0d9cbfb3eeba579618960cbd013cdb5c8edaf0f6e05f9d9201ac1f61e6748f06",
+    "kind": "prop",
+    "name": "Fiche DisplayPort — vue de face"
+   },
+   {
+    "id": "ast_34dbc729b004",
+    "version": 1,
+    "sha256": "781bd0a50f3e4c51513fb4ac5cf21f35d5dc074b94c9eecba7e64693ef803414",
+    "kind": "prop",
+    "name": "Icône audio"
+   },
+   {
+    "id": "ast_3bb7d1617029",
+    "version": 1,
+    "sha256": "8352fed3fa3570cfb6cc5f4d8e556a50f871d66b3ecd10fed45f6bf2fc96948c",
+    "kind": "prop",
+    "name": "Fiche BNC mâle"
+   },
+   {
+    "id": "ast_496bdca7a9dd",
+    "version": 1,
+    "sha256": "45c9ecafb7ab443f3d0e1a99d51a9686547e5b9865eed42e9b863f6e63701948",
+    "kind": "prop",
+    "name": "Moniteur de contrôle"
+   },
+   {
+    "id": "ast_4cf70f8b68fa",
+    "version": 1,
+    "sha256": "b9ee29528da4a07dde80647ee6e1c76ce160b800acab616abf0e0614b2d69d09",
+    "kind": "prop",
+    "name": "Embase BNC femelle"
+   },
+   {
+    "id": "ast_5af57f67f897",
+    "version": 1,
+    "sha256": "d3a515094ded949df9f361b69b8dd96c046eec1185bb053874e0cdaaf9080116",
+    "kind": "prop",
+    "name": "Antenne TV râteau"
+   },
+   {
+    "id": "ast_5edaf081ffd0",
+    "version": 1,
+    "sha256": "606b5f1c4cbf1c39d85c268bcb04861e726e97db971a49c5b0963c6b0ebc17fe",
+    "kind": "prop",
+    "name": "Câble d'antenne TV"
+   },
+   {
+    "id": "ast_6d3fc46bfd5f",
+    "version": 1,
+    "sha256": "8ea5b0e96dc749b6346808d2134475b7abe6e88b94119308f48f9ce6a76c42e6",
+    "kind": "prop",
+    "name": "Projecteur de plateau"
+   },
+   {
+    "id": "ast_7941ca8e5aab",
+    "version": 1,
+    "sha256": "da9c1dd045bcb6fefeda8962907407c466b1e0a0a7e913dbe25e5d6531600d76",
+    "kind": "prop",
+    "name": "Plateau TV"
+   },
+   {
+    "id": "ast_8f8fbfdbb763",
+    "version": 1,
+    "sha256": "d29ce7221cade4aa8a1fe3325deab793b2a717fed3d9bc40e5b5591099f50b7b",
+    "kind": "prop",
+    "name": "Image affichée"
+   },
+   {
+    "id": "ast_90219e731075",
+    "version": 1,
+    "sha256": "f0a6e63087e6d244028bb37a555aa1d8c454323b4f63fbce76f1aae9a80b7cce",
+    "kind": "prop",
+    "name": "Icône vidéo"
+   },
+   {
+    "id": "ast_98b776558642",
+    "version": 1,
+    "sha256": "5a5027e96dcf0f3a39f9e3e07e15362d1c9354ac5b25313a21b33d39f4bd066b",
+    "kind": "prop",
+    "name": "Étiquette 75 Ω"
+   },
+   {
+    "id": "ast_9de03eaf0b1c",
+    "version": 1,
+    "sha256": "0b5dbb6d35905ab18d74a688e5b7bf973be622f2a9ab32f72a912eefe7358d9c",
+    "kind": "prop",
+    "name": "Téléviseur"
+   },
+   {
+    "id": "ast_a43bdc8e8d70",
+    "version": 1,
+    "sha256": "acc1ce69fb23ffa66d832af37054fd4ccf396d4959e21c58b8d91d8b91cf04b7",
+    "kind": "prop",
+    "name": "Câble SDI droit"
+   },
+   {
+    "id": "ast_a79a8b64fb17",
+    "version": 1,
+    "sha256": "03559686d23c85b65f266b80697e7a9f78ed9330267e399ca5dc3761f204f684",
+    "kind": "prop",
+    "name": "Fiche VGA — vue de face"
+   },
+   {
+    "id": "ast_cd5cb31ca13f",
+    "version": 1,
+    "sha256": "06907655ef0dbcd8b5b8e1cba8c5cfbabbd586fb0e187b23e82ae27e45a9fc1a",
+    "kind": "prop",
+    "name": "Câble domestique HDMI / DP"
+   },
+   {
+    "id": "ast_e97b00859ef8",
+    "version": 1,
+    "sha256": "238ac8dc6c3a6d6ae3df44551e3879a78f3ebb31efacaad8b6a85984c094eb4f",
+    "kind": "prop",
+    "name": "Ordinateur"
+   },
+   {
+    "id": "ast_ea94187ca0fb",
+    "version": 1,
+    "sha256": "49afc499e0c88bc72db5b4be96e1f1021ef7d0485c1d52db7d8a1c7704f296b9",
+    "kind": "prop",
+    "name": "Moniteur d'ordinateur"
+   },
+   {
+    "id": "ast_f6cd8ffd19c2",
+    "version": 1,
+    "sha256": "a2acb5b47fd85b79d6473eea38770309556418f3c85c9f3b01d699abd6aa4b80",
+    "kind": "prop",
+    "name": "Caméra de plateau"
+   }
+  ],
+  "sha256": "de35619b4c5518566a763bbe33b03149115daac0bd49a1ed8d03dca49fb21d71"
+ }
+}

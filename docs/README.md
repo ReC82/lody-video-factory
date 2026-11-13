@@ -36,6 +36,10 @@ ainsi que l'existence des fichiers liés.
   prononciation, cache, piste calée et repères recalés pour la bouche et les sous-titres (#164).
 - [Recette contrôlée du rendu 2D parlé](lody-recette-dev-2d.md) — prérequis DEV, jeu de test 2 scènes
   Voltix V1/V2/V3, coût ElevenLabs estimé et plafonné, autorisation écrite, critères PASS/FAIL (#187).
+- [Épisode « Voltix explique le câble SDI »](animation/voltix-137/README.md) (#137) — script chronométré,
+  storyboard 9 scènes, schémas SVG coaxial / BNC, preset, estimation des coûts, MP4 provisoire.
+  **V3 « du HDMI familier au SDI »** : [script, storyboard 8 scènes, kit de 2 échantillons ElevenLabs,
+  animatique muette](animation/voltix-137/v3/README.md).
 
 ## Voix
 

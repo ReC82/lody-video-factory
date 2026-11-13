@@ -1,0 +1,192 @@
+{
+ "cps": 15.0,
+ "duration_seconds": 64.73,
+ "scenes": {
+  "maison": {
+   "offset": 0,
+   "duration": 382,
+   "cues": [
+    {
+     "text": "Vous connaissez sûrement le câble HDMI",
+     "start": 6,
+     "end": 84
+    },
+    {
+     "text": "qui relie votre box à votre télé.",
+     "start": 86,
+     "end": 154
+    },
+    {
+     "text": "Ou le DisplayPort de votre écran d'ordinateur.",
+     "start": 162,
+     "end": 256
+    },
+    {
+     "text": "Et avant, il y avait le VGA, pour l'image analogique.",
+     "start": 264,
+     "end": 372
+    }
+   ]
+  },
+  "studio": {
+   "offset": 382,
+   "duration": 172,
+   "cues": [
+    {
+     "text": "Mais dans les studios télé,",
+     "start": 6,
+     "end": 62
+    },
+    {
+     "text": "on utilise souvent une autre connexion : le SDI.",
+     "start": 64,
+     "end": 162
+    }
+   ]
+  },
+  "distance": {
+   "offset": 554,
+   "duration": 208,
+   "cues": [
+    {
+     "text": "Pourquoi ?",
+     "start": 6,
+     "end": 28
+    },
+    {
+     "text": "D'abord, parce qu'on peut transporter l'image plus loin,",
+     "start": 36,
+     "end": 150
+    },
+    {
+     "text": "avec un câble adapté.",
+     "start": 152,
+     "end": 196
+    }
+   ]
+  },
+  "son": {
+   "offset": 762,
+   "duration": 176,
+   "cues": [
+    {
+     "text": "Et le SDI peut aussi transporter le son avec l'image,",
+     "start": 6,
+     "end": 114
+    },
+    {
+     "text": "sans câble audio séparé.",
+     "start": 116,
+     "end": 166
+    }
+   ]
+  },
+  "coaxial": {
+   "offset": 938,
+   "duration": 322,
+   "cues": [
+    {
+     "text": "Physiquement, il utilise souvent un câble coaxial,",
+     "start": 6,
+     "end": 108
+    },
+    {
+     "text": "comme ceux des antennes de télé.",
+     "start": 110,
+     "end": 176
+    },
+    {
+     "text": "Mais attention :",
+     "start": 184,
+     "end": 218
+    },
+    {
+     "text": "tous les câbles coaxiaux ne conviennent pas !",
+     "start": 220,
+     "end": 312
+    }
+   ]
+  },
+  "ohms": {
+   "offset": 1260,
+   "duration": 190,
+   "cues": [
+    {
+     "text": "Pour le SDI, on utilise une liaison à soixante-quinze ohms,",
+     "start": 6,
+     "end": 126
+    },
+    {
+     "text": "avec du matériel adapté.",
+     "start": 128,
+     "end": 178
+    }
+   ]
+  },
+  "conclusion": {
+   "offset": 1450,
+   "duration": 172,
+   "cues": [
+    {
+     "text": "Voilà pourquoi on trouve tant de",
+     "start": 6,
+     "end": 72
+    },
+    {
+     "text": "connexions SDI en vidéo professionnelle !",
+     "start": 74,
+     "end": 158
+    }
+   ]
+  },
+  "teaser": {
+   "offset": 1622,
+   "duration": 320,
+   "cues": [
+    {
+     "text": "Mais maintenant, imaginez dix caméras et vingt écrans…",
+     "start": 6,
+     "end": 116
+    },
+    {
+     "text": "Comment envoyer la bonne image au bon endroit ?",
+     "start": 124,
+     "end": 220
+    },
+    {
+     "text": "Réponse dans la prochaine vidéo !",
+     "start": 228,
+     "end": 296
+    }
+   ]
+  }
+ },
+ "samples": {
+  "steps": [
+   {
+    "version": "V1",
+    "calls": 2,
+    "characters": 249,
+    "scenes": [
+     1,
+     2
+    ],
+    "texts": [
+     "Vous connaissez sûrement le câble HDMI qui relie votre box à votre télé. Ou le DisplayPort de votre écran d'ordinateur. Et avant, il y avait le VGA, pour l'image analogique.",
+     "Mais dans les studios télé, on utilise souvent une autre connexion : le SDI."
+    ]
+   }
+  ],
+  "calls": 2,
+  "characters": 249,
+  "worst_case_characters": 747,
+  "cap": 750,
+  "within_cap": true
+ },
+ "full_after_samples": {
+  "characters_total": 856,
+  "characters_samples_reused": 249,
+  "characters_to_pay": 607,
+  "calls": 6
+ }
+}
