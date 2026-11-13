@@ -2194,7 +2194,7 @@ def finalize_run(con, run_id):
                         "Répondre dans le ticket GitHub : la réponse est détectée et le travail reprend automatiquement."])
     # #215 : sujet appariable au mail DÉMARRAGE (même numéro, même run).
     queue_notification(con, f"run:{run_id}", r["issue"], state,
-                       f"{NOTIFY_PREFIX} FIN #{r['issue']} — {state.split(' — ')[0]} — {short_title(t['title'])}"
+                       f"{NOTIFY_PREFIX} FIN #{r['issue']} — {' — '.join(state.split(' — ')[:2])} — {short_title(t['title'])}"
                        f" · run {run_id}", redact(body), path.name, md)
 
 
@@ -2480,8 +2480,9 @@ def queue_start_mail(con, s, t, reason=""):
     lines += [f"- {x}" for x in plan] or [f"- Plan non annoncé par la session ({reason or 'aucune déclaration'}) :"
                                           " rien n'est inventé ici, voir le ticket."]
     lines += ["", f"Suivi : https://github.com/{REPO}/issues/{n}", "",
-              f"Un email FIN #{n} (même run {run}) suivra : terminé, PR en CI, à tester, bloqué, échec ou "
-              "interruption. Tant qu'il n'est pas arrivé, la tentative est en cours."]
+              f"Un email FIN #{n} (même run {run}) suivra : code terminé / PR en CI, bloqué, échec ou "
+              "interruption. Tant qu'il n'est pas arrivé, la tentative est en cours. Une FIN ne veut pas dire "
+              "« en ligne » : seule la mise en ligne vérifiée (#221) l'annonce."]
     queue_notification(con, key, n, "Démarrage",
                        f"{NOTIFY_PREFIX} DÉMARRAGE #{n} — {short_title(t['title'])} · run {run}",
                        redact("\n".join(lines)))

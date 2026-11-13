@@ -55,7 +55,7 @@ def test_normal_run_sends_one_start_mail_then_ci_transition_then_end_with_same_r
     poll(orch)
     assert kinds(orch) == ["start", "wait", "run"]
     fin = mails(orch)[-1]
-    assert fin["subject"] == f"[Lody Video Factory] FIN #212 — à tester — Retour rapide au projet · run {run}"
+    assert fin["subject"] == f"[Lody Video Factory] FIN #212 — à tester — CI verte — Retour rapide au projet · run {run}"
     assert "Temps de session Claude" in fin["body"] and "Attente de CI après la session" in fin["body"]
     assert "ci_ended" in marks(orch, 212, run)
     assert orch.con.execute("SELECT at FROM lifecycle WHERE issue=212 AND run_id='' AND kind='pr_opened'"

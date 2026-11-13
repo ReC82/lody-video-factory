@@ -99,7 +99,7 @@ def test_delivery_report_waits_for_ci_then_is_published_once_and_mailed(orch, mo
         assert part in body, part
     orch.mod.flush_notifications(orch.con)
     (msg,) = FakeSMTP.sent
-    assert msg["Subject"] == f"[Lody Video Factory] FIN #1 — à tester — Index de la doc · run {r['run_id']}"
+    assert msg["Subject"] == f"[Lody Video Factory] FIN #1 — à tester — CI verte — Index de la doc · run {r['run_id']}"
     assert msg["To"] == "owner@example.invalid"
     assert r["comment_url"] in msg.get_body(("plain",)).get_content()
     (att,) = list(msg.iter_attachments())
