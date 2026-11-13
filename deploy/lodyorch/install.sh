@@ -149,6 +149,8 @@ if [ "$ISOLATION" = 1 ]; then
     if [ -d "$BASE/repo/.git" ]; then
         as_user git -C "$BASE/repo" config --local --replace-all credential.https://github.com.helper ""
         as_user git -C "$BASE/repo" config --local --add credential.https://github.com.helper "$DEST/bin/git-credential-lodyorch"
+    else
+        echo "  clone dédié $BASE/repo absent : assistant git-credential-lodyorch à configurer après le clonage (relancer --isolation)"
     fi
 fi
 

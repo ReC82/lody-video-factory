@@ -461,7 +461,10 @@ def test_install_isolation_dry_run_never_writes_nor_reads_secrets(tmp_path):
     assert any("-m 0750 /etc/lodyorch" in a for a in actions)
     assert any("merge-broker.env" in a and "0640" in a for a in actions) or "conservé" in out.stdout
     assert any("/opt/lodyorch/bin/gh" in a for a in actions)
-    assert any("git-credential-lodyorch" in a and "credential.https://github.com.helper" in a for a in actions)
+    # L'assistant Git n'est posé que si le clone dédié existe (absent sur un runner CI) ; sinon le
+    # script le dit explicitement au lieu de sauter l'étape en silence.
+    assert (any("git-credential-lodyorch" in a and "credential.https://github.com.helper" in a for a in actions)
+            or "assistant git-credential-lodyorch à configurer après le clonage" in out.stdout)
     # Aucun secret n'est copié, affiché ni déposé par le script ; rien n'est démarré.
     assert not any(re.search(r"(install|cp)\b.*(merge-token|app-key\.pem)", a) for a in actions)
     assert not any(re.search(r"systemctl (enable|start|restart)", a) for a in actions)
