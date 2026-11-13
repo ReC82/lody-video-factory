@@ -84,7 +84,8 @@ def render_header(with_home_link: bool) -> None:
             '<span class="badge">Bêta</span></div>',
             unsafe_allow_html=True,
         )
-        if with_home_link:
+        # Pages de premier niveau (#213) : la barre Projets / Personnages / Ressources remplace ce lien.
+        if with_home_link and nav.current_route().view not in nav.TOP_LEVEL_VIEWS:
             st.button(
                 "Tous les projets",
                 icon=":material/arrow_back:",

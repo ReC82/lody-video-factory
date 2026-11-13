@@ -53,6 +53,22 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent-1) !impo
 .st-key-topbar > div:first-child { margin-right: auto; }
 .st-key-topbar > div:first-child, .st-key-topbar > div:first-child .stMarkdown > div { min-height: 32px; }
 .brand { display: flex; align-items: center; gap: 0.7rem; }
+
+/* ---- Navigation globale Projets / Personnages / Ressources (#213) ---- */
+.st-key-global_nav { gap: 0.4rem; flex-wrap: nowrap; margin-top: 0.25rem; }
+.st-key-global_nav > div { flex: 1 1 0; min-width: 0; }
+.st-key-global_nav button { min-height: 2.75rem; padding: 0.35rem 0.5rem !important; }
+.st-key-global_nav button:disabled { opacity: 1; }
+.st-key-global_nav button p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-key-resume_row button { min-height: 2.75rem; max-width: 100%; }
+.st-key-resume_row button p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero.hero-compact { padding-top: 0.8rem; }
+@media (max-width: 480px) {
+  /* Trois libellés entiers sur 360-390 px : sans icône, marges réduites. */
+  .stApp .st-key-global_nav span:has(> [data-testid="stIconMaterial"]) { display: none; }
+  .stApp .st-key-global_nav button { padding: 0.35rem 0.2rem !important; }
+  .stApp .st-key-global_nav button p { font-size: 0.92rem; }
+}
 .brand-name { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.01em; color: var(--text); }
 .badge {
   font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
