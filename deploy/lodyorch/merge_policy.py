@@ -214,10 +214,20 @@ def evaluate_ci(runs, files):
     return Check("ci", True, f"{len(latest)} vérification(s), requises vertes : {', '.join(required)}")
 
 
+def ux_safe_verdict(files):
+    """Classification `ux-safe` (#221), module installé à côté de celui-ci (import différé)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import ux_safe  # noqa: PLC0415
+    return ux_safe.classify(files)
+
+
 def evaluate(facts):
     """Décision cumulative. `facts` : pr, files, commits, reviews, check_runs, ticket, ticket_events,
-    et facultativement `base_compare` (base en retard) et `authorized_after` (horodatage ISO : une
-    autorisation antérieure ne vaut rien — pas de fusion rétroactive à l'activation).
+    et facultativement `base_compare` (base en retard), `authorized_after` (horodatage ISO : une
+    autorisation antérieure ne vaut rien — pas de fusion rétroactive à l'activation) et `ux_safe_auto`
+    (#221 : une PR classée `ux-safe` par le code vaut autorisation, voir `ux_safe.py`).
     Chaque critère est évalué (pas d'arrêt au premier refus) pour une matrice complète et lisible."""
     pr = facts.get("pr") or {}
     files = facts.get("files") or []
@@ -255,9 +265,22 @@ def evaluate(facts):
     add("ticket-agent-auto", REQUIRED_TICKET_LABEL in t_labels, f"labels ticket : {sorted(t_labels)}", info=True)
     auth = last_label_event(facts.get("ticket_events"), AUTHORIZE_LABEL) or {}
     actor = (auth.get("actor") or {}).get("login")
-    add("autorisation-merge-auto", AUTHORIZE_LABEL in t_labels and actor in TRUSTED_ACTORS,
-        f"`{AUTHORIZE_LABEL}` " + (f"posé par {actor}" if actor else "absent ou posé par un compte non autorisé"), info=True)
+    by_label = AUTHORIZE_LABEL in t_labels and actor in TRUSTED_ACTORS
     after = facts.get("authorized_after")
+    # #221 : livraison UX automatique activée par le propriétaire (`ux_safe_auto`) — une PR classée
+    # `ux-safe` PAR LE CODE (diff réel) vaut autorisation sans `merge:auto`. Non rétroactif : la PR
+    # doit être ouverte après l'activation du mode `on`. Vetos, CI et toutes les autres règles restent.
+    ux = ux_safe_verdict(files) if facts.get("ux_safe_auto") and not by_label else None
+    if ux is not None:
+        add("classification-ux-safe", ux.eligible, ux.summary(), info=True)
+        if after:
+            opened = pr.get("created_at") or ""
+            add("ux-safe-apres-activation", bool(opened) and opened >= after,
+                f"PR ouverte le {opened or '?'} ; activation le {after} : aucune PR antérieure fusionnée sans `merge:auto`")
+        after = None
+    add("autorisation-merge-auto", by_label or bool(ux and ux.eligible),
+        f"`{AUTHORIZE_LABEL}` " + (f"posé par {actor}" if actor else "absent ou posé par un compte non autorisé")
+        + (" ; changement classé `ux-safe` par le code" if ux and ux.eligible else ""), info=True)
     if after:
         when = auth.get("created_at") or ""
         add("autorisation-apres-activation", bool(when) and when >= after,

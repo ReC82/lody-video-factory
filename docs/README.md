@@ -56,6 +56,8 @@ ainsi que l'existence des fichiers liés.
 - [Rétention Docker, versions reproductibles et worktrees](lody-retention.md) — livraison tracée par SHA
   (`scripts/lody-deploy.sh`), journal des releases et retour arrière vérifié, rétention des images en simulation
   par défaut, alertes disque 75/85 %, nettoyage sûr des worktrees LODYORCH (#209).
+- [Livraison UX automatique](lody-livraison-ux.md) — classification `ux-safe` par le code, livreur de
+  l'hôte (CI verte, aucun rendu actif, retour arrière), mails « EN LIGNE — prêt à tester » ; procédure #195 (#221).
 
 ## Intégration continue
 

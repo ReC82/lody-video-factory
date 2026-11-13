@@ -143,7 +143,7 @@ def test_on_merges_authorized_pr_with_expected_sha_keeps_ticket_to_test(orch, mo
     lines = poll(orch)
     assert merges(orch) == [{"pr": num, "sha": SHA, "merge_method": "merge",
                              "commit_title": f"Merge pull request #{num} (fusion automatique lodyorch, #1)"}]
-    assert lines and "PR #91 fusionnée" in lines[0] and "test à faire" in lines[0]
+    assert lines and "PR #91 fusionnée" in lines[0] and "pas encore en ligne" in lines[0]
     t = orch.mod.task(orch.con, 1)
     assert (t["status"], t["ci_state"]) == ("WAITING_OWNER", "merged") and "non déployée" in t["ci_detail"]
     gh = orch.gh()

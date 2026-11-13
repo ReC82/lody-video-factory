@@ -140,6 +140,13 @@ CI_FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_fa
 # sessions) ; le mode effectif est le plus bas entre ce plafond et `lodyorch automerge <mode>`.
 MERGE_MODES = ("off", "dry-run", "on")
 AUTO_MERGE_CEILING = os.environ.get("LQ_AUTO_MERGE", "off").strip().lower()
+# Livraison UX automatique (#221) : une PR classée `ux-safe` par le code (deploy/lodyorch/ux_safe.py)
+# vaut autorisation sans `merge:auto`. Plafond root, désactivé par défaut ; la fusion réelle suit
+# toujours le mode `automerge` (dry-run → simulation seulement).
+UX_SAFE_AUTO = os.environ.get("LQ_UX_SAFE_AUTO", "0") == "1"
+# Journal d'états écrit par le livreur côté hôte (scripts/lody_ux_deliver.py), lu ici pour les mails
+# « Déploiement en cours », « EN LIGNE — prêt à tester », « Déploiement échoué / retour arrière ».
+UX_DELIVERY_JOURNAL = os.environ.get("LQ_UX_DELIVERY_JOURNAL", "")
 if AUTO_MERGE_CEILING not in MERGE_MODES:
     AUTO_MERGE_CEILING = "off"
 PRIORITY_RE = re.compile(r"(?i)^priority\s*:\s*(.*)$")
@@ -1591,12 +1598,14 @@ def after_auto_merge(con, issue, num, head_sha, merge_sha):
             event(con, issue, "gh_error", "Ticket fermé par la fusion et non rouvert : le rouvrir pour le test.")
     set_status_label(con, issue, "WAITING_OWNER")
     gh_call("-X", "POST", f"repos/{REPO}/issues/{issue}/comments", "-f",
-            f"body={BOT_MARKER}\n**PR #{num} fusionnée automatiquement** dans `main` (tête `{head_sha[:10]}`, "
-            f"fusion `{merge_sha[:10]}`) : CI verte, `merge:auto`, politique revalidée juste avant.\n\n"
-            "**Non déployée.** Le ticket reste `à tester` : la fermeture suit votre vérification.")
+            f"body={BOT_MARKER}\n**CI verte — fusionné** : PR #{num} fusionnée automatiquement dans `main` (tête `{head_sha[:10]}`, "
+            f"fusion `{merge_sha[:10]}`), politique revalidée juste avant.\n\n"
+            "**Pas encore en ligne.** Une PR classée `ux-safe` est mise en ligne par le livreur de l'hôte "
+            "(mail « EN LIGNE — prêt à tester » avec preuve) ; sinon, livraison manuelle. Le ticket reste "
+            "`à tester` : la fermeture suit votre vérification.")
     finalize_pending_runs(con, issue)
     title = t["title"] if t else ""
-    return f"#{issue} — PR #{num} fusionnée ({merge_sha[:10]}) — {title} — test à faire"
+    return f"#{issue} — PR #{num} fusionnée ({merge_sha[:10]}) — {title} — pas encore en ligne"
 
 
 def try_auto_merge(con, t, mode):
@@ -1620,7 +1629,7 @@ def try_auto_merge(con, t, mode):
         return None
     asked = mp.AUTHORIZE_LABEL in mp._labels(it)
     head = (pr.get("head") or {}).get("sha", "")
-    if not asked and con.execute("SELECT 1 FROM merge_audit WHERE pr=? AND head_sha=? AND mode=?",
+    if not asked and not UX_SAFE_AUTO and con.execute("SELECT 1 FROM merge_audit WHERE pr=? AND head_sha=? AND mode=?",
                                  (num, head, mode)).fetchone():
         return None  # sans autorisation, un seul verdict complet par SHA : pas de collecte répétée
     try:
@@ -1630,9 +1639,12 @@ def try_auto_merge(con, t, mode):
         return None
     if since:
         facts["authorized_after"] = since
+    facts["ux_safe_auto"] = UX_SAFE_AUTO
     decision = mp.evaluate(facts)
     decision.dry_run = mode != "on"
     new = merge_audit(con, n, decision, mode)
+    # Voie `ux-safe` (#221) : le classement par le code vaut demande — verdict commenté une fois.
+    asked = asked or any(c.code == "classification-ux-safe" and c.ok for c in decision.checks)
     if not decision.eligible:
         if new and asked:
             reasons = "\n".join(f"- `{c.code}` : {c.detail or 'non satisfait'}" for c in decision.refusals)
@@ -1653,6 +1665,7 @@ def try_auto_merge(con, t, mode):
         event(con, n, "merge_error", f"PR #{num} : revalidation impossible ({type(exc).__name__}) — pas de fusion.")
         return None
     fresh["authorized_after"] = since
+    fresh["ux_safe_auto"] = UX_SAFE_AUTO
     again = mp.revalidate(decision, fresh)
     again.dry_run = False
     if not again.eligible:
@@ -1709,11 +1722,98 @@ def watch_merges(con):
 def notify_merges(con, lines):
     """Notification concise et groupée : ce qui a été fusionné, et le test humain qui reste à faire."""
     key = "automerge:" + hashlib.sha256("\n".join(lines).encode()).hexdigest()[:16]
-    body = "\n".join(["Fusion automatique (non déployée) :", *[f"- {x}" for x in lines], "",
-                      "Chaque ticket reste « à tester » : vérifier puis fermer. Aucun déploiement n'a été fait.",
+    body = "\n".join(["CI verte — fusionné (pas encore en ligne) :", *[f"- {x}" for x in lines], "",
+                      "La mise en ligne est annoncée séparément (« EN LIGNE — prêt à tester ») par le livreur ;",
+                      "sans ce mail, rien n'est en ligne. Chaque ticket reste « à tester ».",
                       f"Arrêt immédiat : {CLI_NAME} automerge off"])
-    queue_notification(con, key, None, "Fusion automatique", f"{NOTIFY_PREFIX} {len(lines)} PR fusionnée(s) — à tester",
+    queue_notification(con, key, None, "Fusion automatique", f"{NOTIFY_PREFIX} CI verte — fusionné : {len(lines)} PR (pas encore en ligne)",
                        body)
+
+
+# ---------------------------------------------------------------- livraison UX (#221)
+
+# État écrit par le livreur de l'hôte → (titre du mail, commenter les tickets ?). Titres sans ambiguïté :
+# seul « EN LIGNE — prêt à tester » annonce une version réellement servie (preuve dans le journal).
+DELIVERY_TEXT = {
+    "deploying": ("Déploiement en cours", False),
+    "deferred": ("Déploiement différé — rendu ou livraison en cours", False),
+    "online": ("EN LIGNE — prêt à tester", True),
+    "rolled_back": ("Déploiement échoué / retour arrière", True),
+    "failed": ("Déploiement échoué / retour arrière", True),
+    "refused": ("Mise en ligne manuelle requise — changement non ux-safe", True),
+}
+
+
+def delivery_entries(path, offset):
+    """Lignes JSON ajoutées au journal depuis `offset` (octets). Journal tronqué ou remplacé → relu
+    depuis le début (les clés de notification empêchent tout doublon). Ligne incomplète : ignorée."""
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return [], offset
+    if size < offset:
+        offset = 0
+    out = []
+    with open(path, "rb") as fh:
+        fh.seek(offset)
+        data = fh.read()
+    end = data.rfind(b"\n") + 1
+    for raw in data[:end].splitlines():
+        try:
+            entry = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(entry, dict) and entry.get("id") and entry.get("state") and entry.get("target_sha"):
+            out.append(entry)
+    return out, offset + end
+
+
+def delivery_message(e):
+    """(sujet, corps) d'un état de livraison : ticket(s), commit, lien du site, horodatage, preuve."""
+    title, _ = DELIVERY_TEXT.get(e.get("state"), (f"Livraison : {e.get('state')}", False))
+    tickets = [int(x) for x in e.get("tickets") or [] if str(x).isdigit()]
+    sha = str(e.get("target_sha") or "")
+    site = e.get("site_url") or SITE_URL
+    refs = " ".join(f"#{n}" for n in tickets) or "(aucun ticket cité)"
+    lines = [f"{title}", "", f"Tickets : {refs}", f"Commit : {sha[:12] or '?'}",
+             f"Version servie avant : {str(e.get('served_sha') or '?')[:12]}", f"Horodatage : {e.get('at') or '?'}"]
+    if site:
+        lines.append(f"Site : {site}")
+    if e.get("detail"):
+        lines += ["", str(e["detail"])]
+    if e.get("proof"):
+        lines += ["", "Preuve :", *[f"- {k} : {v}" for k, v in e["proof"].items()]]
+    lines += ["", *[f"Ticket : https://github.com/{REPO}/issues/{n}" for n in tickets]]
+    if e.get("state") == "online":
+        lines += ["", "À tester sur le site ; signaler tout défaut dans le ticket."]
+    subject = f"{NOTIFY_PREFIX} {title} — {refs} — {sha[:10]}"
+    return subject, redact("\n".join(lines))
+
+
+def watch_deliveries(con):
+    """Relaie le journal du livreur (#221) : un mail par état et par livraison, et un commentaire dans
+    chaque ticket concerné pour les états finaux. Lecture seule du journal ; aucun déploiement ici."""
+    if not UX_DELIVERY_JOURNAL:
+        return []
+    offset = int(ctl_get(con, "ux_delivery.offset", "0") or 0)
+    entries, new_offset = delivery_entries(UX_DELIVERY_JOURNAL, offset)
+    done = []
+    for e in entries:
+        key = f"delivery:{e['id']}:{e['state']}"
+        if ctl_get(con, key):
+            continue
+        subject, body = delivery_message(e)
+        tickets = [int(x) for x in e.get("tickets") or [] if str(x).isdigit()]
+        queue_notification(con, key, tickets[0] if len(tickets) == 1 else None, "Livraison", subject, body)
+        if DELIVERY_TEXT.get(e["state"], ("", False))[1]:
+            for n in tickets:
+                gh_call("-X", "POST", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={BOT_MARKER}\n{body}")
+        for n in tickets:
+            event(con, n, "delivery", subject[:300])
+        ctl_set(con, key, iso())
+        done.append(subject)
+    ctl_set(con, "ux_delivery.offset", new_offset)
+    return done
 
 
 CI_TEXT = {"pending": "CI en attente", "success": "CI validée", "failed": "CI en échec", "merged": "fusionnée",
@@ -1788,7 +1888,7 @@ def after_outcome(con, issue, session_id, session_started, report):
         questions = [t["blockers"]]
     if status == "FAILED" and not questions:
         questions = [t["blockers"] or "Échec répété des sessions : voir les journaux."]
-    kind = {"WAITING_OWNER": "Livré — en attente de validation", "DONE": "Terminé",
+    kind = {"WAITING_OWNER": "Travail terminé — PR prête", "DONE": "Clos sans mise en ligne",
             "FAILED": "Échec — intervention nécessaire"}.get(status, "Question bloquante")
     state = t["commit_sha"] or session_id if status in ("WAITING_OWNER", "DONE") else "\n".join(questions)
     key = f"{issue}:{kind}:{hashlib.sha256(state.encode()).hexdigest()[:16]}"
@@ -1822,8 +1922,8 @@ def after_outcome(con, issue, session_id, session_started, report):
 
 # ---------------------------------------------------------------- notifications email
 
-STATE_TEXT = {"WAITING_OWNER": os.environ.get("LQ_WAITING_TEXT", "installé, à tester"),
-              "DONE": "terminé", "FAILED": "en échec — intervention nécessaire"}
+STATE_TEXT = {"WAITING_OWNER": os.environ.get("LQ_WAITING_TEXT", "Travail terminé — PR prête (non fusionnée, non déployée)"),
+              "DONE": "clos sans changement à mettre en ligne", "FAILED": "en échec — intervention nécessaire"}
 
 def queue_notification(con, key, issue, kind, subject, body, attachment_name="", attachment=""):
     """Mise en file (une seule fois par état : clé unique). L'envoi a lieu dans la boucle."""
@@ -1938,11 +2038,14 @@ def finalize_pending_runs(con, issue):
 def report_state(t, outcome):
     """État final lisible : terminé / à tester / bloqué / échec (+ précision)."""
     st, ci = t["status"], t["ci_state"]
+    # #221 : jamais « terminé » seul — l'état dit si c'est une PR, une fusion, ou une mise en ligne.
     if st == "DONE":
-        return "terminé"
+        return "Clos — rien à mettre en ligne"
     if st == "WAITING_OWNER":
-        return {"success": "à tester — CI verte", "merged": "à tester — PR fusionnée par le propriétaire",
-                "pending": "à tester — CI en cours"}.get(ci, "à tester")
+        return {"success": "Travail terminé — PR prête — CI verte, non fusionnée, pas en ligne",
+                "merged": "CI verte — fusionné — pas encore en ligne",
+                "pending": "Travail terminé — PR prête — CI en cours, pas en ligne"}.get(
+                    ci, "Travail terminé — PR prête — pas en ligne")
     if st == "BLOCKED":
         return "bloqué"
     if st == "FAILED":
@@ -2091,7 +2194,7 @@ def finalize_run(con, run_id):
                      + ["", "Le rapport complet est joint (Markdown).",
                         "Répondre dans le ticket GitHub : la réponse est détectée et le travail reprend automatiquement."])
     queue_notification(con, f"run:{run_id}", r["issue"], state,
-                       f"[{REPORT_PROJECT}] #{r['issue']} — {state.split(' — ')[0]} — {t['title']}",
+                       f"[{REPORT_PROJECT}] #{r['issue']} — {' — '.join(state.split(' — ')[:2])} — {t['title']}",
                        redact(body), path.name, md)
 
 
@@ -2277,6 +2380,10 @@ def supervise():
                 watch_merges(con)
             except Exception as exc:  # noqa: BLE001 — idem pour la fusion automatique
                 event(con, None, "merge_error", f"{type(exc).__name__}: {exc}"[:500])
+        try:
+            watch_deliveries(con)
+        except Exception as exc:  # noqa: BLE001 — un journal de livraison illisible n'arrête pas la file
+            event(con, None, "delivery_error", f"{type(exc).__name__}: {exc}"[:500])
         if RUN_REPORTS:
             flush_reports(con)
         if NOTIFY_SMTP_ENV:

@@ -91,7 +91,7 @@ def test_delivery_report_waits_for_ci_then_is_published_once_and_mailed(orch, mo
     (c,) = report_comments(orch, 1)
     body = c["body"]
     assert body.startswith("<!-- lodyorch -->")  # jamais pris pour une réponse du propriétaire
-    for part in ("# Rapport lodyorch — Lody Video Factory — #1", "**à tester — CI verte**", "## 1. Résumé",
+    for part in ("# Rapport lodyorch — Lody Video Factory — #1", "**Travail terminé — PR prête — CI verte, non fusionnée, pas en ligne**", "## 1. Résumé",
                  "## 2. Branche, commits, PR, CI et tests", "CI validée", "`docs/README.md` (added, +39 −0)",
                  "docs: index (#1)", "## 4. Risques, coûts et décisions", "aucun identifié",
                  "1. Ouvrir docs/README.md sur GitHub", "## 6. État final", "## 7. Identification",
@@ -99,7 +99,7 @@ def test_delivery_report_waits_for_ci_then_is_published_once_and_mailed(orch, mo
         assert part in body, part
     orch.mod.flush_notifications(orch.con)
     (msg,) = FakeSMTP.sent
-    assert msg["Subject"] == "[Lody Video Factory] #1 — à tester — Index de la doc"
+    assert msg["Subject"] == "[Lody Video Factory] #1 — Travail terminé — PR prête — Index de la doc"
     assert msg["To"] == "owner@example.invalid"
     assert r["comment_url"] in msg.get_body(("plain",)).get_content()
     (att,) = list(msg.iter_attachments())

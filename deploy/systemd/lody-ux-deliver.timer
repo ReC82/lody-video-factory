@@ -1,0 +1,13 @@
+# #221 — passage du livreur UX toutes les 5 minutes (une seule exécution à la fois : verrou du livreur,
+# puis verrou de lody-deploy.sh partagé avec la rétention).
+[Unit]
+Description=Lody — livraison UX automatique (passage périodique)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Persistent=false
+
+[Install]
+WantedBy=timers.target

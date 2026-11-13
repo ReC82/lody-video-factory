@@ -7,6 +7,9 @@
 >
 > **Mise en service (#205)** : constat et procédure dans
 > [lody-fusion-auto-mise-en-service.md](lody-fusion-auto-mise-en-service.md) — non activée à ce jour ; `dry-run` d'abord, mode réel en attente d'une correction de la séparation des pouvoirs.
+>
+> **Livraison UX (#221)** : voie d'autorisation `ux-safe` (classement par le code, `LQ_UX_SAFE_AUTO`) et
+> mise en ligne par le livreur de l'hôte : [lody-livraison-ux.md](lody-livraison-ux.md).
 
 **Fusion GitHub ≠ déploiement.** Fusionner une PR dans `main` et mettre une version en service sur
 AWS sont deux niveaux distincts, avec des garde-fous distincts. Aucune fusion n'entraîne de
