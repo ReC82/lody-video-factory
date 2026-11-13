@@ -64,3 +64,6 @@ ainsi que l'existence des fichiers liés.
   cumulatifs, exclusions ; fusion par le superviseur après CI verte (#200), à blanc par défaut.
 - [Fusion automatique — mise en service AWS](lody-fusion-auto-mise-en-service.md) — constat du
   13/11, identité GitHub unique (décision propriétaire), risque résiduel, procédure propriétaire pas à pas et livraison #189/#191/#202 (#205).
+- [Isolation des permissions LODYORCH](lody-isolation-permissions.md) — application GitHub pour
+  les sessions, broker de fusion sous un utilisateur Unix dédié, ruleset de `main`, procédure root
+  courte, rollback et kill switch, sans second compte GitHub (#207).

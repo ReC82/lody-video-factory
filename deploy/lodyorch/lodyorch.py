@@ -142,6 +142,22 @@ MERGE_MODES = ("off", "dry-run", "on")
 AUTO_MERGE_CEILING = os.environ.get("LQ_AUTO_MERGE", "off").strip().lower()
 if AUTO_MERGE_CEILING not in MERGE_MODES:
     AUTO_MERGE_CEILING = "off"
+# Isolation des permissions (#207) : la fusion réelle passe par le BROKER (utilisateur Unix
+# lodyorch-merge, seul détenteur du jeton du propriétaire), qui revalide toute la politique. Le
+# superviseur ne fait que déposer une demande dans <LQ_MERGE_BROKER>/requests et lire la réponse.
+# Sans broker, le mode `on` est plafonné à `dry-run` ; LQ_MERGE_DIRECT=1 (fusion par le gh du
+# superviseur, ancien comportement #200) n'est destiné qu'aux tests et à un retour arrière explicite.
+MERGE_BROKER = os.environ.get("LQ_MERGE_BROKER", "").strip()
+MERGE_DIRECT = os.environ.get("LQ_MERGE_DIRECT", "0") == "1"
+MERGE_BROKER_WAIT = int(os.environ.get("LQ_MERGE_BROKER_WAIT", 120))
+# Variables jamais transmises aux sessions Claude : jetons et secrets (par leur nom). Les chemins
+# (…_FILE, …_DIR, …_PATH) ne sont pas des secrets. LQ_SESSION_ENV_KEEP : exceptions explicites
+# (ex. l'authentification de Claude Code elle-même, si elle passe par l'environnement).
+SESSION_ENV_SECRET = re.compile(r"(?i)(TOKEN|SECRET|PASSW(OR)?D|API_?KEY|PRIVATE_?KEY|CREDENTIAL|ACCESS_?KEY|SMTP_)")
+SESSION_ENV_ALWAYS_DROP = {"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN",
+                           "GH_HOST", "GH_CONFIG_DIR", "SSH_AUTH_SOCK", "LQ_REAL_GH"}
+SESSION_ENV_KEEP = {x.strip() for x in os.environ.get("LQ_SESSION_ENV_KEEP", "CLAUDE_CODE_OAUTH_TOKEN").split(",")
+                    if x.strip()}
 PRIORITY_RE = re.compile(r"(?i)^priority\s*:\s*(.*)$")
 TRUSTED_AUTHORS = {"OWNER", "MEMBER", "COLLABORATOR"}
 DEPS_RE = re.compile(r"(?:d[ée]pend(?:ance)?s?\s+(?:de|du|des|d'|on)|bloqu[ée]e?\s+par|blocked\s+by|"
@@ -887,6 +903,24 @@ def classify(exit_code, result, rate_events, killed):
     return "COMPLETED", text[:500], ""
 
 
+def session_env(base, **extra):
+    """Environnement d'une session Claude (#207) : celui du superviseur SANS aucun jeton ni secret
+    (GH_TOKEN, mots de passe, clés…) ni moyen de choisir un autre gh. Le gh des sessions lit le
+    jeton de l'application GitHub lui-même, à chaque appel (bin/gh)."""
+    env = {}
+    for key, value in base.items():
+        if key in SESSION_ENV_KEEP:
+            env[key] = value
+            continue
+        if key in SESSION_ENV_ALWAYS_DROP:
+            continue
+        if SESSION_ENV_SECRET.search(key) and not key.endswith(("_FILE", "_DIR", "_PATH", "_ENV")):
+            continue
+        env[key] = value
+    env.update(extra)
+    return env
+
+
 def run_session(con, t, prepare=None):
     session_id = str(uuid.uuid4())
     log_path = LOG_DIR / f"{iso().replace(':', '')}-{t['issue']}-{session_id[:8]}.jsonl"
@@ -907,8 +941,8 @@ def run_session(con, t, prepare=None):
         if CLAIM_COMMENT:
             claim_issue(con, t["issue"], session_id)
     session_started = iso()
-    env = dict(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
-               LQ_YIELD_FILE=str(yield_file))
+    env = session_env(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
+                      LQ_YIELD_FILE=str(yield_file))
     cmd = [CLAUDE, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--dangerously-skip-permissions", "--session-id", session_id]
     if CLAUDE_SETTINGS:
@@ -1511,6 +1545,9 @@ def auto_merge_mode(con):
     if mode == "on" and not ctl_get(con, "automerge.enabled_at"):
         mode = "dry-run"
     why = f"choisi {chosen}, plafond LQ_AUTO_MERGE={AUTO_MERGE_CEILING}"
+    if mode == "on" and not MERGE_BROKER and not MERGE_DIRECT:
+        mode = "dry-run"
+        why += " ; isolation absente (LQ_MERGE_BROKER vide) : fusion réelle réservée au broker (#207)"
     return mode, why
 
 
@@ -1666,7 +1703,14 @@ def try_auto_merge(con, t, mode):
                 (num, again.head_sha, n, "intent", iso()))
     con.commit()
     try:
-        merge_sha = mp.merge(again, title=f"Merge pull request #{num} (fusion automatique lodyorch, #{n})")
+        if MERGE_BROKER:
+            merge_sha = broker_merge(mp, again, n, since)
+            if merge_sha is None:
+                event(con, n, "merge", f"PR #{num} : demande transmise au broker, réponse attendue "
+                                       "(constatée au prochain tour, jamais rejouée).")
+                return None
+        else:
+            merge_sha = mp.merge(again, title=f"Merge pull request #{num} (fusion automatique lodyorch, #{n})")
     except mp.MergeError as exc:
         con.execute("UPDATE merge_ops SET state='failed', finished_at=?, error=? WHERE pr=? AND head_sha=?",
                     (iso(), redact(str(exc))[:300], num, again.head_sha))
@@ -1679,6 +1723,41 @@ def try_auto_merge(con, t, mode):
     con.commit()
     event(con, n, "merge", f"PR #{num} fusionnée automatiquement ({again.head_sha[:10]} → {merge_sha[:10]}).")
     return after_auto_merge(con, n, num, again.head_sha, merge_sha)
+
+
+def broker_merge(mp, decision, issue, since, wait=None):
+    """Demande de fusion au broker (#207) : fichier `<pr>-<sha>-<nonce>.json` déposé atomiquement,
+    réponse lue dans results/. Rend le SHA de fusion, None si pas de réponse dans le délai (l'intention
+    reste ouverte : recover_merges constate l'état réel), ou lève MergeError (refus, échec GitHub)."""
+    base = Path(MERGE_BROKER)
+    name = f"{decision.pr}-{decision.head_sha}-{uuid.uuid4().hex[:16]}.json"
+    req = {"pr": decision.pr, "head_sha": decision.head_sha, "issue": issue, "mode": "on",
+           "authorized_after": since or "", "requested_at": iso()}
+    tmp = base / "requests" / f".{name}.tmp"
+    try:
+        tmp.write_text(json.dumps(req), encoding="utf-8")
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, base / "requests" / name)
+    except OSError as exc:
+        raise mp.MergeError(None, f"broker injoignable ({type(exc).__name__}) : aucune fusion") from None
+    deadline = time.time() + (MERGE_BROKER_WAIT if wait is None else wait)
+    answer = base / "results" / name
+    while True:
+        if answer.is_file():
+            try:
+                res = json.loads(answer.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                res = {"state": "error", "detail": "réponse illisible"}
+            break
+        if time.time() >= deadline:
+            return None
+        time.sleep(1)
+    if res.get("state") == "merged":
+        return str(res.get("merge_sha") or "")
+    if res.get("state") == "refused":
+        why = "; ".join(f"{r.get('code')} ({r.get('detail')})" for r in res.get("refusals") or [])
+        raise mp.MergeError(None, f"refus du broker : {why or 'politique'}")
+    raise mp.MergeError(res.get("status"), f"broker : {res.get('state')} — {res.get('detail') or ''}")
 
 
 def watch_merges(con):
@@ -3430,6 +3509,59 @@ def cmd_phase(con, args):
     return 0
 
 
+ROOT_SOCKETS = ("/run/docker.sock", "/var/run/docker.sock", "/run/containerd/containerd.sock",
+                "/var/snap/lxd/common/lxd/unix.socket")
+BROKER_SECRETS = ("/etc/lodyorch/merge-token", "/etc/lodyorch/app-key.pem")
+
+
+def isolation_checks(environ=None, sockets=ROOT_SOCKETS, secrets=BROKER_SECRETS, proc_status="/proc/self/status",
+                     real_gh=None):
+    """Contrôles de séparation des privilèges (#207), lecture seule, aucune valeur secrète affichée.
+    Rend des (ok, libellé, détail) ; ok=None = information. Les points ne sont bloquants (✗) qu'une
+    fois le broker configuré (LQ_MERGE_BROKER) : avant, ils décrivent la migration restante."""
+    env = os.environ if environ is None else environ
+    strict = bool(MERGE_BROKER)
+    out = []
+
+    def add(ok, label, detail=""):
+        out.append((ok if (strict or ok) else None, label, detail))
+
+    leaked = sorted(k for k in env if k in SESSION_ENV_ALWAYS_DROP and k.endswith("TOKEN"))
+    add(not leaked, "aucun jeton GitHub dans l'environnement du superviseur", ", ".join(leaked) or "aucun")
+    try:
+        nnp = any(x.split()[-1] == "1" for x in Path(proc_status).read_text().splitlines() if x.startswith("NoNewPrivs"))
+    except OSError:
+        nnp = False
+    add(nnp, "NoNewPrivileges (sudo et setuid inopérants)", "actif" if nnp else "inactif hors du service systemd")
+    open_sockets = [s for s in sockets if os.path.exists(s) and os.access(s, os.W_OK)]
+    add(not open_sockets, "aucun socket donnant root (Docker, containerd, LXD)", ", ".join(open_sockets) or "aucun")
+    readable = [s for s in secrets if os.access(s, os.R_OK)]
+    add(not readable, "secrets du broker illisibles", ", ".join(readable) or "illisibles ou absents")
+    token_file = Path(env.get("LQ_AGENT_TOKEN_FILE", "/var/lib/lodyorch-merge/agent/token"))
+    try:
+        head = token_file.read_text(encoding="utf-8")[:4]
+        age = time.time() - token_file.stat().st_mtime
+        add(head == "ghs_" and age < 3600, "jeton d'agent = jeton d'installation de l'application, récent",
+            f"âge {int(age)} s" + ("" if head == "ghs_" else ", préfixe inattendu"))
+    except OSError:
+        add(False, "jeton d'agent de l'application GitHub", f"{token_file} absent ou illisible")
+    gh = real_gh or env.get("LQ_REAL_GH", "/usr/bin/gh")
+    clean = {k: v for k, v in env.items() if k not in SESSION_ENV_ALWAYS_DROP}
+    try:
+        rc = subprocess.run([gh, "auth", "status", "--hostname", "github.com"], env=clean, capture_output=True,
+                            timeout=20).returncode
+    except (OSError, subprocess.SubprocessError):
+        rc = None
+    add(rc != 0, "aucun identifiant gh enregistré pour le compte de service (jeton du propriétaire retiré)",
+        "gh auth status sans jeton d'agent : " + ("identifiant présent — gh auth logout" if rc == 0 else "aucun"))
+    if MERGE_BROKER:
+        req = Path(MERGE_BROKER) / "requests"
+        add(req.is_dir() and os.access(req, os.W_OK), "file des demandes au broker", str(req))
+    else:
+        out.append((None, "broker de fusion non configuré (LQ_MERGE_BROKER vide)", "mode `on` plafonné à dry-run"))
+    return out
+
+
 def cmd_check(con, _):
     """Contrôles d'installation, en lecture seule : rien n'est démarré, aucun secret n'est affiché.
     Code de sortie 1 si une session serait refusée."""
@@ -3476,6 +3608,12 @@ def cmd_check(con, _):
         _, state = ro_run(["systemctl", "is-active", f"{SERVICE}-notify.timer"])
         print(f"  · envoi des emails : {SERVICE}-notify.timer {state or 'absent'}"
               + ("" if state == "active" else f" (sudo systemctl enable --now {SERVICE}-notify.timer)"))
+    print("  Isolation des permissions (#207) :")
+    for ok, label, detail in isolation_checks():
+        if ok is None:
+            print(f"  · {label}" + (f" — {detail}" if detail else ""))
+        else:
+            line(ok, label, detail)
     hooks = CONSOLE_SETTINGS.read_text(encoding="utf-8") if CONSOLE_SETTINGS.is_file() else ""
     line(f"{CLI_NAME} human busy" in hooks and f"{CLI_NAME} human idle" in hooks,
          "crochets de la console (priorité humaine)", str(CONSOLE_SETTINGS))

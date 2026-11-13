@@ -73,6 +73,10 @@ def poll(orch):
 def automerge(orch, mode, ceiling=None, monkeypatch=None):
     if ceiling:
         monkeypatch.setattr(orch.mod, "AUTO_MERGE_CEILING", ceiling)
+        # Ces tests (#200) couvrent la décision du superviseur : fusion directe par le faux gh. Le
+        # passage par le broker (#207) est couvert par test_isolation.py.
+        monkeypatch.setattr(orch.mod, "MERGE_BROKER", "")
+        monkeypatch.setattr(orch.mod, "MERGE_DIRECT", True)
     orch.mod.cmd_automerge(orch.con, argparse.Namespace(mode=mode, limit=10))
 
 

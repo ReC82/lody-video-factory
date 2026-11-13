@@ -27,7 +27,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 
-POLICY_VERSION = 2
+POLICY_VERSION = 3
 REPO = os.environ.get("LQ_REPO", "ReC82/lody-video-factory")
 DEFAULT_BRANCH = "main"
 
@@ -36,8 +36,14 @@ AUTHORIZE_LABEL = "merge:auto"
 # Signaux humains bloquants : sur le ticket OU la PR, ils prévalent toujours sur l'autorisation.
 VETO_LABELS = ("merge:manual", "agent:blocked", "agent:human", "do-not-merge")
 REQUIRED_TICKET_LABEL = "agent:auto"
-# Comptes autorisés à poser `merge:auto` et à auteur·ice·s de PR acceptées (compte de lodyorch).
-TRUSTED_ACTORS = tuple(a for a in os.environ.get("LQ_MERGE_TRUSTED", REPO.split("/")[0]).split(",") if a)
+# Comptes HUMAINS autorisés à poser `merge:auto` (et à retirer un veto). Un compte `…[bot]` ou une action
+# faite via une application GitHub n'est JAMAIS de confiance, même listé (#207 : les sessions et le
+# superviseur agissent sous l'identité de l'application, discernable du propriétaire).
+TRUSTED_ACTORS = tuple(a.strip() for a in os.environ.get("LQ_MERGE_TRUSTED", REPO.split("/")[0]).split(",") if a.strip())
+# Auteurs de PR acceptés (#207) : le propriétaire et l'application des sessions (`<slug>[bot]`).
+# Être auteur d'une PR ne donne AUCUN droit d'autorisation : ces listes sont distinctes.
+PR_AUTHORS = tuple(a.strip() for a in os.environ.get("LQ_MERGE_PR_AUTHORS", ",".join(TRUSTED_ACTORS)).split(",")
+                   if a.strip())
 
 # Vérifications CI requises sur le SHA de tête (noms des jobs de .github/workflows/ci.yml).
 CHECK_DETECT = "Detect code changes"
@@ -157,6 +163,24 @@ def last_label_event(events, label):
     return found
 
 
+def trusted_event(ev):
+    """Événement fait par un compte humain de confiance, sans application GitHub intermédiaire (#207)."""
+    login = ((ev or {}).get("actor") or {}).get("login") or ""
+    return (login in TRUSTED_ACTORS and not login.endswith("[bot]")
+            and not (ev or {}).get("performed_via_github_app"))
+
+
+def untrusted_veto_removals(events, labels=VETO_LABELS):
+    """Vetos dont le DERNIER événement est un retrait par un compte non autorisé : ils restent valables
+    (une session ne peut pas lever un `merge:manual` posé par le propriétaire)."""
+    last = {}
+    for ev in events or []:
+        name = (ev.get("label") or {}).get("name")
+        if name in labels and ev.get("event") in ("labeled", "unlabeled"):
+            last[name] = ev
+    return sorted(n for n, ev in last.items() if ev.get("event") == "unlabeled" and not trusted_event(ev))
+
+
 def last_label_actor(events, label):
     """Auteur du DERNIER ajout encore valable de `label`."""
     ev = last_label_event(events, label)
@@ -240,7 +264,7 @@ def evaluate(facts):
     head_repo = ((pr.get("head") or {}).get("repo") or {}).get("full_name")
     add("pas-de-fork", head_repo == REPO, f"tête dans {head_repo or 'dépôt inconnu'}", info=True)
     author = (pr.get("user") or {}).get("login")
-    add("auteur-de-confiance", author in TRUSTED_ACTORS, f"auteur {author}", info=True)
+    add("auteur-de-confiance", author in PR_AUTHORS, f"auteur {author}", info=True)
     state = pr.get("mergeable_state")
     add("sans-conflit", pr.get("mergeable") is True and state not in ("dirty",),
         f"mergeable={pr.get('mergeable')} ({state})", info=True)
@@ -255,8 +279,11 @@ def evaluate(facts):
     add("ticket-agent-auto", REQUIRED_TICKET_LABEL in t_labels, f"labels ticket : {sorted(t_labels)}", info=True)
     auth = last_label_event(facts.get("ticket_events"), AUTHORIZE_LABEL) or {}
     actor = (auth.get("actor") or {}).get("login")
-    add("autorisation-merge-auto", AUTHORIZE_LABEL in t_labels and actor in TRUSTED_ACTORS,
-        f"`{AUTHORIZE_LABEL}` " + (f"posé par {actor}" if actor else "absent ou posé par un compte non autorisé"), info=True)
+    via_app = (auth.get("performed_via_github_app") or {}).get("slug") if auth.get("performed_via_github_app") else ""
+    add("autorisation-merge-auto", AUTHORIZE_LABEL in t_labels and trusted_event(auth),
+        f"`{AUTHORIZE_LABEL}` " + ((f"posé par {actor}" + (f" via l'application {via_app}" if via_app else "")
+                                    + ("" if trusted_event(auth) else " — compte non autorisé"))
+                                   if actor else "absent ou posé par un compte non autorisé"), info=True)
     after = facts.get("authorized_after")
     if after:
         when = auth.get("created_at") or ""
@@ -264,6 +291,10 @@ def evaluate(facts):
             f"`{AUTHORIZE_LABEL}` posé le {when or '?'} ; activation le {after} : reposer le label pour autoriser")
     vetoes = sorted((t_labels | _labels(pr)) & set(VETO_LABELS))
     add("aucun-veto", not vetoes, f"veto : {', '.join(vetoes)}" if vetoes else "")
+    lifted = sorted(set(untrusted_veto_removals(facts.get("ticket_events")))
+                    | set(untrusted_veto_removals(facts.get("pr_events"))))
+    add("veto-leve-par-compte-autorise", not lifted,
+        f"veto retiré par un compte non autorisé (reste valable) : {', '.join(lifted)}" if lifted else "")
     latest_review = {}
     for rv in facts.get("reviews") or []:
         if rv.get("state") in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
@@ -364,6 +395,7 @@ def collect(number, get=gh_get):
         "check_runs": _pages(get, f"repos/{REPO}/commits/{sha}/check-runs"),
         "ticket": get(f"repos/{REPO}/issues/{n}") if n else {},
         "ticket_events": _pages(get, f"repos/{REPO}/issues/{n}/events") if n else [],
+        "pr_events": _pages(get, f"repos/{REPO}/issues/{number}/events"),
         "base_compare": get(f"repos/{REPO}/compare/{sha}...{(pr.get('base') or {}).get('ref') or DEFAULT_BRANCH}"),
     }
     return facts
