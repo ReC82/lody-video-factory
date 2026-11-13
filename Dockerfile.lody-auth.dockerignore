@@ -17,3 +17,5 @@ uv.lock
 webui
 app
 test
+# Journal des releases, sauvegardes SQLite et verrou de livraison (#209) : jamais dans une image.
+.lody-ops

@@ -1,0 +1,31 @@
+# Lody PROD avec le rendu Animation 2D (#209) — override VERSIONNÉ, à superposer à docker-compose.lody.yml :
+#
+#   LODY_IMAGE_TAG=<sha> docker compose -f docker-compose.lody.yml -f docker-compose.lody-2d.yml up -d --no-build
+#
+# (en pratique : ./scripts/lody-deploy.sh --2d, qui construit les images, sauvegarde la base et trace la release).
+#
+# Remplace l'override racine NON versionné `docker-compose.lody-2d.override.yml` relevé par l'audit du 13/11/2026,
+# qui faisait tourner l'interface sur le tag MUTABLE `lody-video-factory-2d:local` (retour arrière impossible à
+# reproduire). Ici le tag est OBLIGATOIRE et immuable : le SHA Git de la livraison. Migration (sans toucher au
+# fichier racine tant qu'elle n'est pas validée) : docs/lody-retention.md § « Override 2D ».
+#
+# Seul le service lody-ui change : image 2D (image Lody + Node + Remotion + Chrome, Dockerfile.lody-2d) construite
+# AU-DESSUS de l'image Lody du même SHA. Volumes, secrets, réseau, ports et sécurité restent ceux de
+# docker-compose.lody.yml.
+
+services:
+  lody-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.lody-2d
+      args:
+        LODY_BASE_IMAGE: lody-video-factory:${LODY_IMAGE_TAG:?LODY_IMAGE_TAG obligatoire (SHA Git livré, jamais local)}
+    image: lody-video-factory-2d:${LODY_IMAGE_TAG:?LODY_IMAGE_TAG obligatoire (SHA Git livré, jamais local)}
+    environment:
+      # Moteur de scène Remotion (#150) et délai maximal par scène (secondes), comme le pilote DEV 2D.
+      LODY_ANIMATION_RENDERER: node /MoneyPrinterTurbo/renderers/remotion/bin/lody-remotion.mjs
+      LODY_ANIMATION_SCENE_TIMEOUT: "900"
+      # Licence Remotion : décision écrite du propriétaire, jamais supposée (docs/lody-animation-worker-docker.md).
+      LODY_REMOTION_LICENSE: ${LODY_REMOTION_LICENSE:-}
+    # Chrome headless a besoin d'un /dev/shm plus grand que les 64 Mo par défaut.
+    shm_size: 256m

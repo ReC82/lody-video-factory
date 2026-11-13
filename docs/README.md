@@ -51,6 +51,12 @@ ainsi que l'existence des fichiers liés.
 - [Authentification administrateur](lody-auth.md) — authentification qui protège la page
   « Paramètres système » et le remplacement des clés d'API depuis l'interface.
 
+## Exploitation
+
+- [Rétention Docker, versions reproductibles et worktrees](lody-retention.md) — livraison tracée par SHA
+  (`scripts/lody-deploy.sh`), journal des releases et retour arrière vérifié, rétention des images en simulation
+  par défaut, alertes disque 75/85 %, nettoyage sûr des worktrees LODYORCH (#209).
+
 ## Intégration continue
 
 - [CI ciblée par PR](lody-ci.md) — quel changement déclenche quels tests, Python 3.12, check
