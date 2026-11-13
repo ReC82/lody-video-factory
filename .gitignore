@@ -60,3 +60,6 @@ htmlcov/
 
 # Planche Voltix générée (scripts/animation/rig_pose.py) : seul le PNG est versionné (#136).
 /docs/animation/voltix/planche-voltix.svg
+
+# Exploitation Lody (#209) : journal des releases, sauvegardes SQLite, verrou — propres à l’hôte.
+/.lody-ops/

@@ -13,6 +13,14 @@ COPY lody_auth ./lody_auth
 RUN useradd --create-home --uid 10002 lody-auth
 USER lody-auth
 
+# Provenance (#209) : empreinte des SOURCES de ce service (lody_auth/ + ce Dockerfile), pas le SHA Git :
+# une livraison qui ne touche pas lody-auth réutilise la même image au lieu d'en reconstruire une.
+ARG LODY_SOURCE_HASH=unknown
+LABEL org.opencontainers.image.title="lody-auth" \
+      org.opencontainers.image.source="https://github.com/ReC82/lody-video-factory" \
+      lody.source-hash="${LODY_SOURCE_HASH}" \
+      lody.component="auth"
+
 EXPOSE 8602
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD python3 -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8602/healthz', timeout=3)"

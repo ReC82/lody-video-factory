@@ -43,6 +43,14 @@ COPY test ./test
 COPY main.py cli.py config.example.toml pyproject.toml LICENSE ./
 USER lody
 
+# Provenance (#209) : le SHA Git livré est gravé dans l'image (scripts/lody-deploy.sh le passe en
+# --build-arg). En dernier pour ne pas invalider le cache des couches précédentes.
+ARG LODY_GIT_SHA=unknown
+LABEL org.opencontainers.image.title="lody-video-factory" \
+      org.opencontainers.image.source="https://github.com/ReC82/lody-video-factory" \
+      org.opencontainers.image.revision="${LODY_GIT_SHA}" \
+      lody.component="ui"
+
 EXPOSE 8601
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python3 -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8601/_stcore/health', timeout=3)"

@@ -17,3 +17,5 @@ uv.lock
 webui.bat
 webui.sh
 engine-report
+# Journal des releases, sauvegardes SQLite et verrou de livraison (#209) : jamais dans une image.
+.lody-ops

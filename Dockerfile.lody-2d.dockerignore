@@ -22,3 +22,5 @@ engine-report
 renderers/remotion/node_modules
 renderers/remotion/.bundle
 renderers/remotion/out
+# Journal des releases, sauvegardes SQLite et verrou de livraison (#209) : jamais dans une image.
+.lody-ops
