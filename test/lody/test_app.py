@@ -34,6 +34,11 @@ def _text(app) -> str:
     return " ".join(str(item.value) for item in app.markdown)
 
 
+def _project_rows(app) -> list[str]:
+    """Noms affichés par la liste compacte de l'accueil (#195) : une ligne repliable par projet."""
+    return [expander.label for expander in app.expander]
+
+
 def _button(app, label: str):
     return next(button for button in app.button if button.label == label)
 
@@ -50,7 +55,7 @@ def test_application_starts_and_lists_the_two_example_projects():
     assert not app.exception
     text = _text(app)
     assert "Lody Video Factory" in text and "Tes projets vidéo" in text
-    assert "Audiovisuel" in text and "LodyCrypto" in text
+    assert "Audiovisuel" in _project_rows(app) and "LodyCrypto" in _project_rows(app)
     assert "MoneyPrinterTurbo" in text  # crédit du projet source
     assert _button(app, "Nouveau projet")
 
@@ -79,7 +84,7 @@ def test_create_project_from_the_form_then_it_is_persisted():
 
     st.cache_resource.clear()
     reopened = _run()
-    assert "Ma chaîne tech" in _text(reopened)
+    assert "Ma chaîne tech" in _project_rows(reopened)
 
 
 def test_form_shows_human_error_for_missing_name_and_creates_nothing():
@@ -238,7 +243,7 @@ def test_archive_requires_confirmation_then_project_moves_to_archived_section():
     assert _repo().get(project.id).status == STATUS_ARCHIVED
     home = _text(app)
     assert "est archivé" in home
-    assert any("Projets archivés (1)" in expander.label for expander in app.expander)
+    assert "Afficher les projets archivés (1)" in app.toggle(key="home_show_archived").label
 
 
 def test_archive_can_be_cancelled():

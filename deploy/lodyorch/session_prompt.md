@@ -31,6 +31,10 @@ File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis pa
   ni `systemctl` (le service tourne avec NoNewPrivileges) ; un crochet de garde refuse aussi ces
   commandes et la lecture des fichiers de secrets. Si une commande est refusée, change d'approche :
   ne cherche jamais à contourner le garde (autre interpréteur, encodage, script intermédiaire…).
+- Identité GitHub (#207) : `gh` et `git push` utilisent le jeton de l'application GitHub des
+  sessions (branches, PR, commentaires ; aucun droit sur `main`, ni sur `.github/workflows/`). Ne
+  cherche, n'affiche ni ne remplace aucun autre jeton (`GH_TOKEN`, configuration `gh`…). Un label
+  `merge:auto` posé par toi ne vaut rien ; une modification de workflow se signale dans le rapport.
 - Aucun déploiement, aucune fusion : ton travail s'arrête à une **PR vers `main`** que le
   propriétaire relit, fusionne et déploie lui-même.
 - Machine partagée avec d'autres projets (Dig, Jury Central, RPG Quest) et d'autres superviseurs :
