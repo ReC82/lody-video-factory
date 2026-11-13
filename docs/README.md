@@ -62,3 +62,5 @@ ainsi que l'existence des fichiers liés.
   livre une pull request, sans jamais fusionner ni déployer.
 - [Fusion automatique des PR — politique](lody-fusion-auto.md) — label `merge:auto`, critères
   cumulatifs, exclusions ; fusion par le superviseur après CI verte (#200), à blanc par défaut.
+- [Fusion automatique — mise en service AWS](lody-fusion-auto-mise-en-service.md) — constat du
+  13/11, blocage du compte partagé, procédure propriétaire pas à pas et livraison #189/#191/#202 (#205).
