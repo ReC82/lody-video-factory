@@ -13,6 +13,8 @@ ainsi que l'existence des fichiers liés.
 - [Export / import de configuration de projet](lody-project-transfer.md) — format JSON versionné
   pour exporter ou importer un projet entier (paramètres, personnages, lieux), en création ou en
   mise à jour explicite.
+- [Design system de l'interface](lody-design-system.md) — jetons CSS (espacements, typo, cible
+  tactile 44 px), en-tête minimal, densité mobile, mesures et captures avant/après, recette téléphone (#214).
 
 ## Génération
 
