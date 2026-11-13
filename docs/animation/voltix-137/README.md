@@ -1,5 +1,9 @@
 # Épisode #137 — « Voltix explique le câble SDI » (préproduction + MP4 provisoire)
 
+> **V1 refusée par le propriétaire (11/11/2026)** — trop technique pour une vidéo de découverte. La version
+> en cours est la **[V3 « du HDMI familier au SDI »](v3/README.md)** : script, storyboard, échantillons de voix.
+> Ce dossier reste la référence des schémas coaxial et BNC, réutilisés par la V3.
+
 > **Statut : préproduction livrée, rendu TECHNIQUE provisoire.** Voix et musique de ce MP4 sont des
 > **substituts gratuits** (voix locale Piper, musique générée) : ce n'est **pas** le rendu final. Le rendu final
 > attend : la voix de Voltix choisie et enregistrée dans sa fiche (#153), l'accord écrit du propriétaire sur le

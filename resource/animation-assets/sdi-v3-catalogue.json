@@ -1,0 +1,484 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_137000000100",
+      "name": "Box TV",
+      "kind": "prop",
+      "description": "Décodeur, sortie HDMI étiquetée.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 360,
+            "height": 150,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "boitier",
+              "facade",
+              "sortie-hdmi"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/box-tv/v1/box-tv.svg",
+                "sha256": "e31932c75acbfeae7b702155a200604e913ad83d9b47779db4c080e36389c418"
+              }
+            ]
+          },
+          "sha256": "5612cf80e13b8baa20ec155fa86f346a0478a158bcb71193eae3ba81bb47cfd8",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000101",
+      "name": "Téléviseur",
+      "kind": "prop",
+      "description": "Écran utile 480 × 260 centré en (280, 170).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 560,
+            "height": 400,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "cadre",
+              "ecran",
+              "entree-hdmi",
+              "pied"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/televiseur/v1/televiseur.svg",
+                "sha256": "f94d2e0f17532bb132a6b91ec3578f1b68d3a9b43bdcbf926536adac79ab01f8"
+              }
+            ]
+          },
+          "sha256": "0b5dbb6d35905ab18d74a688e5b7bf973be622f2a9ab32f72a912eefe7358d9c",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000102",
+      "name": "Câble domestique HDMI / DP",
+      "kind": "prop",
+      "description": "Gaine noire, fiches plates de profil.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 80,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fiches",
+              "gaine"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/cable-plat/v1/cable-plat.svg",
+                "sha256": "ac43b28dbec5ecdd30e5161f7f8f018152e0e5cfdea26ad1efe505e69c2c51fd"
+              }
+            ]
+          },
+          "sha256": "06907655ef0dbcd8b5b8e1cba8c5cfbabbd586fb0e187b23e82ae27e45a9fc1a",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000103",
+      "name": "Fiche HDMI — vue de face",
+      "kind": "prop",
+      "description": "Trapèze, deux coins chanfreinés.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 220,
+            "height": 140,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "coque",
+              "interieur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/fiche-hdmi-face/v1/fiche-hdmi-face.svg",
+                "sha256": "c31da4bf3fa5f4b24e779f5108c9e35727f7fc5e935665f7c353fb90bb572f53"
+              }
+            ]
+          },
+          "sha256": "ca688c15c434e4698c6490939a93efff7f73c24a51f9a47dd0b4ab98e57b448c",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000104",
+      "name": "Ordinateur",
+      "kind": "prop",
+      "description": "Tour, sortie DisplayPort « DP ».",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 200,
+            "height": 360,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "boitier",
+              "facade",
+              "sortie-dp"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/pc-tour/v1/pc-tour.svg",
+                "sha256": "62c8123046b02fa61dc112cbce19e42294f0d9c6243f8a104e8c1a63edce8dc7"
+              }
+            ]
+          },
+          "sha256": "238ac8dc6c3a6d6ae3df44551e3879a78f3ebb31efacaad8b6a85984c094eb4f",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000105",
+      "name": "Moniteur d'ordinateur",
+      "kind": "prop",
+      "description": "Écran utile 408 × 236 centré en (240, 154).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 480,
+            "height": 400,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "cadre",
+              "ecran",
+              "pied"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/moniteur-bureau/v1/moniteur-bureau.svg",
+                "sha256": "2bf18935cbc79a06334f8918822739159571ef63c3522995a00bfb44cc48be20"
+              }
+            ]
+          },
+          "sha256": "49afc499e0c88bc72db5b4be96e1f1021ef7d0485c1d52db7d8a1c7704f296b9",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000106",
+      "name": "Fiche DisplayPort — vue de face",
+      "kind": "prop",
+      "description": "Un seul coin chanfreiné.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 220,
+            "height": 140,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "coque",
+              "interieur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/fiche-dp-face/v1/fiche-dp-face.svg",
+                "sha256": "857043ebee4d6632053706b3c9483fc6ac0fd6dde8b8d726b06848b497a0908c"
+              }
+            ]
+          },
+          "sha256": "0d9cbfb3eeba579618960cbd013cdb5c8edaf0f6e05f9d9201ac1f61e6748f06",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000107",
+      "name": "Fiche VGA — vue de face",
+      "kind": "prop",
+      "description": "D-sub 15, 3 × 5 broches, 2 vis ; analogique.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 280,
+            "height": 160,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "broches",
+              "coque",
+              "plaque",
+              "vis"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/fiche-vga-face/v1/fiche-vga-face.svg",
+                "sha256": "741a7307aa05e6bc05d02250a7e305d90765f168dbd65d8d99f9c6a188529b0b"
+              }
+            ]
+          },
+          "sha256": "03559686d23c85b65f266b80697e7a9f78ed9330267e399ca5dc3761f204f684",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000108",
+      "name": "Plateau TV",
+      "kind": "prop",
+      "description": "Mur, sol, voyant ON AIR, bureau.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1080,
+            "height": 760,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "bureau",
+              "mur",
+              "on-air",
+              "sol"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/plateau-decor/v1/plateau-decor.svg",
+                "sha256": "1056441771cc2a00d07e2c723882f79ddd5fa92c31e39b26a3c4fcb3f8ba2934"
+              }
+            ]
+          },
+          "sha256": "da9c1dd045bcb6fefeda8962907407c466b1e0a0a7e913dbe25e5d6531600d76",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000109",
+      "name": "Projecteur de plateau",
+      "kind": "prop",
+      "description": "Sur pied, volets ouverts.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 220,
+            "height": 360,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "pied",
+              "tete",
+              "volets"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/projecteur/v1/projecteur.svg",
+                "sha256": "8517590230d5a8b85dd55491e9ae740a4e829b262df076bd8c730803369d060f"
+              }
+            ]
+          },
+          "sha256": "8ea5b0e96dc749b6346808d2134475b7abe6e88b94119308f48f9ce6a76c42e6",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000110",
+      "name": "Image affichée",
+      "kind": "prop",
+      "description": "Paysage 316 × 190, superposable aux écrans.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 316,
+            "height": 190,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "ciel",
+              "collines",
+              "maison"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/image-paysage/v1/image-paysage.svg",
+                "sha256": "ff0de5912e878537c15c15314c0254f7084718899416855db7448ebfaf9863b0"
+              }
+            ]
+          },
+          "sha256": "d29ce7221cade4aa8a1fe3325deab793b2a717fed3d9bc40e5b5591099f50b7b",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000111",
+      "name": "Câble d'antenne TV",
+      "kind": "prop",
+      "description": "Coaxial blanc, fiches IEC.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 640,
+            "height": 80,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fiches",
+              "gaine"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/cable-antenne/v1/cable-antenne.svg",
+                "sha256": "cf238fe5a1e433a302dcff09b5c0f7d711c9a812861eeef930a2f5c511a7fa17"
+              }
+            ]
+          },
+          "sha256": "606b5f1c4cbf1c39d85c268bcb04861e726e97db971a49c5b0963c6b0ebc17fe",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000112",
+      "name": "Antenne TV râteau",
+      "kind": "prop",
+      "description": "Antenne de toit.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 280,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "elements",
+              "mat"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/antenne-rateau/v1/antenne-rateau.svg",
+                "sha256": "a392e1583fe3cc126d9563e64a4d73e8860c8038cfe1538ff5e404514ba23326"
+              }
+            ]
+          },
+          "sha256": "d3a515094ded949df9f361b69b8dd96c046eec1185bb053874e0cdaaf9080116",
+          "notes": "Épisode #137 V3 : du HDMI familier au SDI."
+        }
+      ]
+    }
+  ]
+}
