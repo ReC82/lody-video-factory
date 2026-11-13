@@ -54,6 +54,11 @@ réel (`on`) reste donc **en attente** ; `dry-run` peut être installé et test�
 
 ### 2.2 Correction technique proposée, sans second compte (ticket séparé à créer)
 
+> **Mise à jour #207** : la variante recommandée ci-dessous (application GitHub + utilisateur Unix
+> séparé, broker de fusion) est implémentée — voir
+> [lody-isolation-permissions.md](lody-isolation-permissions.md) pour le modèle, la procédure root
+> et la recette. Le texte ci-dessous est conservé comme constat d'origine.
+
 Objectif : qu'une session ne détienne plus aucun jeton capable de fusionner ou de poser un label
 indiscernable de celui du propriétaire. Pistes compatibles avec une identité unique, à arbitrer
 dans un ticket dédié (toutes demandent une configuration root ponctuelle de l'hôte) :
