@@ -1,0 +1,2312 @@
+{
+  "schema": "lody.animation/1",
+  "canvas": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920
+  },
+  "scenes": [
+    {
+      "id": "accroche",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Comment une émission passe-t-elle d'une caméra à l'autre… sans que personne ne débranche les câbles ?",
+        "purpose": "Hook : on ne change pas de caméra en débranchant des câbles.",
+        "mood": "énergique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "cables",
+            "objects": [
+              {
+                "id": "cable-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1100
+                  }
+                ]
+              },
+              {
+                "id": "cable-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1100
+                  }
+                ]
+              },
+              {
+                "id": "cable-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 780,
+                    "y": 1100
+                  }
+                ]
+              },
+              {
+                "id": "interdit",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000006",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 800
+                  }
+                ],
+                "start": 75,
+                "scale": [
+                  {
+                    "frame": 75,
+                    "value": 0.2
+                  },
+                  {
+                    "frame": 90,
+                    "value": 1.0
+                  }
+                ],
+                "easing": "spring"
+              },
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Interdit !",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 520
+                  }
+                ],
+                "start": 75
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 2300
+                  },
+                  {
+                    "frame": 15,
+                    "x": 540,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 75,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 70,
+                    "name": "tenir-cable"
+                  },
+                  {
+                    "start": 80,
+                    "end": 120,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 100
+        }
+      }
+    },
+    {
+      "id": "cablage",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Dans une régie, plusieurs caméras envoient leur image vers un appareil : le mélangeur vidéo.",
+        "purpose": "Trois caméras, trois câbles distincts, un mélangeur.",
+        "mood": "clair"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 220,
+                    "y": 500
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 220,
+                    "y": 690
+                  }
+                ]
+              },
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 500
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plaque-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 690
+                  }
+                ]
+              },
+              {
+                "id": "camera-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 500
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plaque-3",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 3",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 690
+                  }
+                ]
+              },
+              {
+                "id": "cable-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 900
+                  }
+                ],
+                "start": 20
+              },
+              {
+                "id": "cable-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 900
+                  }
+                ],
+                "start": 40
+              },
+              {
+                "id": "cable-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 750,
+                    "y": 900
+                  }
+                ],
+                "start": 60
+              },
+              {
+                "id": "melangeur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1300
+                  }
+                ]
+              },
+              {
+                "id": "legende",
+                "type": "text",
+                "text": {
+                  "content": "Mélangeur vidéo",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1500
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 1720
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 90,
+                    "end": 170,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "multivue",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Sur un écran multivue, le réalisateur voit toutes les sources, et choisit laquelle passe à l'antenne.",
+        "purpose": "La multivue montre toutes les sources ; ce n'est pas la sortie diffusée.",
+        "mood": "clair"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "ecran",
+            "objects": [
+              {
+                "id": "multivue",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 820
+                  }
+                ]
+              },
+              {
+                "id": "case-1",
+                "type": "text",
+                "text": {
+                  "content": "1",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 280,
+                    "y": 1000
+                  }
+                ]
+              },
+              {
+                "id": "case-2",
+                "type": "text",
+                "text": {
+                  "content": "2",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1000
+                  }
+                ]
+              },
+              {
+                "id": "case-3",
+                "type": "text",
+                "text": {
+                  "content": "3",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 1000
+                  }
+                ]
+              },
+              {
+                "id": "grand-pvw",
+                "type": "text",
+                "text": {
+                  "content": "PREVIEW",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 340,
+                    "y": 640
+                  }
+                ]
+              },
+              {
+                "id": "grand-pgm",
+                "type": "text",
+                "text": {
+                  "content": "PROGRAM",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 740,
+                    "y": 640
+                  }
+                ]
+              },
+              {
+                "id": "legende",
+                "type": "text",
+                "text": {
+                  "content": "Multivue : toutes les sources",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1250
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1700
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 30,
+                    "end": 150,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "preview-program",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Sur beaucoup de mélangeurs, il y a la prévisualisation, ce qu'on prépare… et le programme, l'image réellement diffusée.",
+        "purpose": "Définir prévisualisation (préparé) et programme (diffusé).",
+        "mood": "pédagogique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "fenetres",
+            "objects": [
+              {
+                "id": "pvw-cadre",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 620
+                  }
+                ]
+              },
+              {
+                "id": "pvw-image",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 620
+                  }
+                ]
+              },
+              {
+                "id": "pvw-titre",
+                "type": "text",
+                "text": {
+                  "content": "PREVIEW — prévisualisation",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 420
+                  }
+                ]
+              },
+              {
+                "id": "pgm-cadre",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1220
+                  }
+                ]
+              },
+              {
+                "id": "pgm-image",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1220
+                  }
+                ]
+              },
+              {
+                "id": "pgm-titre",
+                "type": "text",
+                "text": {
+                  "content": "PROGRAM — à l'antenne",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1020
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 1720
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 110,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 10,
+                    "end": 100,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 110,
+                    "end": 200,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 140
+        }
+      }
+    },
+    {
+      "id": "preparation",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Regardez : Voltix prépare la caméra deux, puis appuie sur le bouton de transition.",
+        "purpose": "Voltix sélectionne la caméra deux en prévisualisation, va vers la transition.",
+        "mood": "dynamique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "pupitre",
+            "objects": [
+              {
+                "id": "melangeur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1250
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.4
+                  }
+                ]
+              },
+              {
+                "id": "bouton-cut",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14200000000c",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 760,
+                    "y": 1150
+                  }
+                ]
+              },
+              {
+                "id": "label-cut",
+                "type": "text",
+                "text": {
+                  "content": "CUT",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 760,
+                    "y": 1060
+                  }
+                ]
+              },
+              {
+                "id": "bouton-auto",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14200000000c",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 900,
+                    "y": 1150
+                  }
+                ]
+              },
+              {
+                "id": "label-auto",
+                "type": "text",
+                "text": {
+                  "content": "AUTO",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 900,
+                    "y": 1060
+                  }
+                ]
+              },
+              {
+                "id": "pvw",
+                "type": "text",
+                "text": {
+                  "content": "PREVIEW : Caméra 2",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 500
+                  }
+                ]
+              },
+              {
+                "id": "pgm",
+                "type": "text",
+                "text": {
+                  "content": "PROGRAM : Caméra 1",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 640
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 320,
+                    "y": 1700
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 20,
+                    "end": 90,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 120,
+                    "end": 170,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "bascule",
+      "duration_frames": 150,
+      "intent": {
+        "narration": "Et hop ! La caméra deux passe au programme.",
+        "purpose": "Changement d'état : la source en preview passe au programme.",
+        "mood": "joyeux"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "fenetres",
+            "objects": [
+              {
+                "id": "pvw-cadre",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 620
+                  }
+                ]
+              },
+              {
+                "id": "pgm-cadre",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1220
+                  }
+                ]
+              },
+              {
+                "id": "pvw-titre",
+                "type": "text",
+                "text": {
+                  "content": "PREVIEW",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 420
+                  }
+                ]
+              },
+              {
+                "id": "pgm-titre",
+                "type": "text",
+                "text": {
+                  "content": "PROGRAM",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1020
+                  }
+                ]
+              },
+              {
+                "id": "pvw-avant",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 620
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  },
+                  {
+                    "frame": 30,
+                    "value": 1
+                  },
+                  {
+                    "frame": 36,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "pvw-apres",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 620
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 30,
+                    "value": 0
+                  },
+                  {
+                    "frame": 36,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "pgm-avant",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1220
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  },
+                  {
+                    "frame": 30,
+                    "value": 1
+                  },
+                  {
+                    "frame": 36,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "pgm-apres",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1220
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 30,
+                    "value": 0
+                  },
+                  {
+                    "frame": 36,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1700
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 36,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 70,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 36,
+                    "end": 90,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 90
+        }
+      }
+    },
+    {
+      "id": "sortie",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "La sortie programme part ensuite vers les moniteurs de contrôle, puis vers la diffusion ou l'enregistrement.",
+        "purpose": "Trajet de la sortie programme : contrôle, puis diffusion ou enregistrement.",
+        "mood": "clair"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "melangeur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 420
+                  }
+                ]
+              },
+              {
+                "id": "l-mel",
+                "type": "text",
+                "text": {
+                  "content": "Mélangeur — sortie programme",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 600
+                  }
+                ]
+              },
+              {
+                "id": "moniteur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 900
+                  }
+                ],
+                "start": 30
+              },
+              {
+                "id": "l-mon",
+                "type": "text",
+                "text": {
+                  "content": "Moniteur de contrôle",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1060
+                  }
+                ],
+                "start": 30
+              },
+              {
+                "id": "diffusion",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14200000000b",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1350
+                  }
+                ],
+                "start": 90
+              },
+              {
+                "id": "l-dif",
+                "type": "text",
+                "text": {
+                  "content": "Diffusion ou enregistrement",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1510
+                  }
+                ],
+                "start": 90
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 880,
+                    "y": 1750
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 30,
+                    "end": 150,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "effets",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Selon le modèle, le mélangeur peut aussi faire des fondus, ajouter des titres ou incruster une image.",
+        "purpose": "Fondu et incrustation simple, sans effet décoratif hors sujet.",
+        "mood": "léger"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "demo",
+            "objects": [
+              {
+                "id": "pgm-cadre",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 760
+                  }
+                ]
+              },
+              {
+                "id": "cam-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 760
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  },
+                  {
+                    "frame": 20,
+                    "value": 1
+                  },
+                  {
+                    "frame": 60,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "cam-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 760
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 20,
+                    "value": 0
+                  },
+                  {
+                    "frame": 60,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "l-fondu",
+                "type": "text",
+                "text": {
+                  "content": "Fondu",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 520
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 1
+                  },
+                  {
+                    "frame": 80,
+                    "value": 1
+                  },
+                  {
+                    "frame": 90,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "titre-incruste",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14200000000a",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 900
+                  }
+                ],
+                "start": 100
+              },
+              {
+                "id": "l-incrust",
+                "type": "text",
+                "text": {
+                  "content": "Incrustation d'un titre",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 520
+                  }
+                ],
+                "start": 100
+              },
+              {
+                "id": "nuance",
+                "type": "text",
+                "text": {
+                  "content": "Selon le modèle",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1200
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1720
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  },
+                  {
+                    "frame": 100,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 100,
+                    "end": 160,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "attention",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Attention : il ne fabrique pas les images. Il sélectionne et combine les sources qu'on lui donne.",
+        "purpose": "Le mélangeur ne fabrique pas les images : il choisit et combine.",
+        "mood": "sérieux"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 220,
+                    "y": 450
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.45
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 220,
+                    "y": 640
+                  }
+                ]
+              },
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 450
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.45
+                  }
+                ]
+              },
+              {
+                "id": "plaque-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 640
+                  }
+                ]
+              },
+              {
+                "id": "camera-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 450
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.45
+                  }
+                ]
+              },
+              {
+                "id": "plaque-3",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 3",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 640
+                  }
+                ]
+              },
+              {
+                "id": "melangeur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1050
+                  }
+                ]
+              },
+              {
+                "id": "l-entree",
+                "type": "text",
+                "text": {
+                  "content": "Sources fournies",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 760
+                  }
+                ]
+              },
+              {
+                "id": "l-role",
+                "type": "text",
+                "text": {
+                  "content": "Il sélectionne et combine",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1250
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 1720
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 60,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "chute",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Voilà pourquoi le mélangeur, c'est un peu le chef d'orchestre de la vidéo en direct !",
+        "purpose": "Chute : Voltix chef d'orchestre des trois caméras.",
+        "mood": "triomphal"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "orchestre",
+            "objects": [
+              {
+                "id": "camera-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 220,
+                    "y": 700
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plaque-1",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 1",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 220,
+                    "y": 890
+                  }
+                ]
+              },
+              {
+                "id": "camera-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 700
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plaque-2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 2",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 890
+                  }
+                ]
+              },
+              {
+                "id": "camera-3",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 700
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "plaque-3",
+                "type": "text",
+                "text": {
+                  "content": "Caméra 3",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 860,
+                    "y": 890
+                  }
+                ]
+              },
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Le chef d'orchestre du direct",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 380
+                  }
+                ],
+                "start": 60
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1600
+                  }
+                ],
+                "easing": "ease_in_out",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 150,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              },
+              {
+                "id": "baguette",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_142000000009",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 660,
+                    "y": 1450
+                  }
+                ],
+                "start": 10
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 6
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    }
+  ]
+}

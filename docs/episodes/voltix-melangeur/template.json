@@ -1,0 +1,36 @@
+{
+  "name": "Voltix — Le mélangeur vidéo",
+  "description": "Épisode « À quoi sert un mélangeur vidéo en direct ? » de la série Voltix décrypte le broadcast (#142). Préproduction : voir docs/episodes/voltix-melangeur.md.",
+  "payload": {
+    "duration_min": 45,
+    "duration_max": 65,
+    "narration_pace": "rapide",
+    "scenes_per_minute_min": 8,
+    "scenes_per_minute_max": 11,
+    "structure": [
+      "Hook : changer de caméra sans débrancher les câbles",
+      "Contexte : les caméras arrivent au mélangeur vidéo",
+      "Multivue : toutes les sources visibles, le réalisateur choisit",
+      "Définitions : prévisualisation et programme",
+      "Démonstration : caméra deux préparée, bouton de transition",
+      "Changement d'état : la prévisualisation passe au programme",
+      "Sortie programme vers contrôle, puis diffusion ou enregistrement",
+      "Fonctions selon le modèle : fondus, titres, incrustation",
+      "Mise en garde : il sélectionne et combine, il ne fabrique pas les images",
+      "Chute : Voltix chef d'orchestre"
+    ],
+    "standing_instructions": "Série Voltix décrypte le broadcast, personnage canonique Voltix sans modification. Français grand public, une seule idée centrale : le mélangeur vidéo sélectionne et combine en direct les sources qu'on lui envoie. Ne jamais confondre multivue (écran de contrôle de toutes les sources) et sortie programme (image diffusée) ; prévisualisation = ce qu'on prépare, programme = ce qui est diffusé ; dire que le mode prévisualisation / programme et les transitions disponibles dépendent du modèle et de son réglage ; ne pas prétendre que la sortie programme part directement à l'antenne. Script TTS-safe : nombres en toutes lettres, aucun sigle prononcé.",
+    "visual_rules": "Illustration vectorielle plate, contours brun foncé, 9:16. Schémas techniquement exacts avec légendes en français. Un câble par caméra vers le mélangeur. Fenêtre de prévisualisation encadrée en vert, fenêtre programme encadrée en rouge, étiquettes toujours visibles. La multivue est un écran distinct de la sortie programme. Une action visuelle toutes les 5 à 7 secondes.",
+    "visual_avoid": [
+      "Personnes réelles ou collègues reconnaissables",
+      "Logos ou marques de fabricants",
+      "Multivue présentée comme l'image diffusée",
+      "Sortie programme reliée directement à une antenne",
+      "Effets décoratifs sans rapport (étincelles, explosions, transitions 3D)",
+      "Modification de la silhouette ou de la palette de Voltix"
+    ],
+    "hook_notes": "Phrase d'accroche dans la première seconde : « Comment une émission passe-t-elle d'une caméra à l'autre… sans que personne ne débranche les câbles ? », avec Voltix qui tire sur des câbles et le panneau d'interdiction.",
+    "subtitle_notes": "Sous-titres français en phrases entières, apostrophes typographiques, « Caméra 2 » en chiffres à l'écran. Les étiquettes PREVIEW / PROGRAM affichées sur le matériel sont doublées de leur traduction française.",
+    "music_notes": "Musique instrumentale discrète et dynamique, droits vérifiés, environ 20 % sous la voix avec ducking, durée strictement limitée à la narration, aucun bip synthétique."
+  }
+}

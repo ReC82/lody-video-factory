@@ -37,6 +37,12 @@ ainsi que l'existence des fichiers liés.
 - [Recette contrôlée du rendu 2D parlé](lody-recette-dev-2d.md) — prérequis DEV, jeu de test 2 scènes
   Voltix V1/V2/V3, coût ElevenLabs estimé et plafonné, autorisation écrite, critères PASS/FAIL (#187).
 
+## Épisodes (préproduction)
+
+- [Voltix — Le mélangeur vidéo](episodes/voltix-melangeur.md) — scénario, script TTS-safe, storyboard
+  `lody.animation/1` et preset de production de l'épisode « À quoi sert un mélangeur vidéo en
+  direct ? » (#142).
+
 ## Voix
 
 - [Catalogue des voix ElevenLabs](lody-elevenlabs-voices.md) — choix d'une voix ElevenLabs
