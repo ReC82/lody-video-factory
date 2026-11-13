@@ -56,6 +56,11 @@ File (tickets GitHub ouverts `agent:auto`, triés `priority:P0` → `P3` puis pa
 4. **Plan** : le superviseur a déjà publié la prise en charge. Publie UNE fois (vérifie les
    commentaires existants portant `<!-- lodyorch -->`) le plan (3 à 6 points) et le nom de la
    branche. Une reprise après crash ne republie pas le plan : elle le complète si besoin.
+   **À chaque session** (première prise, reprise, correction de CI), dès que le travail de CETTE
+   session est décidé et avant de l'exécuter, déclare son plan en 2 à 5 lignes courtes, une par
+   argument : `lodyorch phase --plan "point 1" "point 2" …`. Le superviseur en tire le mail
+   DÉMARRAGE (#215) : n'y mets que ce que tu vas réellement tenter, aucun secret. Ne déclare pas
+   de plan si tu rends tout de suite `BLOCKED`, `DONE` ou `READY` + `deps` sans rien coder.
 5. **Dépendances** : si le ticket a besoin d'un autre ticket ouvert non fusionné, rends `READY`
    avec `"deps": "<n>"` sans rien coder (sauf en mode PRÉPARATION, voir plus haut).
 6. **Décisions** : prends les décisions techniques courantes et documente-les. Ne bloque que pour

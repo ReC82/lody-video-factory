@@ -309,6 +309,7 @@ def db():
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
             pass
+    lc_init(con)  # #215 : jalons du cycle de vie (table ajoutée, rien de modifié)
     return con
 
 
@@ -906,6 +907,7 @@ def run_session(con, t, prepare=None):
         set_status_label(con, t["issue"], "RUNNING")
         if CLAIM_COMMENT:
             claim_issue(con, t["issue"], session_id)
+    lc_launch(con, t["issue"], session_id)
     session_started = iso()
     env = dict(os.environ, LQ_SESSION_ID=session_id, LQ_STATUS_FILE=str(status_file), LQ_ISSUE=str(t["issue"]),
                LQ_YIELD_FILE=str(yield_file))
@@ -921,6 +923,7 @@ def run_session(con, t, prepare=None):
     idle_seconds = setting(con, "session_idle_seconds")[0]
     started = time.time()
     last_out = time.time()
+    lc_checked = 0.0
     result = None
     rate_events = []
     killed = ""
@@ -969,6 +972,13 @@ def run_session(con, t, prepare=None):
             if finished:
                 proc.wait()
                 break
+            if time.time() - lc_checked > 15:
+                # #215 : DÉMARRAGE dès que la session déclare son plan (ou après le délai de grâce).
+                lc_checked = time.time()
+                try:
+                    lc_tick(con)
+                except Exception as exc:  # noqa: BLE001 — un email raté ne doit jamais tuer la session
+                    event(con, t["issue"], "notify_error", f"Cycle de vie : {type(exc).__name__}: {exc}"[:500])
             if CI_WATCH:
                 # La CI des PR déjà livrées reste suivie pendant que cette session avance sur un autre ticket.
                 try:
@@ -1037,6 +1047,7 @@ def run_session(con, t, prepare=None):
     con.execute("UPDATE sessions SET ended_at=?, outcome=?, exit_code=?, detail=?, cost_usd=? WHERE id=?",
                 (iso(), outcome, proc.returncode, (report.get("summary") or detail)[:2000], cost, session_id))
     con.commit()
+    lc_session_end(con, t["issue"], session_id)
     apply_outcome(con, t["issue"], outcome, detail, reset, report)
     if prepare and report.get("status") in STATUSES:
         settle_preparation(con, t["issue"], prepare, key)
@@ -1044,6 +1055,7 @@ def run_session(con, t, prepare=None):
         after_outcome(con, t["issue"], session_id, session_started, report)
     if t["issue"] != TRIAGE:
         record_run(con, t["issue"], session_id, outcome, detail, report)
+        lc_after_outcome(con, t["issue"], session_id)
     set_phase(con, t["issue"], f"session terminée : {outcome}")
     if outcome != "COMPLETED" or not report:
         ctl_set(con, "last_error", redact(f"{iso()} #{t['issue']} {outcome} — {detail}")[:500])
@@ -1440,6 +1452,9 @@ def watch_ci(con):
         pr = gh_json(f"repos/{REPO}/pulls/{num}") if num else None
         if not pr:
             continue  # GitHub injoignable ou PR inconnue : nouvel essai au prochain intervalle
+        lc_pr(con, n, pr)
+        if pr.get("merged") or pr.get("state") == "closed":
+            lc_ci_end(con, t, "merged" if pr.get("merged") else "closed")
         if pr.get("merged"):
             update_task(con, n, ci_state="merged", ci_detail="PR fusionnée par le propriétaire.")
             event(con, n, "ci", "PR fusionnée : suivi de CI terminé.")
@@ -1453,6 +1468,8 @@ def watch_ci(con):
             continue
         verdict, detail = ci_verdict(pr["head"]["sha"])
         waited = time.time() - (ts_of(t["ci_since"]) or time.time())
+        if verdict in ("success", "failure") or waited > CI_TIMEOUT_SECONDS:
+            lc_ci_end(con, t, verdict if verdict in ("success", "failure") else "timeout")
         if verdict == "success":
             ok, why = base_validated(pr)
             if not ok:
@@ -1580,6 +1597,7 @@ def after_auto_merge(con, issue, num, head_sha, merge_sha):
     """Suites d'une fusion automatique : ticket gardé « à tester » (rouvert si `Closes #N` l'a fermé),
     commentaire, rapport. Aucun déploiement. Rend la ligne de notification groupée."""
     t = task(con, issue)
+    lc_mark(con, issue, "", "merged")
     update_task(con, issue, ci_state="merged", status="WAITING_OWNER",
                 ci_detail=f"Fusionnée automatiquement (merge:auto), commit {merge_sha[:10]} — non déployée.",
                 next_action="Tester la fonctionnalité (fusionnée, non déployée) puis fermer le ticket.")
@@ -1611,6 +1629,7 @@ def try_auto_merge(con, t, mode):
     it = gh_json(f"repos/{REPO}/issues/{n}")
     if not pr or not it:
         return None  # GitHub injoignable : nouvel essai au prochain intervalle
+    lc_pr(con, n, pr)
     if pr.get("merged"):
         update_task(con, n, ci_state="merged", ci_detail="PR fusionnée par le propriétaire.")
         event(con, n, "ci", "PR fusionnée : suivi terminé.")
@@ -2004,8 +2023,10 @@ def render_run_report(con, r, t):
            f"| Session lodyorch | `{r['session_id']}` (tentative n° {rank}) |",
            f"| Run | `{run_id}` |",
            f"| Fin de session | {r['outcome']} — {(r['detail'] or '').splitlines()[0][:200] if r['detail'] else '-'} |",
-           f"| **État final** | **{state}** |", "",
-           "## 1. Résumé", "",
+           f"| **État final** | **{state}** |", ""]
+    if s:
+        out += ["## Début, fin et durées", ""] + timing_lines(con, s, t) + [""]
+    out += ["## 1. Résumé", "",
            t["summary"] or str(report.get("summary") or "") or "(aucun résumé : la session n'a pas rendu de rapport)", ""]
     remaining = str(report.get("remaining") or "").strip()
     out += [f"**Reste à faire :** {remaining or 'rien de signalé.'}", "", f"**Déploiement :** {deployed}", "",
@@ -2083,16 +2104,19 @@ def finalize_run(con, run_id):
     link = publish_report(con, run_id)
     state = report_state(t, r["outcome"])
     summary = t["summary"] or str(json.loads(r["report"] or "{}").get("summary") or "(aucun résumé)")
+    s = con.execute("SELECT * FROM sessions WHERE id=?", (r["session_id"],)).fetchone()
     body = "\n".join([f"Projet : {REPORT_PROJECT}", f"Ticket #{r['issue']} — {t['title']}", f"État : {state}",
-                      f"Run : {run_id} (session {r['session_id']})", "", "Résumé :", summary, "",
+                      f"Run : {run_id} (session {r['session_id']})", "", "Résumé :", summary, ""]
+                     + ((timing_lines(con, s, t) + [""]) if s else []) + [
                       f"Rapport complet : {link or 'publication GitHub en attente, il apparaîtra dans le ticket'}",
                       f"Ticket : https://github.com/{REPO}/issues/{r['issue']}"]
                      + ([f"PR : {t['pr']}"] if t["pr"] else [])
                      + ["", "Le rapport complet est joint (Markdown).",
                         "Répondre dans le ticket GitHub : la réponse est détectée et le travail reprend automatiquement."])
+    # #215 : sujet appariable au mail DÉMARRAGE (même numéro, même run).
     queue_notification(con, f"run:{run_id}", r["issue"], state,
-                       f"[{REPORT_PROJECT}] #{r['issue']} — {state.split(' — ')[0]} — {t['title']}",
-                       redact(body), path.name, md)
+                       f"{NOTIFY_PREFIX} FIN #{r['issue']} — {state.split(' — ')[0]} — {short_title(t['title'])}"
+                       f" · run {run_id}", redact(body), path.name, md)
 
 
 def gh_post_json(path, payload):
@@ -2146,6 +2170,399 @@ def flush_reports(con):
     for r in con.execute("""SELECT run_id FROM run_reports WHERE state='ready' AND comment_url='' AND comment_attempts < 30
                             AND (comment_next='' OR comment_next <= ?) ORDER BY created_at""", (iso(),)).fetchall():
         publish_report(con, r["run_id"])
+
+
+# ---------------------------------------------------------------- cycle de vie, DÉMARRAGE / FIN (#215)
+#
+# Chaque tentative (run = 8 premiers caractères de l'identifiant de session) laisse des jalons
+# horodatés au moment où l'événement réel se produit, dans `lifecycle` (une ligne par ticket × run
+# × jalon, INSERT OR IGNORE : un redémarrage ne réécrit jamais un jalon). Jalons du ticket (run '') :
+# discovered, pr_opened, merged. Jalons d'un run : queued (devenu éligible), launched (session
+# lancée, prise en charge), started (première phase déclarée par la session : contexte chargé),
+# plan (plan déclaré : `lodyorch phase --plan …`), ended (fin de session), ci_started, ci_ended.
+#
+# Emails (outbox #123, clés uniques → jamais de doublon) : `start:<run>` DÉMARRAGE au plan déclaré
+# (ou, sans plan, après LQ_START_GRACE s de session) ; `wait:<run>` EN ATTENTE CI quand Claude rend
+# la main avant le verdict ; `run:<run>` FIN = rapport #123 ; `end:<run>` / `lost:<run>` INTERROMPU
+# quand une paire resterait ouverte (limite, arrêt, crash du superviseur…). Aucun appel Claude.
+
+START_GRACE_SECONDS = int(os.environ.get("LQ_START_GRACE", 600))
+PAIR_GRACE_SECONDS = int(os.environ.get("LQ_PAIR_GRACE", 120))
+LOST_SESSION_SECONDS = int(os.environ.get("LQ_LOST_SESSION", 600))
+MAIL_TZ = os.environ.get("LQ_MAIL_TZ", "Europe/Brussels")
+PLAN_MAX_LINES = 6
+CATEGORY_PREFIXES = ("type:", "catégorie:", "categorie:", "category:", "area:", "domaine:")
+CATEGORY_LABELS = {"bug": "Bug", "documentation": "Documentation"}
+CATEGORY_SKIP_TAGS = {"lot", "bloquant", "en pause", "nuit"}
+CATEGORY_ALIASES = {"lodyorch": "Orchestrateur", "orchestrateur": "Orchestrateur"}
+INTERRUPT_TEXT = {
+    "RATE_LIMIT": "limite du fournisseur Claude atteinte — reprise automatique après la limite",
+    "STOPPED": "arrêt volontaire ou priorité à la console — ticket repris ensuite",
+    "INTERRUPTED": "superviseur redémarré pendant la session — ticket repris en premier",
+    "CRASH": "session terminée sans résultat — nouvelle tentative automatique",
+    "TIMEOUT": "session arrêtée (durée maximale ou inactivité) — nouvelle tentative automatique",
+    "TRANSIENT": "erreur passagère du fournisseur — nouvelle tentative automatique",
+    "ERROR": "erreur de session — nouvelle tentative automatique",
+}
+
+
+def lc_init(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS lifecycle(
+        issue INTEGER NOT NULL, run_id TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL, at TEXT NOT NULL,
+        detail TEXT DEFAULT '', PRIMARY KEY(issue, run_id, kind))""")
+    con.commit()
+
+
+def lc_mark(con, issue, run_id, kind, at=None, detail=""):
+    """Pose un jalon une seule fois (le premier horodatage reste) ; True s'il est nouveau."""
+    if issue is None or issue == TRIAGE:
+        return False
+    cur = con.execute("INSERT OR IGNORE INTO lifecycle(issue,run_id,kind,at,detail) VALUES(?,?,?,?,?)",
+                      (issue, run_id or "", kind, at or iso(), redact(str(detail or ""))[:4000]))
+    con.commit()
+    return cur.rowcount == 1
+
+
+def lc_marks(con, issue, run_id=""):
+    return {r["kind"]: r for r in con.execute("SELECT * FROM lifecycle WHERE issue=? AND run_id=?",
+                                              (issue, run_id or "")).fetchall()}
+
+
+def lc_at(marks, kind):
+    return marks[kind]["at"] if kind in marks else ""
+
+
+def lc_discovered(con, issue):
+    """Découverte du ticket : jalon existant, sinon premier événement connu (données d'avant #215)."""
+    m = lc_marks(con, issue).get("discovered")
+    if m:
+        return m["at"]
+    first = con.execute("SELECT MIN(at) FROM events WHERE issue=?", (issue,)).fetchone()[0]
+    if first:
+        lc_mark(con, issue, "", "discovered", first)
+    return first or ""
+
+
+def lc_queued_at(con, issue, launched):
+    """Instant où le ticket est devenu éligible pour ce run : la plus récente de la découverte, de la
+    fin de la session précédente et des événements qui le remettent en file (réponse, reprise,
+    CI rouge…), sans dépasser le lancement. Le temps de file ne compte donc ni le travail précédent
+    ni l'attente du propriétaire."""
+    cands = [lc_discovered(con, issue)]
+    cands.append(con.execute("SELECT MAX(ended_at) FROM sessions WHERE issue=? AND ended_at IS NOT NULL "
+                             "AND ended_at <= ?", (issue, launched)).fetchone()[0])
+    cands.append(con.execute("""SELECT MAX(at) FROM events WHERE issue=? AND at <= ? AND (
+                                kind IN ('reply','resumed','enqueued','discovered','label')
+                                OR (kind='ci' AND message LIKE 'CI en échec : correction%'))""",
+                             (issue, launched)).fetchone()[0])
+    cands = [c for c in cands if c and c <= launched]
+    return max(cands) if cands else launched
+
+
+def lc_launch(con, issue, session_id):
+    """Session lancée avec le ticket attribué (prise en charge) : pas encore un démarrage réel."""
+    if issue == TRIAGE:
+        return
+    s = con.execute("SELECT started_at FROM sessions WHERE id=?", (session_id,)).fetchone()
+    launched = s["started_at"] if s else iso()
+    run = session_id[:8]
+    lc_mark(con, issue, run, "queued", lc_queued_at(con, issue, launched))
+    lc_mark(con, issue, run, "launched", launched)
+
+
+def lc_pr(con, issue, pr):
+    """Ouverture et fusion de la PR, aux horodatages GitHub (horloge UTC commune)."""
+    if not pr:
+        return
+    if pr.get("created_at"):
+        lc_mark(con, issue, "", "pr_opened", pr["created_at"], pr.get("html_url") or "")
+    if pr.get("merged") or pr.get("merged_at"):
+        lc_mark(con, issue, "", "merged", pr.get("merged_at") or iso())
+
+
+def lc_ci_end(con, t, verdict):
+    """Fin de l'attente de CI du dernier run du ticket (verdict, fusion, fermeture ou délai)."""
+    run = (t["last_session"] or "")[:8]
+    if run and lc_marks(con, t["issue"], run).get("ci_started"):
+        lc_mark(con, t["issue"], run, "ci_ended", detail=verdict)
+
+
+def ticket_category(title, labels):
+    """Catégorie métier : label explicite (`type:`, `catégorie:`, `area:`…, ou bug/documentation),
+    sinon première étiquette du titre hors priorité (« [P1][UX mobile] … » → UX mobile)."""
+    labels = labels if isinstance(labels, list) else jlist(labels)
+    for lbl in labels:
+        low = str(lbl).lower()
+        for prefix in CATEGORY_PREFIXES:
+            if low.startswith(prefix) and str(lbl)[len(prefix):].strip():
+                return str(lbl)[len(prefix):].strip()
+    for lbl in labels:
+        if str(lbl).lower() in CATEGORY_LABELS:
+            return CATEGORY_LABELS[str(lbl).lower()]
+    for tag in re.findall(r"\[([^\]]+)\]", title or ""):
+        tag = " ".join(tag.split())
+        if not re.fullmatch(r"(?i)p\d", tag) and tag.lower() not in CATEGORY_SKIP_TAGS:
+            return CATEGORY_ALIASES.get(tag.lower(), tag)
+    return "non classé"
+
+
+def short_title(title, limit=70):
+    text = re.sub(r"^(\s*\[[^\]]*\])+\s*", "", title or "").strip() or (title or "").strip()
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+
+def mail_time(ts_iso):
+    """« 13/11/2026 16:50 (Bruxelles) — 15:50 UTC »."""
+    ts = ts_of(ts_iso)
+    if ts is None:
+        return "?"
+    dt = datetime.fromtimestamp(ts, timezone.utc)
+    try:
+        tz = ZoneInfo(MAIL_TZ)
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = timezone.utc
+    city = MAIL_TZ.rsplit("/", 1)[-1].replace("Brussels", "Bruxelles").replace("_", " ")
+    return f"{dt.astimezone(tz).strftime('%d/%m/%Y %H:%M')} ({city}) — {dt.strftime('%H:%M')} UTC"
+
+
+def run_rank(con, issue, session_id):
+    s = con.execute("SELECT started_at FROM sessions WHERE id=?", (session_id,)).fetchone()
+    return con.execute("SELECT COUNT(*) FROM sessions WHERE issue=? AND started_at <= ?",
+                       (issue, s["started_at"] if s else iso())).fetchone()[0]
+
+
+def lc_timing(con, s):
+    """Durées d'un run (secondes, None si inconnues) à partir des jalons : session (lancement → fin),
+    utile (démarrage réel → fin), file (éligible → lancement), CI (rendu → verdict, en cours si sans
+    verdict), totale (éligible → verdict ou fin). Le temps de CI n'est jamais compté comme actif."""
+    run, n = s["id"][:8], s["issue"]
+    m = lc_marks(con, n, run)
+    launched = lc_at(m, "launched") or s["started_at"]
+    ended = s["ended_at"] or ""
+    queued = lc_at(m, "queued") or lc_queued_at(con, n, launched)
+    ci_start, ci_end = lc_at(m, "ci_started"), lc_at(m, "ci_ended")
+
+    def d(a, b):
+        ta, tb = ts_of(a), ts_of(b)
+        return max(0.0, tb - ta) if ta is not None and tb is not None else None
+
+    return {"run_id": run, "issue": n, "queued": queued, "launched": launched, "started": lc_at(m, "started"),
+            "plan": lc_at(m, "plan"), "plan_lines": jlist(m["plan"]["detail"]) if "plan" in m else [],
+            "ended": ended, "ci_started": ci_start, "ci_ended": ci_end,
+            "ci_running": bool(ci_start and not ci_end), "session": d(launched, ended),
+            "useful": d(lc_at(m, "started"), ended), "queue": d(queued, launched),
+            "ci": d(ci_start, ci_end or (iso() if ci_start else "")),
+            "total": d(queued, ci_end or ended)}
+
+
+def timing_lines(con, s, t):
+    """Rubrique « Début, fin et durées » du rapport #123 (et des emails de fin)."""
+    tm = lc_timing(con, s)
+    sp = lambda v: span(v) if v is not None else "non mesuré"  # noqa: E731
+    rank = run_rank(con, s["issue"], s["id"])
+    sent = con.execute("SELECT sent_at FROM notifications WHERE key=?", (f"start:{tm['run_id']}",)).fetchone()
+    mail = ("envoyé" if sent and sent["sent_at"] else "en file d'envoi" if sent
+            else "non envoyé (plan non annoncé, session courte ou ticket rendu tout de suite)")
+    ci = ("non suivie (pas de PR livrée par ce run)" if not tm["ci_started"] else
+          f"{sp(tm['ci'])} (en cours, Claude ne travaille pas pendant ce temps)" if tm["ci_running"] else sp(tm["ci"]))
+    return [f"- Début (session lancée) : {mail_time(tm['launched'])}",
+            "- Démarrage réel (première phase de la session) : "
+            + (mail_time(tm["started"]) if tm["started"] else "non déclaré"),
+            f"- Plan annoncé : {mail_time(tm['plan']) if tm['plan'] else 'non annoncé'} · mail DÉMARRAGE : {mail}",
+            f"- Fin de session : {mail_time(tm['ended']) if tm['ended'] else 'en cours'}",
+            f"- Temps de session Claude : {sp(tm['session'])}"
+            + (f" (dont {sp(tm['useful'])} après le démarrage réel)" if tm["useful"] is not None else ""),
+            f"- Attente en file avant le lancement : {sp(tm['queue'])}",
+            f"- Attente de CI après la session : {ci}",
+            f"- Durée totale depuis la mise en file : {sp(tm['total'])}",
+            f"- Tentative n° {rank} sur ce ticket ({max(0, rank - 1)} reprise(s) avant celle-ci)",
+            "- Coût Claude : non converti en euros (seul le prix catalogue estimé par Claude Code est affiché "
+            "s'il est fourni)."]
+
+
+def queue_start_mail(con, s, t, reason=""):
+    """Email DÉMARRAGE d'un run, une seule fois (clé `start:<run>`), construit sans appel Claude."""
+    if not NOTIFY_SMTP_ENV or s["issue"] == TRIAGE:
+        return
+    run, n = s["id"][:8], s["issue"]
+    key = f"start:{run}"
+    if con.execute("SELECT 1 FROM notifications WHERE key=?", (key,)).fetchone():
+        return
+    m = lc_marks(con, n, run)
+    plan = jlist(m["plan"]["detail"]) if "plan" in m else []
+    began = lc_at(m, "started") or lc_at(m, "launched") or s["started_at"]
+    labels = jlist(t["gh_labels"]) if "gh_labels" in t.keys() else []
+    lines = [f"Ticket #{n} — {t['title']}",
+             f"Début : {mail_time(began)}",
+             f"Catégorie : {ticket_category(t['title'], labels)} · Priorité P{t['priority'] // 10}",
+             f"Run : {run} (session {s['id']}) · tentative n° {run_rank(con, n, s['id'])}"
+             + (" · préparation" if (s["mode"] if "mode" in s.keys() else "") == "prepare" else ""),
+             "État : Claude travaille réellement sur ce ticket.", "", "Prévu :"]
+    lines += [f"- {x}" for x in plan] or [f"- Plan non annoncé par la session ({reason or 'aucune déclaration'}) :"
+                                          " rien n'est inventé ici, voir le ticket."]
+    lines += ["", f"Suivi : https://github.com/{REPO}/issues/{n}", "",
+              f"Un email FIN #{n} (même run {run}) suivra : terminé, PR en CI, à tester, bloqué, échec ou "
+              "interruption. Tant qu'il n'est pas arrivé, la tentative est en cours."]
+    queue_notification(con, key, n, "Démarrage",
+                       f"{NOTIFY_PREFIX} DÉMARRAGE #{n} — {short_title(t['title'])} · run {run}",
+                       redact("\n".join(lines)))
+
+
+def queue_pair_mail(con, s, t, kind, key, headline):
+    """Email d'état d'un run déjà annoncé (EN ATTENTE CI / INTERROMPU / FIN), une fois par clé."""
+    run, n = s["id"][:8], s["issue"]
+    if con.execute("SELECT 1 FROM notifications WHERE key=?", (key,)).fetchone():
+        return
+    lines = [f"Ticket #{n} — {t['title']}", f"Run : {run} (session {s['id']})", f"État : {headline}", ""]
+    lines += timing_lines(con, s, t)
+    lines += ["", f"Statut actuel du ticket : {t['status']}" + (f" · PR : {t['pr']}" if t["pr"] else ""),
+              f"Prochaine action : {t['next_action'] or '-'}", "", f"Suivi : https://github.com/{REPO}/issues/{n}"]
+    queue_notification(con, key, n, kind, f"{NOTIFY_PREFIX} {kind} #{n} — {headline.split(' — ')[0]} · run {run}",
+                       redact("\n".join(lines)))
+
+
+def supervisor_alive(con):
+    pid = str(ctl_get(con, "supervisor_pid") or "")
+    return pid.isdigit() and Path(f"/proc/{pid}").exists()
+
+
+def lc_tick(con, check_lost=False, force_run=""):
+    """Vérification légère, sans Claude ni GitHub (superviseur et unité d'envoi des emails) :
+    DÉMARRAGE au plan déclaré ou après le délai de grâce, EN ATTENTE CI quand la session a rendu la
+    main, INTERROMPU quand une paire DÉMARRAGE / FIN resterait ouverte. Idempotent."""
+    if not NOTIFY_SMTP_ENV:
+        return
+    horizon = iso(datetime.fromtimestamp(time.time() - 7 * 86400, timezone.utc))
+    for s in con.execute("SELECT * FROM sessions WHERE issue != ? AND started_at >= ?", (TRIAGE, horizon)).fetchall():
+        run, n = s["id"][:8], s["issue"]
+        t = task(con, n)
+        if not t:
+            continue
+        m = lc_marks(con, n, run)
+        start_key = con.execute("SELECT 1 FROM notifications WHERE key=?", (f"start:{run}",)).fetchone()
+        if not start_key:
+            if "plan" in m:
+                queue_start_mail(con, s, t)
+            elif s["ended_at"] is None and time.time() - (ts_of(s["started_at"]) or time.time()) > START_GRACE_SECONDS:
+                queue_start_mail(con, s, t, f"session en cours depuis plus de {START_GRACE_SECONDS // 60} min")
+            continue
+        keys = {r["key"] for r in con.execute("SELECT key FROM notifications WHERE key IN (?,?,?,?)",
+                                              (f"run:{run}", f"end:{run}", f"wait:{run}", f"lost:{run}"))}
+        if s["ended_at"] is None:
+            if check_lost and not supervisor_alive(con) and f"lost:{run}" not in keys \
+                    and time.time() - (ts_of(s["started_at"]) or time.time()) > LOST_SESSION_SECONDS:
+                queue_pair_mail(con, s, t, "INTERROMPU", f"lost:{run}",
+                                "superviseur arrêté pendant la session — aucune progression constatée depuis ; "
+                                "le ticket sera repris au redémarrage")
+            continue
+        rr = con.execute("SELECT state FROM run_reports WHERE run_id=?", (run,)).fetchone()
+        awaiting = (rr["state"] == "awaiting_ci") if rr else (t["last_session"] == s["id"] and t["ci_state"] == "pending")
+        if awaiting and f"wait:{run}" not in keys and f"run:{run}" not in keys:
+            queue_pair_mail(con, s, t, "EN ATTENTE CI",
+                            f"wait:{run}", "PR ouverte, CI en cours — Claude a rendu la main ; le rapport FIN "
+                                           "suivra au verdict de la CI")
+            continue
+        if awaiting or keys & {f"run:{run}", f"end:{run}", f"lost:{run}"}:
+            continue
+        if force_run != s["id"] and time.time() - (ts_of(s["ended_at"]) or time.time()) < PAIR_GRACE_SECONDS:
+            continue  # le rapport FIN est peut-être en cours de rédaction
+        outcome = s["outcome"] or "?"
+        if outcome in INTERRUPT_TEXT:
+            queue_pair_mail(con, s, t, "INTERROMPU", f"end:{run}", INTERRUPT_TEXT[outcome])
+        else:
+            queue_pair_mail(con, s, t, "FIN", f"end:{run}", f"session terminée ({outcome}) — statut {t['status']}")
+
+
+def lc_session_end(con, issue, session_id):
+    """Fin de session (avant l'issue) : jalon, et DÉMARRAGE si le plan a été déclaré juste avant."""
+    if issue == TRIAGE:
+        return
+    s = con.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+    lc_mark(con, issue, session_id[:8], "ended", s["ended_at"] if s else iso(), s["outcome"] if s else "")
+    if NOTIFY_SMTP_ENV and s and "plan" in lc_marks(con, issue, session_id[:8]):
+        queue_start_mail(con, s, task(con, issue))
+
+
+def lc_after_outcome(con, issue, session_id):
+    """Après l'issue et le rapport : début d'attente de CI, puis mail de transition ou de fin."""
+    if issue == TRIAGE:
+        return
+    t = task(con, issue)
+    if t and t["ci_state"] == "pending" and t["last_session"] == session_id:
+        lc_mark(con, issue, session_id[:8], "ci_started", t["ci_since"] or iso())
+    lc_tick(con, force_run=session_id)
+
+
+def pctl(values, q):
+    """Percentile par rang le plus proche (valeurs déjà triées)."""
+    if not values:
+        return None
+    k = max(0, min(len(values) - 1, int(round(q * (len(values) - 1)))))
+    return values[k]
+
+
+def metrics_rows(con, days=None):
+    """Runs mesurés (hors tri du backlog), avec catégorie, priorité et durées."""
+    where, params = "issue != ? AND ended_at IS NOT NULL", [TRIAGE]
+    if days:
+        where += " AND started_at >= ?"
+        params.append(iso(datetime.fromtimestamp(time.time() - days * 86400, timezone.utc)))
+    rows = []
+    for s in con.execute(f"SELECT * FROM sessions WHERE {where} ORDER BY started_at", params).fetchall():
+        t = task(con, s["issue"])
+        tm = lc_timing(con, s)
+        tm.update(category=ticket_category(t["title"] if t else "", t["gh_labels"] if t else "[]"),
+                  priority=f"P{(t['priority'] if t else 20) // 10}", outcome=s["outcome"] or "?",
+                  status=t["status"] if t else "?", title=t["title"] if t else "")
+        rows.append(tm)
+    return rows
+
+
+def cmd_metrics(con, args):
+    """Synthèse des durées par catégorie et priorité, sans aucun appel Claude ni coût converti."""
+    rows = metrics_rows(con, args.days)
+    if not rows:
+        print("Aucune session terminée à mesurer.")
+        return 0
+    sp = lambda v: span(v) if v is not None else "-"  # noqa: E731
+    groups = {}
+    for r in rows:
+        groups.setdefault((r["category"], r["priority"]), []).append(r)
+    head = (f"{'Catégorie':<22} {'Prio':<4} {'Tick.':>5} {'Runs':>4} {'Repr.':>5} {'Bloq.':>5} "
+            f"{'Actif méd.':>10} {'Actif p90':>9} {'Actif tot.':>10} {'CI méd.':>8} {'File méd.':>9}")
+    print(f"{INSTANCE} — durées par catégorie et priorité"
+          + (f" ({args.days} derniers jours)" if args.days else " (historique complet)"))
+    print("Actif = session Claude (lancement → fin) ; CI = attente du verdict après la session (non comptée "
+          "comme active) ; File = éligible → lancement. p90 affiché à partir de 10 runs.")
+    print(head)
+    print("-" * len(head))
+    order = sorted(groups.items(), key=lambda kv: -sum(r["session"] or 0 for r in kv[1]))
+    for (cat, prio), rs in order:
+        act = sorted(r["session"] for r in rs if r["session"] is not None)
+        ci = sorted(r["ci"] for r in rs if r["ci"] is not None and not r["ci_running"])
+        qu = sorted(r["queue"] for r in rs if r["queue"] is not None)
+        tickets = {r["issue"] for r in rs}
+        blocked = {r["issue"] for r in rs if r["status"] in ("BLOCKED", "FAILED")}
+        print(f"{cat[:22]:<22} {prio:<4} {len(tickets):>5} {len(rs):>4} {len(rs) - len(tickets):>5} {len(blocked):>5} "
+              f"{sp(pctl(act, 0.5)):>10} {(sp(pctl(act, 0.9)) if len(act) >= 10 else '-'):>9} {sp(sum(act)):>10} "
+              f"{sp(pctl(ci, 0.5)):>8} {sp(pctl(qu, 0.5)):>9}")
+    total = sum(r["session"] or 0 for r in rows)
+    print("-" * len(head))
+    print(f"Total : {len({r['issue'] for r in rows})} tickets, {len(rows)} runs, {span(total)} de sessions Claude.")
+    print("\nRuns les plus longs (session active) :")
+    for r in sorted(rows, key=lambda r: -(r["session"] or 0))[:args.top]:
+        print(f"  #{r['issue']:<5} run {r['run_id']} {sp(r['session']):>9} actif · CI {sp(r['ci'])}"
+              f"{' (en cours)' if r['ci_running'] else ''} · file {sp(r['queue'])} · {r['outcome']:<11} "
+              f"{r['category'][:18]} — {short_title(r['title'], 50)}")
+    open_pairs = con.execute("""SELECT n.issue, substr(n.key, 7) AS run FROM notifications n WHERE n.key LIKE 'start:%'
+                                AND NOT EXISTS (SELECT 1 FROM notifications f WHERE f.key IN
+                                ('run:' || substr(n.key, 7), 'end:' || substr(n.key, 7), 'lost:' || substr(n.key, 7),
+                                 'wait:' || substr(n.key, 7)))""").fetchall()
+    unsent = con.execute("SELECT COUNT(*) FROM notifications WHERE sent_at IS NULL").fetchone()[0]
+    print(f"\nPaires DÉMARRAGE sans FIN : {', '.join(f'#{p[0]} run {p[1]}' for p in open_pairs) or 'aucune'}"
+          f" · emails non encore remis : {unsent}"
+          + (" (`lodyorch notifications` pour le détail, `--retry` pour relancer)" if unsent else ""))
+    return 0
 
 
 # ---------------------------------------------------------------- boucle
@@ -2280,6 +2697,10 @@ def supervise():
         if RUN_REPORTS:
             flush_reports(con)
         if NOTIFY_SMTP_ENV:
+            try:
+                lc_tick(con)  # #215 : paires DÉMARRAGE / FIN, sans Claude
+            except Exception as exc:  # noqa: BLE001 — un email raté ne doit jamais arrêter la file
+                event(con, None, "notify_error", f"Cycle de vie : {type(exc).__name__}: {exc}"[:500])
             flush_notifications(con)
         blocker = start_blocker(con)
         if blocker:
@@ -3162,6 +3583,9 @@ def cmd_notifications(con, args):
         if not NOTIFY_SMTP_ENV or not os.access(NOTIFY_SMTP_ENV, os.R_OK):
             print("Fichier SMTP illisible ou non configuré (LQ_NOTIFY_SMTP_ENV) : rien envoyé.")
             return 2
+        # #215 : vérification légère sans Claude, aussi quand le superviseur est arrêté (paire
+        # DÉMARRAGE sans FIN → INTERROMPU), puis envoi.
+        lc_tick(con, check_lost=True)
         flush_notifications(con)
         left = con.execute("SELECT COUNT(*) FROM notifications WHERE sent_at IS NULL AND attempts < 30").fetchone()[0]
         print(f"Emails en attente après envoi : {left}.")
@@ -3424,9 +3848,24 @@ def cmd_statusline(con, _):
 
 
 def cmd_phase(con, args):
-    """Appelé par la session : déclare sa phase (analyse, implémentation, tests, PR, rapport…)."""
+    """Appelé par la session : déclare sa phase (analyse, implémentation, tests, PR, rapport…).
+    #215 : la première phase d'une session marque son démarrage réel ; `--plan "point" "point" …`
+    déclare le plan de la session (une ligne par argument), d'où le mail DÉMARRAGE envoyé par le
+    superviseur. Un second plan dans la même session est journalisé mais ne renvoie aucun mail."""
     raw = os.environ.get("LQ_ISSUE") or ctl_get(con, "phase_issue")
-    set_phase(con, int(raw) if str(raw).isdigit() else None, " ".join(args.text))
+    issue = int(raw) if str(raw).isdigit() else None
+    run = os.environ.get("LQ_SESSION_ID", "")[:8]
+    if args.plan:
+        lines = [" ".join(x.split())[:200] for x in args.text if x.strip()][:PLAN_MAX_LINES]
+        set_phase(con, issue, "plan annoncé — " + " ; ".join(lines))
+        if run and issue is not None:
+            lc_mark(con, issue, run, "started")
+            if lc_mark(con, issue, run, "plan", detail=json.dumps(lines, ensure_ascii=False)):
+                print("Plan enregistré : le superviseur envoie le mail DÉMARRAGE.")
+        return 0
+    set_phase(con, issue, " ".join(args.text))
+    if run and issue is not None:
+        lc_mark(con, issue, run, "started")
     return 0
 
 
@@ -3518,7 +3957,11 @@ def main():
     s = sub.add_parser("human")
     s.add_argument("state", choices=("busy", "idle"))
     s = sub.add_parser("phase")
+    s.add_argument("--plan", action="store_true", help="déclare le plan de la session (une ligne par argument)")
     s.add_argument("text", nargs="+")
+    s = sub.add_parser("metrics")
+    s.add_argument("--days", type=int, default=None)
+    s.add_argument("--top", type=int, default=8)
     s = sub.add_parser("notifications")
     s.add_argument("--retry", action="store_true")
     s.add_argument("--send", action="store_true")
@@ -3547,7 +3990,7 @@ def main():
             "config": cmd_config, "reload": cmd_reload, "sync": cmd_sync,
             "notifications": cmd_notifications, "notify": cmd_notify, "phase": cmd_phase, "labels": cmd_labels,
             "automerge": cmd_automerge,
-            "report": cmd_report, "reports": cmd_reports,
+            "report": cmd_report, "reports": cmd_reports, "metrics": cmd_metrics,
             "console": cmd_console, "human": cmd_human, "statusline": cmd_statusline,
             "check": cmd_check}[args.cmd](con, args)
     sys.exit(code or 0)
