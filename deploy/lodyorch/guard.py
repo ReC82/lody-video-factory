@@ -35,6 +35,10 @@ PROTECTED_STRICT = [
     (r"\.credentials\.json|\.claude\.json\b|\.config/gh\b|hosts\.yml|\.git-credentials|\.netrc|\.ssh/",
      "identifiants"),
     (r"\.local/state/(?!lodyorch\b)", "état d'un autre superviseur"),
+    # #207 : identité privilégiée du broker de fusion (jeton du propriétaire, clé de l'application,
+    # jeton d'agent, journal). La vraie barrière est Unix (utilisateur lodyorch-merge) ; ceci évite
+    # qu'une session tente seulement d'y toucher ou d'afficher le jeton d'agent.
+    (r"/etc/lodyorch\b|lodyorch-merge\b|merge-token\b|app-key\.pem", "identifiants du broker de fusion"),
 ]
 # LOOSE : noms qu'une prose peut citer (message de commit…) ; cherchés dans les chemins des outils
 # fichiers et, pour Bash, hors texte entre guillemets et hors document « here ».
@@ -69,6 +73,10 @@ FORBIDDEN_COMMANDS = [
     (r"\bgit\s+(config\s+--global|filter-branch|filter-repo)\b", "configuration globale ou réécriture d'historique"),
     (r"\blodyorch\s+(?!(status|pulse|queue|log|sessions|phase|check)\b)\S+", "pilotage du superviseur : réservé au propriétaire"),
     (r"(^|[\s;&|(`])(printenv|env)\s*($|[|;&>])|/proc/\d+/environ", "dump de l'environnement"),
+    (r"(^|[\s;&|(`])(export\s+)?(GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN|GH_CONFIG_DIR|GH_HOST|LQ_AGENT_TOKEN_FILE"
+     r"|LQ_REAL_GH)=", "identité GitHub imposée par le superviseur (#207)"),
+    (r"\bgh\s+api\b[^\n]*(/rulesets|/branches/[^\s/]+/protection|/collaborators|/keys|/hooks|/installation)\b",
+     "réglages et protections du dépôt"),
 ]
 
 STRONG_SECRETS = re.compile(

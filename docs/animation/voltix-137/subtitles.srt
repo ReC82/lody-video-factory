@@ -1,0 +1,80 @@
+1
+00:00:00,333 --> 00:00:01,433
+Tu vois ce câble ?
+
+2
+00:00:01,633 --> 00:00:05,233
+En régie, il peut relier une caméra à un mélangeur vidéo.
+
+3
+00:00:05,833 --> 00:00:07,533
+C'est une liaison SDI :
+
+4
+00:00:07,733 --> 00:00:09,700
+de la vidéo numérique professionnelle.
+
+5
+00:00:10,367 --> 00:00:11,500
+Regarde à l'intérieur.
+
+6
+00:00:11,700 --> 00:00:15,500
+Ce câble coaxial possède un conducteur central, un isolant…
+
+7
+00:00:15,700 --> 00:00:18,033
+… et un blindage, protégés par une gaine.
+
+8
+00:00:18,767 --> 00:00:22,467
+Et cette fiche métallique ? C'est un connecteur BNC.
+
+9
+00:00:22,667 --> 00:00:25,400
+On l'insère, on le tourne, et il se verrouille !
+
+10
+00:00:26,167 --> 00:00:29,267
+Attention : le BNC, c'est le connecteur.
+
+11
+00:00:29,467 --> 00:00:31,567
+Le SDI, c'est le signal.
+
+12
+00:00:32,300 --> 00:00:34,500
+Et le son peut aussi voyager avec l'image.
+
+13
+00:00:35,267 --> 00:00:41,367
+Tu entendras parler de HD-SDI, de 3G-SDI et de 12G-SDI.
+
+14
+00:00:41,567 --> 00:00:44,300
+Selon le format, on transporte plus de données…
+
+15
+00:00:44,500 --> 00:00:48,467
+… par exemple de la 4K à 60 images par seconde en 12G.
+
+16
+00:00:49,233 --> 00:00:51,233
+Mais attention : ce n'est pas magique !
+
+17
+00:00:51,433 --> 00:00:54,133
+La qualité du câble, de ses connecteurs…
+
+18
+00:00:54,333 --> 00:00:56,567
+… et sa longueur comptent énormément.
+
+19
+00:00:57,333 --> 00:01:02,167
+Voilà : le signal SDI, un bon coaxial et des BNC adaptés.
+
+20
+00:01:02,367 --> 00:01:04,067
+Et la régie retrouve son image !
+

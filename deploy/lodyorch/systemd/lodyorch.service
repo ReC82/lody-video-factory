@@ -11,7 +11,9 @@ Type=simple
 # Compte de service des autres superviseurs : jamais root.
 User=ubuntu
 Environment=HOME=/home/ubuntu
-Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+# /opt/lodyorch/bin en tête : gh et l'assistant Git y utilisent le jeton de l'application GitHub
+# (#207), jamais celui du propriétaire.
+Environment=PATH=/opt/lodyorch/bin:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=/opt/lodyorch/lodyorch.env
 WorkingDirectory=/home/ubuntu/lody-orch
 ExecStart=/usr/bin/python3 /opt/lodyorch/lodyorch.py run
@@ -27,12 +29,14 @@ TimeoutStopSec=90
 # - l'arbre de production Lody (config.toml et ses sauvegardes, secrets/, storage/, data/) et les
 #   fichiers SMTP/clés des autres projets sont invisibles ;
 # - les autres projets et superviseurs sont en lecture seule (leurs bases d'état restent lisibles
-#   pour le quota partagé), le système (/usr, /etc, /boot) aussi.
+#   pour le quota partagé), le système (/usr, /etc, /boot) aussi ;
+# - #207 : secrets et journal du broker de fusion (utilisateur lodyorch-merge) invisibles, ainsi que
+#   les sockets qui donnent root sans sudo (Docker, containerd, LXD : ubuntu est membre du groupe lxd).
 NoNewPrivileges=yes
 ProtectSystem=full
-InaccessiblePaths=-/srv/moneyprinterturbo -/home/ubuntu/.config/plugadmin -/home/ubuntu/.config/dig -/home/ubuntu/.ssh -/etc/dig
+InaccessiblePaths=-/srv/moneyprinterturbo -/home/ubuntu/.config/plugadmin -/home/ubuntu/.config/dig -/home/ubuntu/.ssh -/etc/dig -/etc/lodyorch -/var/lib/lodyorch-merge/state -/run/docker.sock -/var/run/docker.sock -/run/containerd -/var/snap/lxd -/run/lxd.socket
 ReadOnlyPaths=-/srv -/opt -/home/ubuntu/Dig -/home/ubuntu/LodyLand -/home/ubuntu/.local/state
-ReadWritePaths=/home/ubuntu/.local/state/lodyorch -/home/ubuntu/.local/state/claude
+ReadWritePaths=/home/ubuntu/.local/state/lodyorch -/home/ubuntu/.local/state/claude -/var/lib/lodyorch-merge/requests
 PrivateTmp=yes
 # Ressources : l'hôte (2 CPU, ~4 Go) est partagé avec la production Lody. Les sessions (Claude, tests,
 # rendus Remotion/Chrome) sont freinées au-delà de 1,4 Go et ne dépassent jamais 1,8 Go ni 1,5 CPU ;

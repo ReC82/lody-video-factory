@@ -1,0 +1,30 @@
+[Unit]
+Description=Lody Video Factory — broker de fusion et de jetons LODYORCH (#207, seul détenteur des identifiants privilégiés)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Utilisateur système dédié : ni le superviseur ni les sessions Claude (compte ubuntu) ne lisent
+# ses secrets (/etc/lodyorch, 0640 root:lodyorch-merge) ni son journal (state, 0700).
+User=lodyorch-merge
+Group=lodyorch-merge
+Environment=LQ_BROKER_CONF=/etc/lodyorch/merge-broker.env
+ExecStart=/usr/bin/python3 /opt/lodyorch/merge_broker.py tick
+TimeoutStartSec=300
+UMask=0027
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/lodyorch-merge/state /var/lib/lodyorch-merge/requests /var/lib/lodyorch-merge/results /var/lib/lodyorch-merge/agent
+InaccessiblePaths=-/srv -/run/docker.sock -/var/run/docker.sock -/var/snap/lxd

@@ -1,0 +1,10 @@
+[Unit]
+Description=Lody Video Factory — tour du broker LODYORCH (jeton d'agent + demandes de fusion), toutes les 30 s
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

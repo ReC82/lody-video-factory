@@ -348,9 +348,7 @@ def render(repo: LocationRepository, project: Project) -> None:
                   on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         return
 
-    with st.container(horizontal=True, key="project_actions"):
-        st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="loc_back",
-                  on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
+    # « Retour au projet » est affiché en tête de page par app.render (#212).
 
     is_open, target = _form_target(project.id)
     current: Location | None = None

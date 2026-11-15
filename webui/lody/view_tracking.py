@@ -239,8 +239,6 @@ def _render_result(service: ProductionService, project: Project, production: Pro
         with st.container(horizontal=True, key="result_actions"):
             st.button("Créer une nouvelle version" if production.is_animated else "Créer une V2", type="primary",
                       icon=":material/edit_note:", key="create_v2", on_click=_go_v2, args=(service, project, production))
-            st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project_result",
-                      on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         if production.is_animated:  # #159 : réédition scène par scène, rendu 2D local
             st.markdown('<p class="muted-note">Une nouvelle version conserve celle-ci intacte et ne recalcule que les '
                         "scènes modifiées.</p>", unsafe_allow_html=True)
@@ -566,10 +564,7 @@ def render(service: ProductionService, project: Project, production_id: str, kit
                                                     key="v2_from_failed"):
                         _go_v2(service, project, current)
                         st.rerun()
-                if current.status is not S.TERMINEE:  # le résultat a ses propres actions
-                    if st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="back_project_run"):
-                        nav.go(nav.VIEW_PROJECT, project.id)
-                        st.rerun()
+                # « Retour au projet » est en tête de page, hors fragment (#212).
             # #91 : deux téléchargements directs, sans ZIP, disponibles pour une production en cours
             # (instantané partiel explicitement identifié comme tel), échouée ou terminée — jamais un
             # nouvel appel fournisseur, jamais reconstruit depuis la configuration ACTUELLE du projet.

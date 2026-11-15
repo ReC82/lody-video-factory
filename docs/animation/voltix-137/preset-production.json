@@ -1,0 +1,46 @@
+{
+  "schema": "lody.episode-preset/137",
+  "note": "Préréglage de l'épisode #137. « template » suit EXACTEMENT le format des templates de production (#110, webui/lody/templates.py : validate_fields) ; « project » liste les réglages du projet attendus ; « storyboard » désigne le storyboard lody.animation/1 réellement rendu. Aucune clé API, aucun identifiant de voix.",
+  "template": {
+    "name": "Voltix — épisode technique broadcast",
+    "description": "Épisode pédagogique de 55 à 65 s en Animation 2D : Voltix explique UN concept broadcast avec des schémas vectoriels animés exacts.",
+    "payload": {
+      "duration_min": 55,
+      "duration_max": 65,
+      "narration_pace": "rapide",
+      "scenes_per_minute_min": 8,
+      "scenes_per_minute_max": 10,
+      "structure": [
+        "Accroche : question concrète (6 s)",
+        "Situation en régie (6 s)",
+        "Schéma 1 animé par étapes",
+        "Schéma 2 : geste technique",
+        "Distinction clé (signal ≠ connecteur)",
+        "Détail utile (audio intégré)",
+        "Variantes et débits, sans chiffres universels",
+        "Limites et bonnes pratiques",
+        "Récapitulatif et image retrouvée"
+      ],
+      "standing_instructions": "Un seul concept par épisode. Exactitude technique d'abord : ne jamais annoncer de distance maximale universelle, rappeler que les performances dépendent du débit, du câble, des connecteurs et des équipements. Texte affiché et texte parlé séparés : sigles épelés pour la synthèse (SDI → « èsse dé i », BNC → « bé ène cé »), nombres écrits en toutes lettres (« soixante-quinze ohms », « quatre K à soixante images par seconde »).",
+      "visual_rules": "Style Voltix (#136) : aplats, contour #2A1F14 de 6 px (jamais noir pur), palette de la fiche Voltix. Schémas en SVG vectoriels éditables, un calque par pièce, animés par étapes ; zone des schémas en haut de l'écran 9:16, Voltix en bas à droite, sous-titres sous Voltix sans recouvrir les schémas.",
+      "visual_avoid": [
+        "connecteur RJ45, XLR ou F confondu avec un BNC",
+        "image fixe zoomée à la place d'une animation",
+        "marque ou logo de fabricant",
+        "distance maximale universelle de câble"
+      ],
+      "hook_notes": "Voltix entre en rebondissant, câble coaxial en main ; question écrite à l'écran dès la première seconde.",
+      "subtitle_notes": "Phrase entière, apostrophes françaises, bloc sombre arrondi lisible sur mobile, 60 caractères maximum par réplique, jamais sur les schémas.",
+      "music_notes": "Boucle instrumentale sans paroles, environ 20 % du niveau de la voix avec ducking, coupée à la durée de la narration plus un court fondu."
+    }
+  },
+  "project": {
+    "render_mode": "animation",
+    "format": "9:16",
+    "canvas": {"width": 1080, "height": 1920, "fps": 30},
+    "character": "Voltix",
+    "voice": "voix enregistrée dans la fiche Voltix (#153) ; tant qu'elle est absente, voix provisoire locale Piper",
+    "catalogs": ["resource/animation-assets/voltix-catalogue.json", "resource/animation-assets/sdi-catalogue.json"]
+  },
+  "storyboard": "docs/animation/voltix-137/storyboard.json"
+}

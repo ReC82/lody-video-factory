@@ -1,0 +1,13 @@
+#!/bin/sh
+# gh des sessions et du superviseur LODYORCH (#207) : identité de l'application GitHub (jeton
+# d'installation d'une heure renouvelé par le broker), JAMAIS le jeton du propriétaire.
+# Placé en tête du PATH par lodyorch.service. Sans jeton d'agent (isolation pas encore installée),
+# se comporte comme le gh du système : « lodyorch check » le signale.
+TOKEN_FILE=${LQ_AGENT_TOKEN_FILE:-/var/lib/lodyorch-merge/agent/token}
+REAL_GH=${LQ_REAL_GH:-/usr/bin/gh}
+unset GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+if [ -r "$TOKEN_FILE" ]; then
+    GH_TOKEN=$(head -n 1 "$TOKEN_FILE")
+    export GH_TOKEN
+fi
+exec "$REAL_GH" "$@"

@@ -84,7 +84,8 @@ def render_header(with_home_link: bool) -> None:
             '<span class="badge">Bêta</span></div>',
             unsafe_allow_html=True,
         )
-        if with_home_link:
+        # Pages de premier niveau (#213) : la barre Projets / Personnages / Ressources remplace ce lien.
+        if with_home_link and nav.current_route().view not in nav.TOP_LEVEL_VIEWS:
             st.button(
                 "Tous les projets",
                 icon=":material/arrow_back:",
@@ -92,6 +93,25 @@ def render_header(with_home_link: bool) -> None:
                 key="nav_home",
                 on_click=nav.go,
             )
+
+
+# Sous-pages d'un projet (#212) : « Retour au projet » s'affiche en premier, sous l'en-tête commun.
+PROJECT_SUBVIEWS = (nav.VIEW_SETTINGS, nav.VIEW_PRODUCTION, nav.VIEW_TRACK, nav.VIEW_V2,
+                    nav.VIEW_CHARACTERS, nav.VIEW_LOCATIONS)
+
+
+def render_project_back(project: Project | None, view: str) -> None:
+    """« ← Retour au projet » immédiatement sous l'en-tête, au-dessus du titre de la page (#212).
+
+    Jamais dans un expander ni en bas de page : visible dès le premier écran sur mobile. Le lien
+    « Tous les projets » de l'en-tête reste disponible, en second plan. Le retour passe par ``nav.go`` :
+    les brouillons persistés (#189) et les réglages enregistrés sont conservés."""
+    if project is None or view not in PROJECT_SUBVIEWS:
+        return
+    with st.container(key="project_back_bar"):
+        st.button("Retour au projet", icon=":material/arrow_back:", key="nav_project",
+                  on_click=nav.go, args=(nav.VIEW_PROJECT, project.id),
+                  help=f"Revenir à la page du projet « {project.name} »")
 
 
 def render_flash() -> None:
