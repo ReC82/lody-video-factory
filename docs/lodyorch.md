@@ -209,7 +209,7 @@ n'est pas une tentative et ne produit pas de rapport.
   `<!-- lodyorch:rapport run=ID -->`. Le marqueur est cherché avant publication : jamais de doublon,
   même après un crash. Si GitHub est indisponible, le rapport reste archivé et la publication est
   retentée (délai croissant). Pour « lis le rapport #N » : dernier commentaire « Rapport lodyorch » du ticket.
-- **Email** : sujet `[Lody Video Factory] #N — état — intitulé`, résumé et lien du commentaire dans
+- **Email** : sujet `[Lody Video Factory] FIN #N — état — intitulé · run ID` (#215), résumé et lien du commentaire dans
   le corps, Markdown en pièce jointe, une fois par run. Transport et destinataire : le fichier SMTP
   existant de PlugAdmin (comme digorch et jury-central). **Le superviseur et ses sessions ne le voient
   pas** (systemd) : les emails sont préparés dans la base d'état puis envoyés par
@@ -267,6 +267,51 @@ sudo systemctl enable --now lodyorch-notify.timer  # emails des rapports
 lodyorch console                               # rattache LA console ; la crée seulement si absente
 ```
 
+## Démarrage réel, paire DÉMARRAGE / FIN et durées (ticket #215)
+
+La boîte mail indique ce qui se passe : pour chaque tentative réelle, un mail **DÉMARRAGE #N**, puis
+un mail **FIN #N** portant le **même identifiant de run** (8 caractères de la session) dans le sujet.
+
+- **Démarrage réel** : la session déclare son plan avec `lodyorch phase --plan "point" "point" …`
+  (commande déjà permise par le garde). Le superviseur — sans aucun appel Claude — met alors en
+  file `[Lody Video Factory] DÉMARRAGE #N — intitulé · run ID` : ticket et lien, heure de
+  Bruxelles et UTC (`LQ_MAIL_TZ`), run et tentative, catégorie et priorité, plan déclaré. Pas de mail
+  pour une simple découverte, une prise en charge ou un ticket rendu tout de suite (bloqué,
+  dépendance, déjà livré) sans plan. Session qui travaille sans déclarer de plan : DÉMARRAGE après
+  `LQ_START_GRACE` s (600 par défaut) avec « plan non annoncé » — rien n'est inventé.
+- **EN ATTENTE CI #N** : la session a ouvert sa PR et rendu la main ; Claude ne travaille plus, le
+  rapport FIN suivra au verdict de la CI.
+- **FIN #N** : le rapport #123 (terminé / à tester / bloqué / échec), enrichi d'une rubrique « Début,
+  fin et durées ».
+- **INTERROMPU #N** : une paire resterait ouverte — limite du fournisseur, arrêt volontaire, ou
+  superviseur arrêté pendant la session (détecté par `lodyorch-notify`, qui tourne même quand le
+  superviseur est mort, après `LQ_LOST_SESSION` s). Au redémarrage, le rapport FIN de la tentative
+  interrompue suit normalement.
+- Chaque mail a une clé unique dans l'outbox #123 (`start:`, `wait:`, `run:`, `end:`, `lost:` + run) :
+  jamais de doublon après un redémarrage ; un échec SMTP ne bloque ni ne relance aucune session.
+
+**Jalons persistés** (table `lifecycle`, ajoutée sans migration destructive, premier horodatage
+conservé) : ticket — `discovered`, `pr_opened` et `merged` (horodatages GitHub) ; run — `queued`
+(devenu éligible : découverte, fin de la tentative précédente, réponse du propriétaire, CI rouge),
+`launched` (session lancée = prise en charge), `started` (première phase déclarée), `plan`, `ended`,
+`ci_started`, `ci_ended`. Test humain et déploiement ne sont pas instrumentés (aucune source fiable
+côté superviseur).
+
+**Durées distinctes** : temps de session Claude (lancement → fin, dont « après démarrage réel »),
+attente en file (éligible → lancement), attente de CI (fin de session → verdict, jamais comptée
+comme active), durée totale (éligible → verdict ou fin), tentatives. Aucun coût converti en euros :
+seul le prix catalogue estimé par Claude Code reste affiché quand il existe.
+
+```
+lodyorch metrics [--days 30] [--top 8]   durées par catégorie et priorité, runs les plus longs,
+                                         paires DÉMARRAGE sans FIN, emails non remis
+```
+
+La catégorie vient d'un label explicite (`type:`, `catégorie:`, `area:`… ou `bug`, `documentation`),
+sinon de la première étiquette du titre hors priorité (`[P1][UX mobile] …` → UX mobile), sinon
+« non classé ». Médiane toujours, p90 à partir de 10 runs. Les sessions antérieures à #215 sont
+mesurées (session, file) ; leur attente de CI n'est pas connue.
+
 ## Exploitation
 
 ```
@@ -276,6 +321,7 @@ lodyorch pulse                  point d'activité en 3 lignes (fenêtre « activ
 lodyorch check                  contrôles d'installation (lecture seule)
 lodyorch labels [--apply]       labels du dépôt comparés au protocole (#117)
 lodyorch reports | report N     rapports de tentative (#123)
+lodyorch metrics [--days N]     durées par catégorie et priorité (#215)
 lodyorch queue | log [N] | sessions
 lodyorch pause | resume         ne plus démarrer de session / reprendre (resume réarme le disjoncteur)
 lodyorch stop [--now]           arrêter après la session en cours, ou tout de suite
