@@ -6,12 +6,17 @@
   `deliver` (WAITING_OWNER + PR), `blocked`, `crash` (aucun résultat, code 1), `secret` (fuite simulée
   d'un jeton dans la sortie, qui doit être masquée dans le journal). FAKE_CLAUDE_SLEEP : durée
   simulée de la session avant son rapport (essais de reprise). FAKE_CLAUDE_EXTRA : JSON fusionné
-  dans le rapport de fin."""
+  dans le rapport de fin. FAKE_CLAUDE_PLAN (#215) : liste JSON déclarée par la vraie commande
+  `lodyorch phase --plan …` avant tout le reste ; mode `limit` : limite fournisseur (429)."""
 
 import json
 import os
+import subprocess
 import sys
 import time
+from pathlib import Path
+
+ORCH = Path(__file__).resolve().parents[2] / "deploy" / "lodyorch" / "lodyorch.py"
 
 
 def main(argv):
@@ -30,7 +35,15 @@ def main(argv):
         print(json.dumps({"type": "user", "message": {"content": [
             {"type": "tool_result", "tool_use_id": "t1", "content": "token ghp_" + "A" * 36 + " api_key=\"zzzzzzzzzzzz\""}]}}),
             flush=True)
+    plan = json.loads(os.environ.get("FAKE_CLAUDE_PLAN") or "[]")
+    if plan:
+        subprocess.run([sys.executable, str(ORCH), "phase", "--plan", *plan], check=True,
+                       stdout=subprocess.DEVNULL)
     if mode == "crash":
+        return 1
+    if mode == "limit":
+        print(json.dumps({"type": "result", "result": "usage limit reached", "is_error": True,
+                          "api_error_status": 429}), flush=True)
         return 1
     time.sleep(float(os.environ.get("FAKE_CLAUDE_SLEEP", "0")))
     status = {"deliver": "WAITING_OWNER", "secret": "WAITING_OWNER", "blocked": "BLOCKED"}[mode]
