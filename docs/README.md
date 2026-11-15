@@ -10,6 +10,9 @@ ainsi que l'existence des fichiers liés.
 
 - [Interface et déploiement](lody-ui.md) — interface Streamlit indépendante (`webui/Lody.py`)
   organisée par projets, avec ses commandes de build, de déploiement et de retour arrière.
+- [Navigation et architecture d'information](lody-navigation.md) — domaines Projets / Personnages /
+  Ressources, portée réelle des données, parcours à une main, voix et proposition de bibliothèque
+  partagée (#213).
 - [Export / import de configuration de projet](lody-project-transfer.md) — format JSON versionné
   pour exporter ou importer un projet entier (paramètres, personnages, lieux), en création ou en
   mise à jour explicite.
