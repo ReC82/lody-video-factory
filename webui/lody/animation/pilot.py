@@ -10,6 +10,8 @@ installer la démonstration Voltix #150 dans un projet de DEV.
 - ``install_voltix_demo`` : catalogue Voltix (#136) + schéma coaxial (#150) + storyboard de la démo #150,
   prêt à être préparé dans le projet. Aucun appel payant ; la démo est muette tant que la voix n'est pas
   branchée dans le fournisseur.
+- ``link_catalog_characters`` (#211) : relie les marionnettes d'un catalogue déjà installé à la fiche personnage
+  du même nom créée APRÈS l'installation (sinon la vidéo restait muette sans moyen de corriger).
 """
 
 from __future__ import annotations
@@ -154,6 +156,47 @@ def coax_manifest(data_root: Path) -> dict[str, Any]:
                                          "sha256": animation_worker.sha256_file(data_root / COAX_PATH)}]})
 
 
+def voice_label(character: Any) -> str:
+    """Voix réellement utilisée par le rendu 2D pour cette fiche (même lecture que ``voiceover.voice_spec``)."""
+    from lody.animation.voiceover import voice_spec
+
+    spec = voice_spec(character)
+    if spec is None:
+        return "aucune voix ElevenLabs choisie sur la fiche : à faire dans Personnages, sinon le rendu est refusé"
+    return f"voix ElevenLabs « {spec.voice_name or spec.voice_id} »"
+
+
+def link_catalog_characters(repo: AnimationAssetRepository, project_id: str, catalog: Any) -> list[str]:
+    """Relie à leur fiche (même nom, casse ignorée) les marionnettes du catalogue présentes dans le projet sans lien.
+
+    Retrouve l'asset local par EMPREINTE de version (jamais par nom d'asset) ; un lien déjà posé, même vers une
+    autre fiche, n'est jamais remplacé (choix de l'utilisateur). Renvoie une note par marionnette traitée."""
+    from lody.characters import CharacterRepository
+
+    characters = {" ".join(c.name.split()).casefold(): c
+                  for c in CharacterRepository(repo.db_path).list_for_project(project_id, include_inactive=False)}
+    by_digest = _versions_by_digest(repo, project_id)
+    notes: list[str] = []
+    for item in catalog.get("assets", []) if isinstance(catalog, dict) else []:
+        wanted = " ".join(str(item.get("character") or "").split())
+        if item.get("kind") != "character" or not wanted:
+            continue
+        local_ids = {by_digest[v.get("sha256")][0] for v in item.get("versions") or [] if v.get("sha256") in by_digest}
+        for asset_id in sorted(local_ids):
+            asset = repo.get(project_id, asset_id)
+            if asset.character_id:
+                continue
+            character = characters.get(wanted.casefold())
+            if character is None:
+                notes.append(f"« {asset.name} » n'est reliée à aucune fiche : crée le personnage « {wanted} » avec sa "
+                             "voix puis réinstalle la démo, ou relie-la dans « Voix des marionnettes ». "
+                             "Sinon la vidéo sera muette.")
+                continue
+            repo.update(project_id, asset_id, character_id=character.id)
+            notes.append(f"« {asset.name} » reliée à la fiche « {character.name} » ({voice_label(character)}).")
+    return notes
+
+
 def install_voltix_demo(repo: AnimationAssetRepository, project_id: str, data_root: Path,
                         bundled_root: Path = BUNDLED_ROOT, storyboard_path: Path = DEMO_STORYBOARD
                         ) -> tuple[dict[str, Any], list[str]]:
@@ -181,5 +224,8 @@ def install_voltix_demo(repo: AnimationAssetRepository, project_id: str, data_ro
             notes.append("Schéma « câble coaxial 75 Ω » ajouté au catalogue.")
     else:
         notes.append("Assets de la démo déjà présents dans le catalogue du projet.")
-    notes.append("Démo #150 muette dans Lody : la voix provisoire de la vidéo de référence n'est pas rejouée.")
+    catalog = json.loads((bundled_root / VOLTIX_CATALOG.relative_to(BUNDLED_ROOT)).read_text(encoding="utf-8"))
+    notes.extend(link_catalog_characters(repo, project_id, catalog))
+    notes.append("La voix vient de la fiche personnage reliée à la marionnette (ElevenLabs) ; sans fiche reliée, "
+                 "la vidéo est muette et ses répliques deviennent les sous-titres.")
     return adopt_storyboard(repo, project_id, storyboard), notes

@@ -22,6 +22,7 @@ from lody.generation.runtime import DEFAULT_PROVIDER
 from lody.generation.service import ProductionService
 from lody.projects import Project
 from lody.theme import esc
+from lody.view_home import label_text
 
 FORM_KEY = "_char_form"  # (project_id, character_id ou None) tant que le formulaire est ouvert ; absent = fermé.
 CONFIRM_KEY = "_char_confirm_deactivate"
@@ -161,7 +162,25 @@ def _voice_summary(character: Character) -> str:
     return " · ".join(filter(None, [label, character.voice_name]))
 
 
+def row_label(character: Character) -> str:
+    """Libellé d'une ligne compacte (#212) : nom, puis rôle et statut en mini-indication.
+
+    Échappé comme les noms de projet (#195) : un libellé d'expander Streamlit interprète le Markdown."""
+    parts = [label_text(character.name)]
+    if character.role:
+        parts.append(label_text(character.role))
+    if character.is_primary:
+        parts.append("principal")
+    if not character.is_active:
+        parts.append("inactif")
+    return " · ".join(parts)
+
+
 def _row(repo: CharacterRepository, project: Project, character: Character) -> None:
+    """Une ligne par personnage (#212) : le détail et les actions s'ouvrent au toucher, jamais en grande carte.
+
+    La désactivation reste en deux temps (bouton tertiaire puis confirmation explicite) : jamais d'action
+    destructive sur un tap involontaire."""
     badges = []
     if character.is_primary:
         badges.append('<span class="pill pill-ok">Principal</span>')
@@ -172,33 +191,35 @@ def _row(repo: CharacterRepository, project: Project, character: Character) -> N
     if voice:
         details.append(esc(voice))
     meta_text = " · ".join(details) or "Rôle non précisé"
-    with st.container(horizontal=True, vertical_alignment="center", key=f"item_row_{character.id}"):
-        st.markdown(
-            f'<div class="prod-info"><p class="prod-title">{esc(character.name)}</p>'
-            f'<p class="prod-meta"><span>{meta_text}</span>{"".join(badges)}</p></div>',
-            unsafe_allow_html=True,
-        )
-        with st.container(horizontal=True, key=f"item_actions_{character.id}"):
-            st.button("Modifier", key=f"edit_{character.id}", icon=":material/edit:",
-                      on_click=_start_edit, args=(project.id, character.id))
-            if character.is_active:
-                st.button("Désactiver", key=f"deactivate_{character.id}", type="tertiary",
-                          on_click=_ask_deactivate, args=(character.id,))
-            else:
-                st.button("Réactiver", key=f"activate_{character.id}", type="tertiary",
-                          on_click=_activate, args=(repo, project.id, character.id))
-    if st.session_state.get(CONFIRM_KEY) == character.id:
-        with st.container(key=f"confirm_deactivate_{character.id}"):
+    confirming = st.session_state.get(CONFIRM_KEY) == character.id
+    state = "active" if character.is_active else "inactive"
+    with st.container(key=f"crow_{state}_{character.id}"):
+        with st.expander(row_label(character), expanded=confirming, key=f"cexp_{character.id}"):
             st.markdown(
-                f'<p class="confirm-title">Désactiver « {esc(character.name)} » ?</p>'
-                '<p class="confirm-text">Il n’apparaîtra plus dans les choix d’une prochaine production, '
-                "mais reste modifiable et peut être réactivé à tout moment.</p>",
+                f'<div class="prod-info"><p class="prod-meta"><span>{meta_text}</span>{"".join(badges)}</p></div>',
                 unsafe_allow_html=True,
             )
-            with st.container(horizontal=True, key=f"confirm_deactivate_actions_{character.id}"):
-                st.button("Oui, désactiver", type="primary", key=f"confirm_deactivate_yes_{character.id}",
-                          on_click=_deactivate, args=(repo, project.id, character.id))
-                st.button("Annuler", key=f"cancel_deactivate_{character.id}", on_click=_cancel_deactivate)
+            with st.container(horizontal=True, key=f"item_actions_{character.id}"):
+                st.button("Modifier", key=f"edit_{character.id}", icon=":material/edit:", type="primary",
+                          on_click=_start_edit, args=(project.id, character.id))
+                if character.is_active:
+                    st.button("Désactiver", key=f"deactivate_{character.id}", type="tertiary",
+                              on_click=_ask_deactivate, args=(character.id,))
+                else:
+                    st.button("Réactiver", key=f"activate_{character.id}", type="tertiary",
+                              on_click=_activate, args=(repo, project.id, character.id))
+            if confirming:
+                with st.container(key=f"confirm_deactivate_{character.id}"):
+                    st.markdown(
+                        f'<p class="confirm-title">Désactiver « {esc(character.name)} » ?</p>'
+                        '<p class="confirm-text">Il n’apparaîtra plus dans les choix d’une prochaine production, '
+                        "mais reste modifiable et peut être réactivé à tout moment.</p>",
+                        unsafe_allow_html=True,
+                    )
+                    with st.container(horizontal=True, key=f"confirm_deactivate_actions_{character.id}"):
+                        st.button("Oui, désactiver", type="primary", key=f"confirm_deactivate_yes_{character.id}",
+                                  on_click=_deactivate, args=(repo, project.id, character.id))
+                        st.button("Annuler", key=f"cancel_deactivate_{character.id}", on_click=_cancel_deactivate)
 
 
 # Contraintes GÉNÉRIQUES (jamais spécifiques à un personnage, donc jamais un codage en dur de nom/trait) :
@@ -769,12 +790,10 @@ def _render_import_export(repo: CharacterRepository, project: Project) -> None:
 
 
 def render(repo: CharacterRepository, project: Project, service: ProductionService) -> None:
+    # #212 : titre compact (le nom du projet en sur-titre), aide repliée au lieu d'un pavé introductif.
     st.markdown(
-        '<section class="hero"><p class="eyebrow">Personnages</p>'
-        f'<h1 class="hero-title">{esc(project.name)}</h1>'
-        '<p class="hero-sub">Facultatif : décris les personnages récurrents de ce projet pour les retrouver '
-        "plus tard dans une production. Sans personnage, tes vidéos se génèrent exactement comme aujourd’hui."
-        "</p></section>",
+        f'<section class="hero hero-compact"><p class="eyebrow">{esc(project.name)}</p>'
+        '<h1 class="hero-title">Personnages</h1></section>',
         unsafe_allow_html=True,
     )
 
@@ -787,10 +806,6 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
         st.button("Retour au projet", icon=":material/arrow_back:", key="char_back_archived",
                   on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
         return
-
-    with st.container(horizontal=True, key="project_actions"):
-        st.button("Retour au projet", icon=":material/arrow_back:", type="tertiary", key="char_back",
-                  on_click=nav.go, args=(nav.VIEW_PROJECT, project.id))
 
     is_open, target = _form_target(project.id)
     current: Character | None = None
@@ -811,6 +826,18 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
             unsafe_allow_html=True,
         )
 
+    if is_open:
+        # #212 : le formulaire remplace la liste, en haut de page — jamais à atteindre par défilement.
+        # « Annuler » referme sans rien enregistrer et rend la liste.
+        _render_form(repo, project, target, current)
+        _render_reference_proposal(repo, project, service, current)
+        _render_voice_casting(repo, service, project, current)
+        _render_voice_lab(repo, service, project, current)
+        return
+
+    st.button("Ajouter un personnage", type="primary", icon=":material/add:", key="add_character",
+              on_click=_start_create, args=(project.id,))
+
     characters = repo.list_for_project(project.id)
     if not characters:
         with st.container(key="empty_state"):
@@ -821,18 +848,16 @@ def render(repo: CharacterRepository, project: Project, service: ProductionServi
                 unsafe_allow_html=True,
             )
     else:
-        with st.container(key="characters"):
-            st.markdown('<p class="card-eyebrow">Personnages du projet</p>', unsafe_allow_html=True)
+        with st.container(key="char_list"):
             for character in characters:
                 _row(repo, project, character)
 
-    if not is_open:
-        st.button("Ajouter un personnage", type="primary", icon=":material/add:", key="add_character",
-                  on_click=_start_create, args=(project.id,))
-    else:
-        _render_reference_proposal(repo, project, service, current)
-        _render_voice_casting(repo, service, project, current)
-        _render_voice_lab(repo, service, project, current)
-        _render_form(repo, project, target, current)
-
-    _render_import_export(repo, project)
+    with st.expander("À quoi servent les personnages ?", icon=":material/help:"):
+        st.markdown(
+            '<p class="row-desc">Facultatif : décris les personnages récurrents de ce projet pour les retrouver '
+            "d’une vidéo à l’autre. Sans personnage, tes vidéos se génèrent exactement comme aujourd’hui. Un "
+            "personnage n’est utilisé par une production que s’il y est explicitement sélectionné.</p>",
+            unsafe_allow_html=True,
+        )
+    with st.expander("Import / Export", icon=":material/import_export:"):
+        _render_import_export(repo, project)

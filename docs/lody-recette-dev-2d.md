@@ -32,7 +32,7 @@ moteur de scène factice et le vrai worker, le vrai cache de scène, le vrai ser
 | **Accès au moteur qui détient la clé ElevenLabs** | **Absent** : le pilote ne rejoint pas le réseau `moneyprinterturbo_default` et n'a pas `LODY_ENGINE_URL` ; la synthèse passe par `POST /api/v1/voice_preview` du moteur | **Décision du propriétaire** : surcharge temporaire, non versionnée (§ 4.2). Sans elle, la recette s'arrête proprement à « moteur injoignable » (testé) |
 | Clé ElevenLabs | Dans le `config.toml` du moteur, jamais dans Lody ni dans le pilote | Rien à copier. Ne rien ajouter au pilote |
 | Fiche « Voltix » avec voix ElevenLabs | Le volume DEV est vierge : aucune fiche | Créer la fiche **avant** d'installer la démo (§ 4.3) |
-| Lien asset « Voltix — marionnette » → fiche | Fait **uniquement à l'import du catalogue**, si une fiche « Voltix » existe déjà ; aucun écran ne permet de le refaire après | Respecter l'ordre du § 4.3, sinon la vidéo est annoncée muette (« Voix : désactivée ») |
+| Lien asset « Voltix — marionnette » → fiche | Fait à l'import du catalogue si une fiche « Voltix » existe ; depuis #211, **réinstaller la démo** relie aussi une fiche créée après coup, et **Atelier 2D → « Voix des marionnettes »** permet de choisir la fiche à la main | Sans lien, la vidéo est annoncée muette (« Voix : désactivée ») |
 | Assets du jeu de test | Ceux de la démo #150, présents dans l'image | « Installer la démo Voltix #150 » puis importer `storyboard-v1.json` |
 | Tarif pour l'estimation en € | `pricing.toml` absent du volume DEV → total « partiel » | Facultatif : déposer `/data/pricing.toml` (§ 4.4) ; l'estimation en **caractères** est toujours affichée |
 | Préflight du worker | Ne contrôle ni la voix ni le moteur | La voix est contrôlée par « Préparer la génération » (ligne « Voix ») |
@@ -109,7 +109,9 @@ redémarrée. Le préflight reste « Aucun secret visible ».
 2. **Personnages → Nouveau** : nom exactement `Voltix`, voix **ElevenLabs**, `voice_id` recopié de la fiche Voltix
    de production (saisie manuelle — aucun appel), mêmes réglages de direction de voix.
 3. **Nouvelle production → Atelier 2D → « Installer la démo Voltix #150 »** : le message ne doit **pas** contenir
-   « personnage « Voltix » absent du projet, lien non repris ».
+   « personnage « Voltix » absent du projet, lien non repris ». Si c'est le cas (fiche créée après), créer la
+   fiche puis réinstaller la démo, ou choisir la fiche dans « Voix des marionnettes » (#211) : la ligne sous la
+   marionnette doit afficher « Voix ElevenLabs « … » ».
 4. Importer `docs/animation/recette-187/storyboard-v1.json` comme storyboard (2 scènes : `accueil`, `coaxial`).
 5. Sans pricing : facultatif § 4.4. Puis passer au protocole.
 

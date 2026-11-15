@@ -1,0 +1,803 @@
+{
+  "schema": "lody.animation-assets/1",
+  "assets": [
+    {
+      "id": "ast_137000000001",
+      "name": "Caméra de plateau",
+      "kind": "prop",
+      "description": "Caméra générique, sortie SDI en BNC.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 380,
+            "height": 320,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "corps",
+              "objectif",
+              "sortie-sdi",
+              "trepied",
+              "viseur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/regie-camera/v1/regie-camera.svg",
+                "sha256": "ff60c6d4fee17a07d6d64fd897a977ec599274ace53a08846673d30b1f20b760"
+              }
+            ]
+          },
+          "sha256": "a2acb5b47fd85b79d6473eea38770309556418f3c85c9f3b01d699abd6aa4b80",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000002",
+      "name": "Mélangeur vidéo",
+      "kind": "prop",
+      "description": "Bus PGM/PVW, T-bar, entrées SDI en BNC.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 460,
+            "height": 270,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "bus",
+              "entrees-sdi",
+              "pupitre",
+              "t-bar"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/regie-melangeur/v1/regie-melangeur.svg",
+                "sha256": "94e50c21deed2fb56eed12e026d2243c1c0bacb95e90ad9747b3a3c471471544"
+              }
+            ]
+          },
+          "sha256": "194e073c680d2341714941509a119798f0413a0aa1470dd278ad4bbb9f64e9bf",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000003",
+      "name": "Moniteur de contrôle",
+      "kind": "prop",
+      "description": "Écran noir, entrée SDI.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 400,
+            "height": 320,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "cadre",
+              "ecran",
+              "entree-sdi",
+              "pied"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/regie-moniteur/v1/regie-moniteur.svg",
+                "sha256": "2512cb189843f2073bd9ce8b0fd9da635c1f9d5e9e2400d4219a4385c2970588"
+              }
+            ]
+          },
+          "sha256": "45c9ecafb7ab443f3d0e1a99d51a9686547e5b9865eed42e9b863f6e63701948",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000004",
+      "name": "Mire de barres",
+      "kind": "prop",
+      "description": "Image retrouvée sur le moniteur.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 316,
+            "height": 190,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "barres"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/mire/v1/mire.svg",
+                "sha256": "3df3e2205685c1c4e25130b4515c0189f35a8d61d07bc2ec5e93f67bc63ae1cb"
+              }
+            ]
+          },
+          "sha256": "a33f912012a46c9b40ba8825f9545eeba4506746ae13625534db8805c7a39cbb",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000005",
+      "name": "Câble SDI droit",
+      "kind": "prop",
+      "description": "Coaxial noir, fiche BNC à chaque bout.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 760,
+            "height": 80,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "fiches",
+              "gaine"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/cable-sdi-droit/v1/cable-sdi-droit.svg",
+                "sha256": "7e6f630f94cbbb636061bd565d6ae4783f25fc6dc32d641c52be875f75dd68fc"
+              }
+            ]
+          },
+          "sha256": "acc1ce69fb23ffa66d832af37054fd4ccf396d4959e21c58b8d91d8b91cf04b7",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000006",
+      "name": "Paquet numérique",
+      "kind": "prop",
+      "description": "Petit paquet de données qui voyage dans le câble.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 72,
+            "height": 72,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "paquet"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/paquet/v1/paquet.svg",
+                "sha256": "c4fdf9b3f62f2e56625a6df5b8347a3ca87fe4c20616631f7f086b95c0e8e413"
+              }
+            ]
+          },
+          "sha256": "3ac0a45fb9f497d4567d0920465008ff8a67730e592d528fd00d9b0c8e01484f",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000010",
+      "name": "Coax longitudinal — Âme en cuivre",
+      "kind": "prop",
+      "description": "Calque de la coupe longitudinale (repère commun 1000 × 240).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1000,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "coax-ame"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/coax-ame/v1/coax-ame.svg",
+                "sha256": "4e12c050e0a5c4f67014cec966759a6f97443919c49eed40c175d06b53208412"
+              }
+            ]
+          },
+          "sha256": "241b10a59e2b3412e7925591db8c262a328467a8cdea5000fd3062778b0db60b",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000011",
+      "name": "Coax longitudinal — Diélectrique (isolant)",
+      "kind": "prop",
+      "description": "Calque de la coupe longitudinale (repère commun 1000 × 240).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1000,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "coax-isolant"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/coax-isolant/v1/coax-isolant.svg",
+                "sha256": "8c0992facc0bf35e3486aaee513ffee8f59f5fb721a5c7bbec9096c0c1012b56"
+              }
+            ]
+          },
+          "sha256": "58225a6e2d63dc1f787a00ed9dfa0c82a84e9cc47ff4f5876bda6d9e8332920e",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000012",
+      "name": "Coax longitudinal — Blindage : feuille + tresse",
+      "kind": "prop",
+      "description": "Calque de la coupe longitudinale (repère commun 1000 × 240).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1000,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "coax-blindage",
+              "feuille",
+              "tresse"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/coax-blindage/v1/coax-blindage.svg",
+                "sha256": "78e310d01518e4678d2557ff5da885fee49d9bb2e5fe6a95c3c81dcdf8c8a347"
+              }
+            ]
+          },
+          "sha256": "ac29097895201b4aba5771d545d43b1ea045d2f84948f1f8f9be3e5afc93b234",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000013",
+      "name": "Coax longitudinal — Gaine extérieure",
+      "kind": "prop",
+      "description": "Calque de la coupe longitudinale (repère commun 1000 × 240).",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1000,
+            "height": 240,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "coax-gaine"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/coax-gaine/v1/coax-gaine.svg",
+                "sha256": "d55c64428a2d57175eee2630399c615bf037950b0c5ae52838c818b62d01070a"
+              }
+            ]
+          },
+          "sha256": "78d0a57de57bddaaae2f2f2e664b02fca951241c5c12fdf3311d048fc40da240",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000014",
+      "name": "Coax — coupe transversale légendée",
+      "kind": "prop",
+      "description": "Âme, diélectrique, feuille, tresse, gaine ; proportions type 1694A.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 1000,
+            "height": 560,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "ame",
+              "coupe",
+              "dielectrique",
+              "feuille",
+              "gaine",
+              "impedance",
+              "legendes",
+              "tresse"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/coax-transversale/v1/coax-transversale.svg",
+                "sha256": "fadab59b24b4b4f5b0730b92fccb15eab918a3a59509fb928e3d5f7dbcde1e1b"
+              }
+            ]
+          },
+          "sha256": "3ebdb40f2137a049dce4aa1b9a2e662bc5374d0f78f5460e7a5ad46ed37486ed",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000020",
+      "name": "BNC — débranché / inséré / verrouillé",
+      "kind": "prop",
+      "description": "Planche de profil : fente en J et ergot dans les trois états.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 900,
+            "height": 840,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "etat-debranche",
+              "etat-insere",
+              "etat-verrouille"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/bnc-etats/v1/bnc-etats.svg",
+                "sha256": "7975b5e7793234af4bf502603dfe4474265bc30e164314a2491b67a3a42f7519"
+              }
+            ]
+          },
+          "sha256": "6ae045357ac9af9b1db30f10caae6fadac7980bc3351a1d2a541cd419cd44c15",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000021",
+      "name": "BNC — bague vue de face",
+      "kind": "prop",
+      "description": "Bague de la fiche mâle, 2 entrées de fente.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 360,
+            "height": 360,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "bague",
+              "broche",
+              "isolant"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/bnc-bague-face/v1/bnc-bague-face.svg",
+                "sha256": "2639540667bd9f85d6c0bea5917fe67607ac1a152ab4517e5d977eca4beb80f6"
+              }
+            ]
+          },
+          "sha256": "c82c24c3ddc2c8b5c7b4e11abdc2e4e0c7294083b008dbb220b2b89cb92b6d75",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000022",
+      "name": "BNC — fût et ergots vue de face",
+      "kind": "prop",
+      "description": "Embase femelle, 2 ergots.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 360,
+            "height": 360,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "ergots",
+              "fut"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/bnc-ergots-face/v1/bnc-ergots-face.svg",
+                "sha256": "69d07110be1a78b5eb36d9d1bfdb4f2fef9834ba870f2340e9b4314919f4e4e9"
+              }
+            ]
+          },
+          "sha256": "f629b18887fb07c815d2ec1784b6ae60440af30dcbf16b4af127d3609ebedbd7",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000030",
+      "name": "Signal numérique stable",
+      "kind": "prop",
+      "description": "Créneaux nets.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 160,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "onde"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/onde-stable/v1/onde-stable.svg",
+                "sha256": "bfc32aa27e86220b139669d0466433c0bb4b24b008afc3b2665e961f6ce25947"
+              }
+            ]
+          },
+          "sha256": "ea8063f864a476b7d916b51ad99b7b18e18f6c0671f074016664e85c5e65a189",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000031",
+      "name": "Signal numérique dégradé",
+      "kind": "prop",
+      "description": "Créneaux déformés et coupures.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 600,
+            "height": 160,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "onde"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/onde-degradee/v1/onde-degradee.svg",
+                "sha256": "cbaa4c283ffd70b57e56153dbfc4961fe1af3fba9f7485199795ccd1afd15932"
+              }
+            ]
+          },
+          "sha256": "3bfeedcb7865d1773bb6b2fe3922df799f957ee34ad2302c7a464ed8af27b8b8",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000032",
+      "name": "Icône vidéo",
+      "kind": "prop",
+      "description": "Piste vidéo.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 160,
+            "height": 140,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "icone"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/icone-video/v1/icone-video.svg",
+                "sha256": "9f9bf49e9a026b006f0e21839be39250d3a6699e89631f1ae76209a05a81ce9a"
+              }
+            ]
+          },
+          "sha256": "f0a6e63087e6d244028bb37a555aa1d8c454323b4f63fbce76f1aae9a80b7cce",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000033",
+      "name": "Icône audio",
+      "kind": "prop",
+      "description": "Piste audio intégrée.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 160,
+            "height": 140,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "icone"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/icone-audio/v1/icone-audio.svg",
+                "sha256": "2a6a48cb7b85c12781bb63aead66aa24e5159aaf884e71537aa008b8368b2aad"
+              }
+            ]
+          },
+          "sha256": "781bd0a50f3e4c51513fb4ac5cf21f35d5dc074b94c9eecba7e64693ef803414",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000040",
+      "name": "Débit HD-SDI",
+      "kind": "prop",
+      "description": "Barre proportionnelle au débit nominal.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 760,
+            "height": 90,
+            "anchor": {
+              "x": 0.0,
+              "y": 0.5
+            },
+            "parts": [
+              "barre",
+              "valeur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/debit-hd/v1/debit-hd.svg",
+                "sha256": "aea40267764fd993f11484f450ca30c4fd000c0a447560015cfaa9a88a54fc02"
+              }
+            ]
+          },
+          "sha256": "d12d19d8454aa2e59ba23b8e230c51c1457a55805aab66a4e4580ca206cc445a",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000041",
+      "name": "Débit 3G-SDI",
+      "kind": "prop",
+      "description": "Barre proportionnelle au débit nominal.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 760,
+            "height": 90,
+            "anchor": {
+              "x": 0.0,
+              "y": 0.5
+            },
+            "parts": [
+              "barre",
+              "valeur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/debit-3g/v1/debit-3g.svg",
+                "sha256": "beb88f20937841efb1dc3c2a2b6a680385c43dd2727c59e2d4e00a5bbd5aa1d6"
+              }
+            ]
+          },
+          "sha256": "e75bec44c90b8f4b81524cd32ecf60e3bfcda837db1808aeefb8586262b31604",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000042",
+      "name": "Débit 12G-SDI",
+      "kind": "prop",
+      "description": "Barre proportionnelle au débit nominal.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 760,
+            "height": 90,
+            "anchor": {
+              "x": 0.0,
+              "y": 0.5
+            },
+            "parts": [
+              "barre",
+              "valeur"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/debit-12g/v1/debit-12g.svg",
+                "sha256": "62d956686ab8227c834e99249a427247053a1cf8cba8fcc036a969ba16d1e0e6"
+              }
+            ]
+          },
+          "sha256": "933efdd0e1fbe3318c56154c994739e5aa047db4d1695e91a4d487a1b1a2dd06",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    },
+    {
+      "id": "ast_137000000050",
+      "name": "Étiquette 75 Ω",
+      "kind": "prop",
+      "description": "Impédance du câble et des connecteurs.",
+      "is_active": true,
+      "character": null,
+      "location": null,
+      "versions": [
+        {
+          "version": 1,
+          "manifest": {
+            "format": "svg",
+            "width": 240,
+            "height": 120,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.5
+            },
+            "parts": [
+              "etiquette"
+            ],
+            "files": [
+              {
+                "role": "base",
+                "path": "animation-assets/etiquette-75/v1/etiquette-75.svg",
+                "sha256": "8010d766fffc84953d5bfecfbd4e593782ccaca146990b3a2ecdd7ccaff31446"
+              }
+            ]
+          },
+          "sha256": "5a5027e96dcf0f3a39f9e3e07e15362d1c9354ac5b25313a21b33d39f4bd066b",
+          "notes": "Épisode #137 : schéma SDI/BNC v1."
+        }
+      ]
+    }
+  ]
+}

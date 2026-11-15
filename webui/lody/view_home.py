@@ -12,7 +12,7 @@ import re
 
 import streamlit as st
 
-from lody import catalog, nav
+from lody import catalog, nav, view_library
 from lody.components import EMPTY_ICON_SVG, format_datetime
 from lody.project_list import SORT_OPTIONS, SORT_RECENT, filter_projects, sort_projects
 from lody.projects import Project, ProjectNotFound, ProjectRepository, STATUS_ACTIVE, STATUS_ARCHIVED
@@ -38,6 +38,32 @@ def _restore(repo: ProjectRepository, project_id: str) -> None:
 def _open(project_id: str) -> None:
     st.session_state[LAST_OPENED_KEY] = project_id
     nav.go(nav.VIEW_PROJECT, project_id)
+
+
+def resume_target(active: list[Project], last_opened: str | None) -> Project | None:
+    """Projet à reprendre (#213) : le dernier ouvert dans cette session s'il est encore actif, sinon le
+    projet actif modifié le plus récemment. Aucun projet archivé n'est proposé."""
+    if not active:
+        return None
+    for project in active:
+        if project.id == last_opened:
+            return project
+    return max(active, key=lambda project: project.updated_at)
+
+
+def _render_resume(active: list[Project]) -> None:
+    target = resume_target(active, st.session_state.get(LAST_OPENED_KEY))
+    if target is None:
+        return
+    with st.container(key="resume_row"):
+        st.button(
+            f"Reprendre : {label_text(target.name)}",
+            key="resume_project",
+            icon=":material/history:",
+            help="Rouvrir directement ce projet",
+            on_click=_open,
+            args=(target.id,),
+        )
 
 
 def _clear_search() -> None:
@@ -119,15 +145,18 @@ def render(repo: ProjectRepository) -> None:
     archived = repo.list_projects(STATUS_ARCHIVED)
     is_empty = not active and not archived
 
+    view_library.render_global_nav(nav.VIEW_HOME)
     if is_empty:
         title, subtitle = "Bienvenue sur Lody Video Factory", "Crée ton premier projet pour organiser tes vidéos."
     else:
-        title, subtitle = "Tes projets vidéo", "Retrouve tes projets, ou lance-en un nouveau."
+        # Accueil compact (#213) : pas de sous-titre, la liste et la reprise arrivent dès le premier écran.
+        title, subtitle = "Tes projets vidéo", ""
 
     with st.container(horizontal=True, vertical_alignment="bottom", key="hero_row"):
         st.markdown(
-            '<section class="hero"><p class="eyebrow">Projets</p>'
-            f'<h1 class="hero-title">{esc(title)}</h1><p class="hero-sub">{esc(subtitle)}</p></section>',
+            f'<section class="hero{"" if subtitle else " hero-compact"}"><p class="eyebrow">Projets</p>'
+            f'<h1 class="hero-title">{esc(title)}</h1>'
+            + (f'<p class="hero-sub">{esc(subtitle)}</p>' if subtitle else "") + "</section>",
             unsafe_allow_html=True,
         )
         if not is_empty:
@@ -157,6 +186,7 @@ def render(repo: ProjectRepository) -> None:
             )
         return
 
+    _render_resume(active)
     _prepare_widget_state()
     with st.container(horizontal=True, vertical_alignment="center", key="list_toolbar"):
         query = st.text_input(
