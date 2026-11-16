@@ -114,8 +114,14 @@ def main(argv):
         return 0
     if base.endswith("/pulls"):
         head = query.get("head", [""])[0].split(":", 1)[-1]
-        print(json.dumps([p for p in data.get("pulls", {}).values() if p["head"].get("ref") == head
-                          and p.get("state") == "open"]))
+        page = int(query.get("page", ["1"])[0])
+        # Sans `head` : toutes les PR ouvertes (inventaire #228), une seule page.
+        print(json.dumps([p for p in data.get("pulls", {}).values() if (not head or p["head"].get("ref") == head)
+                          and p.get("state") == "open"] if page == 1 else []))
+        return 0
+    m = re.fullmatch(r"repos/[^/]+/[^/]+/branches/([^/]+)", base)
+    if m:
+        print(json.dumps({"name": m.group(1), "commit": {"sha": data.get("main_sha", "c" * 40)}}))
         return 0
     m = re.fullmatch(r"repos/[^/]+/[^/]+/commits/([^/]+)/check-runs", base)
     if m:

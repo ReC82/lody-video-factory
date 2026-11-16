@@ -90,6 +90,35 @@ Il ne partage rien en écriture avec `dig`, `digorch`, `jury-central` ou `rpgque
   e-mail « File à l'arrêt » part, et seulement si le propriétaire peut débloquer la file (PR à relire
   ou ticket bloqué). Il est dédoublonné sur l'état de la file et espacé d'au moins 12 h.
 
+### File d'intégration : résorber les PR en attente (ticket #228)
+
+Une PR ouverte à rebaser, corriger ou fusionner est du **travail**, pas une raison d'attendre.
+
+- **Inventaire dynamique** (`pr_inventory`, table `pr_queue`) : quand aucun ticket neuf n'est
+  exécutable, et au plus toutes les `LQ_PR_INVENTORY_EVERY` secondes (600 par défaut, ou tout de
+  suite après `sync`), le superviseur relit sur GitHub **toutes** les PR ouvertes : tête, verdict CI,
+  `mergeable`/`mergeable_state`, ticket lié (`agent/<N>-…`), brouillon, statut du ticket, refus
+  « base périmée » de la politique de fusion. Classement : `conflit`, `CI en échec`, `base périmée`
+  (réparables), `CI en cours`, `en calcul`, `prête`, `brouillon`, `ticket dans la file`,
+  `intervention humaine requise` (branche hors convention, ticket bloqué/terminé/hors file, essais
+  épuisés), chacune avec sa raison et, si besoin, **l'unique action** attendue du propriétaire.
+- **Session INTÉGRATION** : la PR réparable la mieux classée (priorité du ticket, code avant
+  documentation, conflit d'abord, plus ancienne d'abord) est confiée à une session sur **sa propre
+  branche** : `git merge origin/main` (jamais de rebase ni de push forcé), résolution consciente des
+  conflits en gardant les changements récents de `main`, lint/tests, push. Le ticket revient en
+  `WAITING_OWNER` avec la même PR ; la CI fraîche est suivie par `watch_ci`, la fusion reste décidée
+  par la politique et le broker (#200/#207), la mise en ligne par le livreur (#221). Une PR verte
+  connue d'avant le suivi de CI est soumise directement à la politique de fusion, sans session.
+- Passe **avant** la file de préparation (#165) et **après** tout ticket neuf exécutable.
+- **Garde-fous** : une seule tentative par état (tête de la PR, tête de `main`) ; un nouvel essai
+  n'a lieu que si l'une des deux bouge. Après `LQ_INTEGRATION_MAX_ATTEMPTS` essais (2 par défaut)
+  sans tête verte, la PR passe « intervention humaine requise ». Plafond
+  `max_integration_sessions_per_day` (`LQ_MAX_INTEGRATION_SESSIONS_PER_DAY`, 6 par défaut,
+  0 = désactivé), compté aussi dans `max_sessions_per_day`.
+- **E-mail « File à l'arrêt »** : jamais envoyé tant qu'une PR est intégrable ; sinon il donne le
+  nombre de PR à traiter, de conflits, de blocages réellement non résolubles, l'action en cours, et
+  pour chaque blocage la raison concrète et l'action unique. `status` liste la file d'intégration.
+
 ## Labels tenus par le superviseur
 
 | Situation | Label |

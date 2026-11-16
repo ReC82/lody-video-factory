@@ -197,6 +197,11 @@ SETTINGS = {
                                   "File de préparation (#165) : sessions lancées au plus par jour sur un ticket dont "
                                   "les dépendances ont une PR en revue non fusionnée (contrats, tests, maquettes). "
                                   "Comptées aussi dans max_sessions_per_day. 0 = désactivé."),
+    "max_integration_sessions_per_day": ("LQ_MAX_INTEGRATION_SESSIONS_PER_DAY", 6, 0, 50,
+                                         "File d'intégration (#228) : sessions lancées au plus par jour pour réparer une "
+                                         "PR en attente (conflit avec main, CI en échec, base périmée) quand aucun "
+                                         "ticket neuf n'est exécutable. Comptées aussi dans max_sessions_per_day. "
+                                         "0 = désactivé."),
     "max_cost_usd_per_day": ("LQ_MAX_COST_USD_PER_DAY", 0.0, 0.0, 10000.0,
                              "Plafond du coût estimé du jour (total_cost_usd de Claude Code, prix catalogue : "
                              "une estimation, pas une facture). 0 = désactivé."),
@@ -325,6 +330,15 @@ def db():
     CREATE TABLE IF NOT EXISTS merge_ops(
         pr INTEGER, head_sha TEXT, issue INTEGER, state TEXT, started_at TEXT, finished_at TEXT DEFAULT '',
         merge_sha TEXT DEFAULT '', error TEXT DEFAULT '', PRIMARY KEY(pr, head_sha));
+    """)
+    # #228 : inventaire des PR ouvertes (file d'intégration), reconstruit depuis GitHub à chaque passage.
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS pr_queue(
+        pr INTEGER PRIMARY KEY, issue INTEGER, title TEXT DEFAULT '', branch TEXT DEFAULT '',
+        head_sha TEXT DEFAULT '', main_sha TEXT DEFAULT '', kind TEXT DEFAULT '', reason TEXT DEFAULT '',
+        action TEXT DEFAULT '', ci TEXT DEFAULT '', merge_state TEXT DEFAULT '', docs_only INTEGER NOT NULL DEFAULT 0,
+        files_sha TEXT DEFAULT '', priority INTEGER NOT NULL DEFAULT 50, repair_key TEXT DEFAULT '',
+        repairs INTEGER NOT NULL DEFAULT 0, last_repair_at TEXT DEFAULT '', seen_at TEXT DEFAULT '');
     """)
     for table, col, decl in (("tasks", "prep_key", "TEXT DEFAULT ''"), ("sessions", "mode", "TEXT DEFAULT ''"),
                              ("tasks", "merge_checked_at", "TEXT DEFAULT ''")):
@@ -529,6 +543,234 @@ def next_preparation(con):
     return found[0] if found else None
 
 
+# ---------------------------------------------------------------- file d'intégration (#228)
+#
+# Une PR ouverte en conflit avec main, en échec de CI ou à base périmée est du TRAVAIL, pas une
+# attente : quand aucun ticket neuf n'est exécutable, une session INTÉGRATION la répare sur sa
+# propre branche (`git merge origin/main`, jamais de rebase ni de push forcé). La CI fraîche est
+# ensuite suivie par watch_ci, la fusion reste décidée par la politique et le broker (#200/#207), la
+# mise en ligne par le livreur de l'hôte (#221). Une seule tentative par couple (tête de la PR, main) ;
+# après LQ_INTEGRATION_MAX_ATTEMPTS tentatives sans résultat, la PR passe « intervention humaine
+# requise », avec la raison concrète et l'unique action attendue.
+
+INVENTORY_EVERY_SECONDS = int(os.environ.get("LQ_PR_INVENTORY_EVERY", 600))
+INTEGRATION_MAX_ATTEMPTS = int(os.environ.get("LQ_INTEGRATION_MAX_ATTEMPTS", 2))
+BRANCH_TICKET_RE = re.compile(r"^agent/(\d+)-")
+DOCS_ONLY_RE = re.compile(r"^([^/]+\.md|docs/.*\.md)$")  # même règle que merge_policy.DOCS_ONLY
+REPAIRABLE = ("conflict", "ci_failed", "stale_base")
+PR_KIND_TEXT = {"conflict": "conflit avec main", "ci_failed": "CI en échec", "stale_base": "base périmée",
+                "ci_pending": "CI en cours", "ready": "prête (CI verte, sans conflit)",
+                "computing": "fusionnabilité en cours de calcul par GitHub", "draft": "brouillon (préparation)",
+                "in_queue": "ticket déjà dans la file", "human": "intervention humaine requise"}
+
+
+def classify_pr(con, pr, ci, prev=None):
+    """(kind, ticket, raison, action humaine) d'une PR ouverte, d'après GitHub et la base locale.
+    `ci` : verdict de ci_verdict sur la tête ; `prev` : ligne pr_queue précédente (essais déjà faits)."""
+    num = pr["number"]
+    head = pr.get("head") or {}
+    branch = head.get("ref", "")
+    head_repo = (head.get("repo") or {}).get("full_name", "")
+    m = BRANCH_TICKET_RE.match(branch)
+    issue = int(m.group(1)) if m else None
+    if not m or (head_repo and head_repo != REPO):
+        return ("human", issue, f"branche « {branch} » hors convention agent/<ticket>-… : jamais modifiée par {INSTANCE}",
+                f"relire puis fusionner ou fermer la PR #{num} à la main")
+    t = task(con, issue)
+    if not t:
+        return ("human", issue, f"ticket #{issue} hors de la file agent:auto",
+                f"poser agent:auto sur #{issue}, ou traiter la PR #{num} à la main")
+    if t["status"] in ("READY", "RUNNING", "TESTING"):
+        return "in_queue", issue, f"ticket #{issue} {t['status']} : sa propre session reprend la PR", ""
+    if t["status"] in ("BLOCKED", "FAILED", "SUSPENDED"):
+        why = (t["blockers"] or "en attente du propriétaire").strip().replace("\n", " ")[:160]
+        return ("human", issue, f"ticket #{issue} {t['status']} : {why}",
+                f"répondre dans le ticket #{issue} (ou retirer agent:blocked)")
+    if t["status"] == "DONE":
+        return ("human", issue, f"ticket #{issue} terminé mais PR #{num} encore ouverte",
+                f"fermer la PR #{num}, ou rouvrir le ticket #{issue}")
+    if pr.get("draft"):
+        return "draft", issue, "brouillon : attend la fusion de ses dépendances", ""
+    mergeable, state = pr.get("mergeable"), pr.get("mergeable_state") or ""
+    kind = ""
+    if mergeable is False or state == "dirty":
+        kind, reason = "conflict", f"conflit avec main (mergeable_state={state or '?'})"
+    elif ci == "failure":
+        kind, reason = "ci_failed", "CI en échec sur la tête de la PR"
+    elif con.execute("""SELECT 1 FROM merge_audit WHERE pr=? AND head_sha=? AND refusals LIKE ?
+                        ORDER BY id DESC LIMIT 1""", (num, head.get("sha", ""), "%base-sans-chevauchement%")).fetchone():
+        kind, reason = "stale_base", "base trop ancienne ou fichiers modifiés depuis par main (politique de fusion)"
+    if kind:
+        repairs = prev["repairs"] if prev else 0
+        if repairs >= INTEGRATION_MAX_ATTEMPTS:
+            return ("human", issue, f"{reason} ; {repairs} tentative(s) d'intégration automatique sans résultat",
+                    f"résoudre à la main la PR #{num} (merge de main dans {branch}) ou la fermer")
+        return kind, issue, reason, ""
+    if mergeable is None or state == "unknown":
+        return "computing", issue, "GitHub calcule encore la fusionnabilité", ""
+    if ci != "success":
+        return "ci_pending", issue, f"CI {ci} sur la tête", ""
+    return ("ready", issue, f"CI verte, sans conflit (mergeable_state={state or '?'})",
+            f"fusionner la PR #{num}, ou poser merge:auto sur #{issue}")
+
+
+def pr_docs_only(num, head_sha, prev):
+    """Documentation seule ? Liste des fichiers relue seulement quand la tête change."""
+    if prev and prev["files_sha"] == head_sha:
+        return bool(prev["docs_only"])
+    files = gh_list(f"repos/{REPO}/pulls/{num}/files")
+    return bool(files) and all(DOCS_ONLY_RE.match(f.get("filename", "")) for f in files)
+
+
+def main_head():
+    data = gh_json(f"repos/{REPO}/branches/main")
+    return ((data or {}).get("commit") or {}).get("sha", "") if isinstance(data, dict) else ""
+
+
+def pr_inventory(con, force=False):
+    """Inventaire dynamique des PR ouvertes (tête, CI, conflits, ticket, risques) dans pr_queue.
+    Espacé de LQ_PR_INVENTORY_EVERY sauf demande explicite ; rend la liste ou None (pas de passage,
+    ou GitHub injoignable : l'inventaire précédent est gardé)."""
+    last = float(ctl_get(con, "pr_inventory_ts", "0") or 0)
+    if not force and not ctl_get(con, "pr_inventory_requested") and time.time() - last < INVENTORY_EVERY_SECONDS:
+        return None
+    ctl_set(con, "pr_inventory_ts", time.time())
+    ctl_set(con, "pr_inventory_requested", "")
+    pulls = gh_list(f"repos/{REPO}/pulls?state=open")
+    if pulls is None:
+        return None
+    main_sha = main_head()
+    seen, rows = [], []
+    for item in pulls:
+        num = item.get("number")
+        pr = gh_json(f"repos/{REPO}/pulls/{num}") if num else None
+        if not isinstance(pr, dict) or pr.get("state") != "open":
+            continue
+        prev = con.execute("SELECT * FROM pr_queue WHERE pr=?", (num,)).fetchone()
+        head_sha = (pr.get("head") or {}).get("sha", "")
+        ci, _ = ci_verdict(head_sha) if head_sha else ("none", "")
+        repairs = prev["repairs"] if prev else 0
+        if prev and repairs and not (prev["repair_key"] or "").startswith(head_sha[:12]) and ci == "success":
+            repairs = 0  # tête nouvelle et verte depuis le dernier essai : la réparation a réussi
+            con.execute("UPDATE pr_queue SET repairs=0 WHERE pr=?", (num,))
+            prev = con.execute("SELECT * FROM pr_queue WHERE pr=?", (num,)).fetchone()
+        kind, issue, reason, action = classify_pr(con, pr, ci, prev)
+        t = task(con, issue) if issue else None
+        row = dict(pr=num, issue=issue, title=(pr.get("title") or "")[:200], branch=(pr.get("head") or {}).get("ref", ""),
+                   head_sha=head_sha, main_sha=main_sha, kind=kind, reason=reason, action=action, ci=ci,
+                   merge_state=str(pr.get("mergeable_state") or ""),
+                   docs_only=int(pr_docs_only(num, head_sha, prev)), files_sha=head_sha,
+                   priority=t["priority"] if t else 99, repairs=repairs, seen_at=iso())
+        con.execute(f"""INSERT INTO pr_queue({','.join(row)}) VALUES({','.join('?' * len(row))})
+                        ON CONFLICT(pr) DO UPDATE SET {','.join(f'{k}=excluded.{k}' for k in row if k != 'pr')}""",
+                    tuple(row.values()))
+        if kind == "ready" and t and t["status"] == "WAITING_OWNER" and pr_number(t["pr"]) == num \
+                and t["ci_state"] not in ("success", "pending", "merged"):
+            # PR verte connue d'avant le suivi de CI : soumise à la politique de fusion (#200), sans session.
+            update_task(con, issue, ci_state="success", ci_detail="CI verte constatée par l'inventaire (#228).",
+                        merge_checked_at="")
+        seen.append(num)
+        rows.append(row)
+    con.execute(f"DELETE FROM pr_queue WHERE pr NOT IN ({','.join('?' * len(seen)) or 'NULL'})", seen)
+    con.commit()
+    ctl_set(con, "pr_inventory_at", iso())
+    return rows
+
+
+def integration_key(row):
+    return f"{row['head_sha'][:12]}:{row['main_sha'][:12]}"
+
+
+def integration_sessions_today(con):
+    return con.execute("SELECT COUNT(*) c FROM sessions WHERE mode='integrate' AND started_at >= ?",
+                       (iso(day_start(con)),)).fetchone()["c"]
+
+
+def integration_candidates(con):
+    """PR réparables pas encore tentées pour leur état (tête, main), par valeur : priorité du ticket,
+    code (testable) avant documentation, puis la plus ancienne."""
+    out = []
+    for r in con.execute(f"""SELECT * FROM pr_queue WHERE kind IN ({','.join('?' * len(REPAIRABLE))})
+                             ORDER BY priority, docs_only, CASE kind WHEN 'conflict' THEN 0 WHEN 'stale_base' THEN 1
+                             ELSE 2 END, pr""", REPAIRABLE).fetchall():
+        if r["repair_key"] == integration_key(r):
+            continue  # déjà tentée pour cet état : on attend que la PR ou main bouge
+        t = task(con, r["issue"])
+        if not t or t["status"] != "WAITING_OWNER":
+            continue
+        out.append((t, r))
+    return out
+
+
+def next_integration(con):
+    """La PR à intégrer quand aucun ticket neuf n'est exécutable : (ticket, ligne pr_queue) ou None."""
+    cap = setting(con, "max_integration_sessions_per_day")[0]
+    if not cap or integration_sessions_today(con) >= cap:
+        return None
+    found = integration_candidates(con)
+    return found[0] if found else None
+
+
+def integration_overview(con):
+    """Synthèse locale (sans réseau) de la file d'intégration, pour le statut et les emails."""
+    rows = con.execute("SELECT * FROM pr_queue ORDER BY priority, docs_only, pr").fetchall()
+    by = {}
+    for r in rows:
+        by.setdefault(r["kind"], []).append(r)
+    cap = setting(con, "max_integration_sessions_per_day")[0]
+    return {"rows": rows, "by": by, "total": len(rows),
+            "conflicts": len(by.get("conflict", [])),
+            "repairable": [r for r in rows if r["kind"] in REPAIRABLE],
+            "candidates": [r["pr"] for _, r in integration_candidates(con)],
+            "human": by.get("human", []), "ready": by.get("ready", []),
+            "pending": by.get("ci_pending", []) + by.get("computing", []),
+            "used": integration_sessions_today(con), "cap": cap,
+            "at": ctl_get(con, "pr_inventory_at")}
+
+
+def integration_text(iv):
+    """Une ligne : PR à traiter, conflits, réparables, blocages humains, prochaine action."""
+    if not iv["total"]:
+        return ""
+    parts = [f"{iv['total']} PR ouverte(s) : {iv['conflicts']} en conflit"]
+    other = len(iv["repairable"]) - iv["conflicts"]
+    if other:
+        parts.append(f"{other} autre(s) à réparer (CI en échec / base périmée)")
+    if iv["pending"]:
+        parts.append(f"{len(iv['pending'])} en CI ou en calcul")
+    if iv["ready"]:
+        parts.append(f"{len(iv['ready'])} prête(s) à fusionner")
+    parts.append(f"{len(iv['human'])} blocage(s) réellement humain(s)")
+    if iv["candidates"]:
+        if iv["cap"] and iv["used"] < iv["cap"]:
+            parts.append(f"prochaine intégration : PR #{iv['candidates'][0]} (intégrations du jour {iv['used']}/{iv['cap']})")
+        else:
+            parts.append("intégration " + ("désactivée" if not iv["cap"] else f"plafonnée ({iv['used']}/{iv['cap']})"))
+    elif iv["repairable"]:
+        parts.append("réparations tentées : attente d'un nouveau SHA de la PR ou de main")
+    return "intégration : " + ", ".join(parts)
+
+
+INTEGRATE_TEXT = """## Mode INTÉGRATION (#228) — à respecter strictement
+
+Aucun ticket neuf n'est exécutable : le superviseur te confie la **réparation de la PR #{pr}**
+(branche `{branch}`, tête `{head}`) du ticket #{issue}, déjà livrée mais non fusionnable :
+**{reason}**. Ce mode remplace la règle 3 (réconciliation) pour cette session ; tout le reste vaut.
+- Travaille SUR la branche de la PR, dans `{workdir}/ticket-{issue}` (créé depuis `{branch}` s'il
+  manque ; sinon `git fetch origin` puis `git checkout {branch}` et `git pull --ff-only`). Jamais de
+  nouvelle branche, jamais de deuxième PR, jamais de rebase ni de push forcé.
+- `git merge origin/main` : résous chaque conflit **en conscience** — lis le diff de main depuis la
+  base commune (`git log -p --merge`), garde les changements récents de main, réapplique ceux de la
+  PR par-dessus ; en cas de doute sur une intention produit, n'écrase rien et rends `BLOCKED` avec
+  UNE question précise. Ne supprime aucun fichier utilisateur, aucune migration destructive.
+- CI en échec : `gh run view <id> --log-failed`, correction ciblée sur la même branche.
+- Lint et tests ciblés comme la CI, puis push de la branche (nouvelle tête = nouvelle CI) ; mets à
+  jour le corps de la PR (section « Intégration du {today} ») et commente le ticket UNE fois.
+- Ne fusionne, n'approuve et ne ferme rien : la fusion suit la politique (#200) et le broker (#207).
+- Rapport de fin : `"status": "WAITING_OWNER"` avec la MÊME PR ({pr_url}) et le dernier SHA poussé.
+"""
+
+
 def local_missing(con, deps):
     """Dépendances ouvertes d'après la seule base locale (lecture seule, sans réseau)."""
     done = {r["issue"] for r in con.execute(
@@ -559,6 +801,7 @@ def queue_overview(con):
         "SELECT issue FROM tasks WHERE status IN ('BLOCKED','FAILED') ORDER BY priority, issue")]
     cap = setting(con, "max_prep_sessions_per_day")[0]
     ov["prep_used"], ov["prep_cap"] = prep_sessions_today(con), cap
+    ov["integration"] = integration_overview(con)
     return ov
 
 
@@ -597,36 +840,83 @@ def overview_text(ov):
                      + (f" ({len(ov['prepared'])} déjà préparé(s) : {_nums(ov['prepared'])})" if ov["prepared"] else ""))
     if ov["delayed"]:
         parts.append("en délai de reprise : " + ", ".join(f"#{n} après {nb}" for n, nb in ov["delayed"][:4]))
+    if ov.get("integration") and integration_text(ov["integration"]):
+        parts.append(integration_text(ov["integration"]))
     return " ; ".join(parts) + "."
 
 
+def integration_action(iv):
+    """Ce que fait (ou attend) la file d'intégration, en une phrase."""
+    if iv["candidates"] and iv["cap"] and iv["used"] < iv["cap"]:
+        return f"intégration de la PR #{iv['candidates'][0]} au prochain tour"
+    if iv["candidates"]:
+        return ("file d'intégration désactivée (max_integration_sessions_per_day=0)" if not iv["cap"] else
+                f"intégrations du jour plafonnées ({iv['used']}/{iv['cap']}) : reprise demain, ou "
+                f"`{CLI_NAME} config set max_integration_sessions_per_day <n>`")
+    if iv["pending"]:
+        return "attente de la CI ou du calcul GitHub sur " + _nums(r["pr"] for r in iv["pending"])
+    if iv["repairable"]:
+        return ("réparation déjà tentée sur l'état actuel de " + _nums(r["pr"] for r in iv["repairable"])
+                + " : reprise dès qu'un nouveau commit arrive sur la PR ou sur main")
+    if iv["ready"]:
+        return "attente de la fusion des PR prêtes (propriétaire, ou politique merge:auto / ux-safe)"
+    if iv["human"]:
+        return "attente du propriétaire : voir l'action unique de chaque blocage ci-dessous"
+    return "aucune : ni ticket exécutable ni PR à intégrer"
+
+
 def notify_idle(con, ov):
-    """Un seul email quand la file est réellement à l'arrêt (rien d'exécutable ni de préparable) et
-    que le propriétaire peut la débloquer (PR à relire, tickets bloqués). Dédoublonné sur l'état de la
-    file et espacé d'au moins 12 h : jamais de boucle d'emails identiques."""
+    """Un seul email quand la file est réellement à l'arrêt (rien d'exécutable, de préparable ni
+    d'intégrable) et que le propriétaire peut la débloquer. Dédoublonné sur l'état de la file et
+    espacé d'au moins 12 h : jamais de boucle d'emails identiques. #228 : jamais « aucun travail
+    utile » tant qu'une PR est réparable ; compte les PR, les conflits et les vrais blocages."""
     if not NOTIFY_SMTP_ENV or ov["executable"] or ov["delayed"]:
         return
     if ov["preparable"] and ov["prep_cap"] and ov["prep_used"] < ov["prep_cap"]:
         return
-    if not ov["in_review"] and not ov["blocked"]:
+    iv = ov.get("integration") or integration_overview(con)
+    if iv["candidates"] and iv["cap"] and iv["used"] < iv["cap"]:
+        return  # une PR est intégrable : ce n'est pas une file à l'arrêt
+    if not ov["in_review"] and not ov["blocked"] and not iv["total"]:
         return
-    state = json.dumps([[n for n, *_ in ov["in_review"]], ov["blocked"], ov["waiting_deps"]])
+    state = json.dumps([[n for n, *_ in ov["in_review"]], ov["blocked"], ov["waiting_deps"],
+                        [[r["pr"], r["kind"], r["head_sha"]] for r in iv["rows"]]])
     digest = hashlib.sha256(state.encode()).hexdigest()[:16]
     last = ctl_get(con, "idle_notice_at")
     if ctl_get(con, "idle_notice_key") == digest or (last and time.time() - float(last) < 12 * 3600):
         return
     ctl_set(con, "idle_notice_key", digest)
     ctl_set(con, "idle_notice_at", time.time())
-    lines = [f"{INSTANCE} n'a plus de travail utile : aucune session n'est lancée tant que rien ne change.", "",
-             "Synthèse :", overview_text(ov), "", "PR en attente de revue :"]
-    lines += [f"- #{n} : {pr or '(PR non renseignée)'}" for n, pr, _ in ov["in_review"]] or ["- aucune"]
+    nothing = not iv["repairable"] and not iv["pending"] and not iv["ready"]
+    lines = [f"{INSTANCE} : aucune session lancée pour l'instant"
+             + (" — rien n'est réparable sans vous." if nothing else " — intégration en attente (voir l'action en cours)."),
+             "", f"PR ouvertes à traiter : {iv['total']}", f"Conflits avec main : {iv['conflicts']}",
+             f"Blocages réellement non résolubles par {INSTANCE} : {len(iv['human'])}",
+             f"Action en cours : {integration_action(iv)}", "", "Synthèse :", overview_text(ov)]
+    if iv["human"]:
+        lines += ["", "Intervention humaine indispensable (raison → action unique) :"]
+        lines += [f"- PR #{r['pr']}" + (f" (ticket #{r['issue']})" if r["issue"] else "") + f" : {r['reason']} → {r['action']}"
+                  for r in iv["human"]]
+    if iv["ready"]:
+        lines += ["", "Prêtes à fusionner (CI verte, sans conflit) :"]
+        lines += [f"- PR #{r['pr']} : {r['action']}" for r in iv["ready"]]
+    others = [r for r in iv["rows"] if r["kind"] not in ("human", "ready")]
+    if others:
+        lines += ["", "Autres PR ouvertes :"]
+        lines += [f"- PR #{r['pr']}" + (f" (ticket #{r['issue']})" if r["issue"] else "")
+                  + f" : {PR_KIND_TEXT.get(r['kind'], r['kind'])} — {r['reason']}" for r in others]
+    if not iv["total"]:
+        lines += ["", "PR en attente de revue :"]
+        lines += [f"- #{n} : {pr or '(PR non renseignée)'}" for n, pr, _ in ov["in_review"]] or ["- aucune"]
     if ov["blocked"]:
         lines += ["", "Tickets bloqués (une réponse dans le ticket les relance) :"]
         lines += [f"- https://github.com/{REPO}/issues/{n}" for n in ov["blocked"]]
-    lines += ["", "Aucune fusion automatique : la file reprend dès qu'une PR est fusionnée, qu'un ticket est "
-              "débloqué ou qu'un nouveau ticket agent:auto arrive."]
-    queue_notification(con, f"idle:{digest}", None, "File à l'arrêt",
-                       f"{NOTIFY_PREFIX} File à l'arrêt — {len(ov['in_review'])} PR en revue", "\n".join(lines))
+    lines += ["", "La file reprend seule dès qu'une PR ou main change, qu'un ticket est débloqué ou qu'un nouveau "
+              "ticket agent:auto arrive. Fusion : politique et broker (#200/#207) ; mise en ligne : livreur (#221)."]
+    subject = (f"{NOTIFY_PREFIX} File à l'arrêt — {iv['total']} PR à traiter, {iv['conflicts']} conflit(s), "
+               f"{len(iv['human'])} blocage(s) humain(s)" if iv["total"]
+               else f"{NOTIFY_PREFIX} File à l'arrêt — {len(ov['in_review'])} PR en revue")
+    queue_notification(con, f"idle:{digest}", None, "File à l'arrêt", subject, "\n".join(lines))
 
 
 # ---------------------------------------------------------------- quota
@@ -857,7 +1147,7 @@ n'est exécutable : le superviseur te confie une **préparation**, qui remplace 
 """
 
 
-def build_prompt(con, t, session_id, status_file, prepare=None):
+def build_prompt(con, t, session_id, status_file, prepare=None, integrate=None):
     base = PROMPT_FILE.read_text(encoding="utf-8")
     history = con.execute("""SELECT started_at, outcome, detail FROM sessions WHERE issue=?
                              ORDER BY started_at DESC LIMIT 5""", (t["issue"],)).fetchall()
@@ -869,6 +1159,10 @@ def build_prompt(con, t, session_id, status_file, prepare=None):
     if prepare:
         mode = PREPARE_TEXT.format(deps=", ".join(f"#{n}" for n in prepare), deps_csv=",".join(map(str, prepare)),
                                    prs=", ".join(review_pr(con, n) or f"#{n}" for n in prepare))
+    elif integrate:
+        mode = INTEGRATE_TEXT.format(pr=integrate["pr"], branch=integrate["branch"], head=integrate["head_sha"][:10],
+                                     issue=t["issue"], reason=integrate["reason"], workdir=WORKDIR,
+                                     today=iso()[:10], pr_url=f"https://github.com/{REPO}/pull/{integrate['pr']}")
     if "{{MODE}}" in base:
         base = base.replace("{{MODE}}", mode)
     elif mode:
@@ -929,21 +1223,31 @@ def session_env(base, **extra):
     return env
 
 
-def run_session(con, t, prepare=None):
+def run_session(con, t, prepare=None, integrate=None):
     session_id = str(uuid.uuid4())
     log_path = LOG_DIR / f"{iso().replace(':', '')}-{t['issue']}-{session_id[:8]}.jsonl"
     status_file = LOG_DIR / f"{session_id}.status.json"
     # Présent = le propriétaire a repris la main : lu par le crochet de garde de la session.
     yield_file = LOG_DIR / f"{session_id}.yield"
     yield_at = 0.0
-    prompt = build_prompt(con, t, session_id, status_file, prepare)
+    prompt = build_prompt(con, t, session_id, status_file, prepare, integrate)
     key = prep_key(con, prepare) if prepare else ""
     con.execute("INSERT INTO sessions(id,issue,started_at,log_path,mode) VALUES(?,?,?,?,?)",
-                (session_id, t["issue"], iso(), str(log_path), "prepare" if prepare else ""))
+                (session_id, t["issue"], iso(), str(log_path),
+                 "prepare" if prepare else "integrate" if integrate else ""))
+    if integrate:
+        # #228 : une seule tentative par état (tête, main), comptée AVANT la session (un crash compte).
+        con.execute("UPDATE pr_queue SET repair_key=?, repairs=repairs+1, last_repair_at=? WHERE pr=?",
+                    (integration_key(integrate), iso(), integrate["pr"]))
+        update_task(con, t["issue"], note=f"Intégration (#228) de la PR #{integrate['pr']} ({integrate['branch']}) : "
+                                          f"{integrate['reason']}. Merge d'origin/main sur la même branche, tests, "
+                                          "push, puis WAITING_OWNER avec la même PR.")
+        ctl_set(con, "pr_inventory_requested", "1")
     update_task(con, t["issue"], status="RUNNING", last_session=session_id, last_activity=iso(),
                 attempts=t["attempts"] + 1)
     event(con, t["issue"], "session_start", f"Session {session_id} (tentative {t['attempts'] + 1})"
-          + (f" — préparation : dépendances {', '.join(f'#{n}' for n in prepare)} en revue" if prepare else ""))
+          + (f" — préparation : dépendances {', '.join(f'#{n}' for n in prepare)} en revue" if prepare else "")
+          + (f" — intégration de la PR #{integrate['pr']} : {integrate['reason']}" if integrate else ""))
     if GH_SYNC and t["issue"] != TRIAGE:
         set_status_label(con, t["issue"], "RUNNING")
         if CLAIM_COMMENT:
@@ -2578,7 +2882,8 @@ def queue_start_mail(con, s, t, reason=""):
              f"Début : {mail_time(began)}",
              f"Catégorie : {ticket_category(t['title'], labels)} · Priorité P{t['priority'] // 10}",
              f"Run : {run} (session {s['id']}) · tentative n° {run_rank(con, n, s['id'])}"
-             + (" · préparation" if (s["mode"] if "mode" in s.keys() else "") == "prepare" else ""),
+             + {"prepare": " · préparation", "integrate": " · intégration de PR (#228)"}.get(
+                 (s["mode"] if "mode" in s.keys() else "") or "", ""),
              "État : Claude travaille réellement sur ce ticket.", "", "Prévu :"]
     lines += [f"- {x}" for x in plan] or [f"- Plan non annoncé par la session ({reason or 'aucune déclaration'}) :"
                                           " rien n'est inventé ici, voir le ticket."]
@@ -2896,7 +3201,16 @@ def supervise():
             pause_for(con, POLL_SECONDS)
             continue
         t = next_task(con)
-        prepare = None
+        prepare = integrate = None
+        if t is None and GH_SYNC:
+            # #228 : une PR à réparer est du travail, avant toute préparation et avant d'annoncer l'arrêt.
+            try:
+                pr_inventory(con)
+            except Exception as exc:  # noqa: BLE001 — un inventaire raté ne doit jamais arrêter la file
+                event(con, None, "integration_error", f"Inventaire des PR : {type(exc).__name__}: {exc}"[:500])
+            found = next_integration(con)
+            if found:
+                t, integrate = found
         if t is None:
             found = next_preparation(con)
             if found:
@@ -2934,7 +3248,7 @@ def supervise():
             continue
         ctl_set(con, "preflight_error", "")
         ctl_set(con, "idle_reason", "")
-        run_session(con, t, prepare)
+        run_session(con, t, prepare, integrate)
         if GH_SYNC:
             ctl_set(con, "sync_requested", "1")
 
@@ -3214,8 +3528,11 @@ def observe(con):
             o["next"] = t
             break
     o["overview"] = ov = queue_overview(con)
-    o["prepare_next"] = (task(con, ov["preparable"][0]) if not o["next"] and ov["preparable"] and ov["prep_cap"]
-                         and ov["prep_used"] < ov["prep_cap"] else None)
+    iv = ov["integration"]
+    o["integrate_next"] = (next((r for r in iv["rows"] if r["pr"] == iv["candidates"][0]), None)
+                           if not o["next"] and iv["candidates"] and iv["cap"] and iv["used"] < iv["cap"] else None)
+    o["prepare_next"] = (task(con, ov["preparable"][0]) if not o["next"] and not o["integrate_next"] and ov["preparable"]
+                         and ov["prep_cap"] and ov["prep_used"] < ov["prep_cap"] else None)
 
     # État et catégorie d'inactivité (pulse) : repos normal, quota, session bloquée, erreur, validation.
     if not alive and mode in ("STOP", "STOP_NOW") and not cur:
@@ -3240,6 +3557,9 @@ def observe(con):
     elif mode != "RUNNING":
         state, why, cat = "BLOQUÉ", f"mode {mode} — " + (ctl_get(con, "pause_reason") or f"{CLI_NAME} resume pour reprendre."), \
             "en pause"
+    elif o["integrate_next"]:
+        state, why, cat = "AU REPOS", (f"aucun ticket neuf, intégration de la PR #{o['integrate_next']['pr']} au "
+                                       "prochain tour — " + overview_text(ov)), "repos normal"
     elif o["prepare_next"]:
         state, why, cat = "AU REPOS", ("rien d'exécutable, préparation au prochain tour — " + overview_text(ov)), \
             "repos normal"
@@ -3301,6 +3621,8 @@ def cmd_pulse(con, _):
         ticket = f"#{cur['issue']} {ptitle(t)[:58]}"
     elif o["next"]:
         ticket = f"prochain : #{o['next']['issue']} {ptitle(o['next'])[:52]}"
+    elif o["integrate_next"]:
+        ticket = f"intégration : PR #{o['integrate_next']['pr']} (#{o['integrate_next']['issue']})"
     elif o["prepare_next"]:
         ticket = f"préparation : #{o['prepare_next']['issue']} {ptitle(o['prepare_next'])[:48]}"
     else:
@@ -3573,6 +3895,15 @@ def cmd_status_tickets(con, _):
         print(f"Prochain ticket à préparer (#165) : #{o['prepare_next']['issue']} {ptitle(o['prepare_next'])[:60]} "
               f"— préparations du jour {ov['prep_used']}/{ov['prep_cap']}")
     print(f"Synthèse de la file : {overview_text(ov)}")
+    iv = ov["integration"]
+    if iv["total"]:
+        print(f"File d'intégration (#228, inventaire {local(iv['at']) if iv['at'] else 'jamais'}) : "
+              f"{integration_action(iv)}")
+        for r in iv["rows"][:15]:
+            print(f"  PR #{r['pr']}" + (f" (#{r['issue']})" if r["issue"] else "")
+                  + f" : {PR_KIND_TEXT.get(r['kind'], r['kind'])} — {r['reason'][:90]}"
+                  + (f" → {r['action']}" if r["action"] else "")
+                  + (f" [essais {r['repairs']}/{INTEGRATION_MAX_ATTEMPTS}]" if r["repairs"] else ""))
     later = [t for t in queue_rows if t is not nxt]
     if later:
         print("Ensuite : " + ", ".join(f"#{t['issue']} P{t['priority'] // 10}" for t in later[:12])
@@ -3760,6 +4091,7 @@ def cmd_sync(con, _):
         print("Synchronisation GitHub désactivée pour cette instance (LQ_GH_SYNC).")
         return 2
     ctl_set(con, "sync_requested", "1")
+    ctl_set(con, "pr_inventory_requested", "1")  # #228 : inventaire des PR ouvertes refait aussi
     print("Synchronisation demandée : le superviseur la fera dans les 2 s s'il est inactif, sinon après la session.")
     return 0
 
