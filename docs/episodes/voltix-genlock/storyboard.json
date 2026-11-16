@@ -1,0 +1,2388 @@
+{
+  "schema": "lody.animation/1",
+  "canvas": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920
+  },
+  "scenes": [
+    {
+      "id": "accroche",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Deux caméras filment à la même cadence. Alors pourquoi leurs images ne sont-elles pas forcément synchronisées ?",
+        "purpose": "Accrocher : même cadence, mais pas le même instant.",
+        "mood": "intrigué, énergique",
+        "notes": "Les aiguilles tournent à la même vitesse ; seul l'angle de départ diffère (40°)."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "cameras",
+            "objects": [
+              {
+                "id": "camera-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 900
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.75
+                  }
+                ]
+              },
+              {
+                "id": "camera-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 780,
+                    "y": 900
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.75
+                  }
+                ]
+              },
+              {
+                "id": "label-a",
+                "type": "text",
+                "text": {
+                  "content": "Caméra A",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1130
+                  }
+                ]
+              },
+              {
+                "id": "label-b",
+                "type": "text",
+                "text": {
+                  "content": "Caméra B",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 780,
+                    "y": 1130
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "chronos",
+            "objects": [
+              {
+                "id": "chrono-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 1350
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 179,
+                    "value": 360
+                  }
+                ]
+              },
+              {
+                "id": "chrono-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 780,
+                    "y": 1350
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": 40
+                  },
+                  {
+                    "frame": 179,
+                    "value": 400
+                  }
+                ]
+              },
+              {
+                "id": "decalage",
+                "type": "text",
+                "text": {
+                  "content": "Décalage !",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1550
+                  }
+                ],
+                "start": 100,
+                "opacity": [
+                  {
+                    "frame": 100,
+                    "value": 0
+                  },
+                  {
+                    "frame": 115,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 2300
+                  },
+                  {
+                    "frame": 18,
+                    "x": 540,
+                    "y": 1750
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.2
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 90,
+                    "name": "confusion"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 10,
+                    "end": 50,
+                    "name": "rebond"
+                  },
+                  {
+                    "start": 100,
+                    "end": 170,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "musiciens",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Imaginez deux musiciens qui jouent à la même vitesse… mais pas sur le même tempo !",
+        "purpose": "Métaphore : même vitesse, temps décalés.",
+        "mood": "ludique"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.4
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "metronomes",
+            "objects": [
+              {
+                "id": "metronome-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 330,
+                    "y": 900
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": -20
+                  },
+                  {
+                    "frame": 30,
+                    "value": 20
+                  },
+                  {
+                    "frame": 60,
+                    "value": -20
+                  },
+                  {
+                    "frame": 90,
+                    "value": 20
+                  },
+                  {
+                    "frame": 120,
+                    "value": -20
+                  },
+                  {
+                    "frame": 150,
+                    "value": 20
+                  },
+                  {
+                    "frame": 179,
+                    "value": -20
+                  }
+                ]
+              },
+              {
+                "id": "metronome-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000005",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 750,
+                    "y": 900
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": 5
+                  },
+                  {
+                    "frame": 15,
+                    "value": 20
+                  },
+                  {
+                    "frame": 45,
+                    "value": -20
+                  },
+                  {
+                    "frame": 75,
+                    "value": 20
+                  },
+                  {
+                    "frame": 105,
+                    "value": -20
+                  },
+                  {
+                    "frame": 135,
+                    "value": 20
+                  },
+                  {
+                    "frame": 165,
+                    "value": -20
+                  },
+                  {
+                    "frame": 179,
+                    "value": -10
+                  }
+                ]
+              },
+              {
+                "id": "note-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000c",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 30,
+                    "x": 330,
+                    "y": 700
+                  },
+                  {
+                    "frame": 90,
+                    "x": 330,
+                    "y": 560
+                  }
+                ],
+                "start": 30,
+                "opacity": [
+                  {
+                    "frame": 30,
+                    "value": 1
+                  },
+                  {
+                    "frame": 90,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "note-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000c",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 45,
+                    "x": 750,
+                    "y": 700
+                  },
+                  {
+                    "frame": 105,
+                    "x": 750,
+                    "y": 560
+                  }
+                ],
+                "start": 45,
+                "opacity": [
+                  {
+                    "frame": 45,
+                    "value": 1
+                  },
+                  {
+                    "frame": 105,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "tempo",
+                "type": "text",
+                "text": {
+                  "content": "Même vitesse, temps décalés",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1220
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  },
+                  {
+                    "frame": 100,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 20,
+                    "end": 80,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 110,
+                    "end": 170,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "fade",
+          "frames": 8
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 90
+        }
+      }
+    },
+    {
+      "id": "horloges",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "C'est pareil avec deux caméras : chacune suit sa propre horloge, donc leurs images ne démarrent pas ensemble.",
+        "purpose": "Deux horloges internes : trames non alignées.",
+        "mood": "explicatif",
+        "notes": "Bandes de trames : rectangles identiques (même cadence) ; la bande B est décalée d'une fraction de trame. Une ligne verticale pointillée montre que les débuts d'image ne coïncident pas."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "cameras",
+            "objects": [
+              {
+                "id": "camera-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 200,
+                    "y": 560
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "camera-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 200,
+                    "y": 1060
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "label-a",
+                "type": "text",
+                "text": {
+                  "content": "Caméra A",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 200,
+                    "y": 720
+                  }
+                ]
+              },
+              {
+                "id": "label-b",
+                "type": "text",
+                "text": {
+                  "content": "Caméra B",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 200,
+                    "y": 1220
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "trames",
+            "objects": [
+              {
+                "id": "trames-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000006",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 560
+                  },
+                  {
+                    "frame": 210,
+                    "x": 400,
+                    "y": 560
+                  }
+                ],
+                "start": 0,
+                "easing": "linear"
+              },
+              {
+                "id": "trames-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000006",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 610,
+                    "y": 1060
+                  },
+                  {
+                    "frame": 210,
+                    "x": 470,
+                    "y": 1060
+                  }
+                ],
+                "start": 0,
+                "easing": "linear"
+              },
+              {
+                "id": "repere",
+                "type": "text",
+                "text": {
+                  "content": "Début d'image",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 620,
+                    "y": 1340
+                  }
+                ],
+                "start": 90
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 60,
+                    "end": 150,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "reference",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "En broadcast, on peut leur envoyer une référence commune. Ça s'appelle le Genlock !",
+        "purpose": "Nommer la solution : un générateur de référence unique.",
+        "mood": "révélation",
+        "notes": "Un seul générateur, une branche par caméra vers son entrée GENLOCK (connecteur BNC, entrée seulement)."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "generateur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000007",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 560
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.3
+                  },
+                  {
+                    "frame": 20,
+                    "value": 1.0
+                  }
+                ],
+                "easing": "spring"
+              },
+              {
+                "id": "label-generateur",
+                "type": "text",
+                "text": {
+                  "content": "Générateur de référence",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 760
+                  }
+                ]
+              },
+              {
+                "id": "camera-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 280,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ]
+              },
+              {
+                "id": "camera-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 1180
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.6
+                  }
+                ]
+              },
+              {
+                "id": "cable-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 410,
+                    "y": 900
+                  }
+                ],
+                "start": 40,
+                "opacity": [
+                  {
+                    "frame": 40,
+                    "value": 0
+                  },
+                  {
+                    "frame": 60,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "cable-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 670,
+                    "y": 900
+                  }
+                ],
+                "start": 40,
+                "opacity": [
+                  {
+                    "frame": 40,
+                    "value": 0
+                  },
+                  {
+                    "frame": 60,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "entree-a",
+                "type": "text",
+                "text": {
+                  "content": "Entrée GENLOCK",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 280,
+                    "y": 1360
+                  }
+                ],
+                "start": 60
+              },
+              {
+                "id": "entree-b",
+                "type": "text",
+                "text": {
+                  "content": "Entrée GENLOCK",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 800,
+                    "y": 1360
+                  }
+                ],
+                "start": 60
+              },
+              {
+                "id": "titre",
+                "type": "text",
+                "text": {
+                  "content": "Genlock",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 300
+                  }
+                ],
+                "start": 120,
+                "opacity": [
+                  {
+                    "frame": 120,
+                    "value": 0
+                  },
+                  {
+                    "frame": 135,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1700
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "surprise"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 30,
+                    "end": 100,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 120,
+                    "end": 170,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "alignement",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Les caméras alignent alors leur timing sur ce signal de référence.",
+        "purpose": "Montrer le verrouillage : les bandes de trames s'alignent.",
+        "mood": "satisfaisant"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "trames",
+            "objects": [
+              {
+                "id": "trames-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000006",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 600
+                  },
+                  {
+                    "frame": 180,
+                    "x": 400,
+                    "y": 600
+                  }
+                ],
+                "start": 0,
+                "easing": "linear"
+              },
+              {
+                "id": "trames-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000006",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 610,
+                    "y": 1000
+                  },
+                  {
+                    "frame": 90,
+                    "x": 470,
+                    "y": 1000
+                  },
+                  {
+                    "frame": 180,
+                    "x": 400,
+                    "y": 1000
+                  }
+                ],
+                "start": 0,
+                "easing": "linear"
+              },
+              {
+                "id": "impulsion-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000b",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 20,
+                    "x": 540,
+                    "y": 380
+                  },
+                  {
+                    "frame": 60,
+                    "x": 540,
+                    "y": 600
+                  }
+                ],
+                "start": 20,
+                "opacity": [
+                  {
+                    "frame": 20,
+                    "value": 1
+                  },
+                  {
+                    "frame": 60,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "impulsion-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000b",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 20,
+                    "x": 540,
+                    "y": 380
+                  },
+                  {
+                    "frame": 60,
+                    "x": 540,
+                    "y": 1000
+                  }
+                ],
+                "start": 20,
+                "opacity": [
+                  {
+                    "frame": 20,
+                    "value": 1
+                  },
+                  {
+                    "frame": 60,
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "id": "reference",
+                "type": "text",
+                "text": {
+                  "content": "Référence",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 330
+                  }
+                ]
+              },
+              {
+                "id": "aligne",
+                "type": "text",
+                "text": {
+                  "content": "Aligné !",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1250
+                  }
+                ],
+                "start": 100,
+                "opacity": [
+                  {
+                    "frame": 100,
+                    "value": 0
+                  },
+                  {
+                    "frame": 115,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 100,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 100,
+                    "end": 160,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "commutation",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Résultat : on facilite la synchronisation des sources et les changements de plan, surtout dans les installations exigeantes.",
+        "purpose": "Bénéfice : bascules propres au mélangeur.",
+        "mood": "dynamique",
+        "notes": "Coupes franches A → B → A sur le moniteur programme, synchronisées sur « changements de plan »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "melangeur",
+            "objects": [
+              {
+                "id": "melangeur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000009",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1250
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.9
+                  }
+                ]
+              },
+              {
+                "id": "label-melangeur",
+                "type": "text",
+                "text": {
+                  "content": "Mélangeur",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1420
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "ecran",
+            "objects": [
+              {
+                "id": "ecran",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000d",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 560
+                  }
+                ]
+              },
+              {
+                "id": "programme",
+                "type": "text",
+                "text": {
+                  "content": "Programme",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 330
+                  }
+                ]
+              },
+              {
+                "id": "source-a",
+                "type": "text",
+                "text": {
+                  "content": "Caméra A",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 560
+                  }
+                ],
+                "end": 90
+              },
+              {
+                "id": "source-b",
+                "type": "text",
+                "text": {
+                  "content": "Caméra B",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 560
+                  }
+                ],
+                "start": 90,
+                "end": 150
+              },
+              {
+                "id": "source-a2",
+                "type": "text",
+                "text": {
+                  "content": "Caméra A",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 560
+                  }
+                ],
+                "start": 150
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 180,
+                    "y": 1700
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.9
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 85,
+                    "end": 100,
+                    "name": "rebond"
+                  },
+                  {
+                    "start": 145,
+                    "end": 160,
+                    "name": "rebond"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 120
+        }
+      }
+    },
+    {
+      "id": "synchroniseur",
+      "duration_frames": 210,
+      "intent": {
+        "narration": "Mais attention : certains mélangeurs savent resynchroniser des sources qui ne sont pas verrouillées.",
+        "purpose": "Nuance : synchroniseur d'image intégré à certains mélangeurs.",
+        "mood": "nuance",
+        "notes": "Aucun chiffre de retard : seulement « léger retard possible, selon équipement »."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "schema",
+            "objects": [
+              {
+                "id": "camera-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 250,
+                    "y": 520
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "camera-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000003",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 830,
+                    "y": 520
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 0.5
+                  }
+                ]
+              },
+              {
+                "id": "non-verrouille",
+                "type": "text",
+                "text": {
+                  "content": "Non verrouillées",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 380
+                  }
+                ]
+              },
+              {
+                "id": "melangeur",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000009",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1050
+                  }
+                ],
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.1
+                  }
+                ]
+              },
+              {
+                "id": "synchro",
+                "type": "text",
+                "text": {
+                  "content": "Synchroniseur d'image",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1250
+                  }
+                ],
+                "start": 60,
+                "opacity": [
+                  {
+                    "frame": 60,
+                    "value": 0
+                  },
+                  {
+                    "frame": 75,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "retard",
+                "type": "text",
+                "text": {
+                  "content": "Peut ajouter un léger retard",
+                  "style": "label"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1340
+                  }
+                ],
+                "start": 120,
+                "opacity": [
+                  {
+                    "frame": 120,
+                    "value": 0
+                  },
+                  {
+                    "frame": 135,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 820,
+                    "y": 1700
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 110,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 50,
+                    "end": 120,
+                    "name": "montrer"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "pas-obligatoire",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Le Genlock n'est donc pas obligatoire pour tous les directs. Et ce n'est pas un timecode !",
+        "purpose": "Deux mises en garde : pas toujours obligatoire, différent du timecode.",
+        "mood": "malicieux",
+        "notes": "Le timecode étiquette chaque image (heures:minutes:secondes:images) ; il ne règle pas le timing vidéo."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.4
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "cartes",
+            "objects": [
+              {
+                "id": "pas-obligatoire",
+                "type": "text",
+                "text": {
+                  "content": "Pas obligatoire partout",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 520
+                  }
+                ]
+              },
+              {
+                "id": "genlock",
+                "type": "text",
+                "text": {
+                  "content": "Genlock = timing",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 800
+                  }
+                ],
+                "start": 90,
+                "opacity": [
+                  {
+                    "frame": 90,
+                    "value": 0
+                  },
+                  {
+                    "frame": 100,
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "id": "difference",
+                "type": "text",
+                "text": {
+                  "content": "≠",
+                  "style": "title"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 920
+                  }
+                ],
+                "start": 100
+              },
+              {
+                "id": "timecode",
+                "type": "text",
+                "text": {
+                  "content": "Timecode = numéro d'image",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1040
+                  }
+                ],
+                "start": 100,
+                "opacity": [
+                  {
+                    "frame": 100,
+                    "value": 0
+                  },
+                  {
+                    "frame": 110,
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "neutre"
+                  },
+                  {
+                    "frame": 90,
+                    "name": "surprise"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 20,
+                    "end": 70,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 100,
+                    "end": 170,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 150
+        }
+      }
+    },
+    {
+      "id": "pas-image",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Et non : cette référence ne transporte pas l'image. Elle sert seulement à synchroniser le temps.",
+        "purpose": "Comparer câble SDI (image) et câble de référence (timing seul).",
+        "mood": "clair",
+        "notes": "Câble SDI épais avec une vignette d'image qui circule ; câble de référence fin avec seulement des impulsions."
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "regie",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000002",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ],
+                "opacity": [
+                  {
+                    "frame": 0,
+                    "value": 0.3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "cables",
+            "objects": [
+              {
+                "id": "cable-sdi",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000a",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 620
+                  }
+                ]
+              },
+              {
+                "id": "label-sdi",
+                "type": "text",
+                "text": {
+                  "content": "SDI : l'image",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 460
+                  }
+                ]
+              },
+              {
+                "id": "image-sdi",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000d",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 10,
+                    "x": 160,
+                    "y": 620
+                  },
+                  {
+                    "frame": 90,
+                    "x": 920,
+                    "y": 620
+                  }
+                ],
+                "start": 10,
+                "scale": [
+                  {
+                    "frame": 10,
+                    "value": 0.2
+                  }
+                ],
+                "easing": "linear"
+              },
+              {
+                "id": "cable-ref",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000008",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1120
+                  }
+                ]
+              },
+              {
+                "id": "label-ref",
+                "type": "text",
+                "text": {
+                  "content": "Référence : le timing seulement",
+                  "style": "caption"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              },
+              {
+                "id": "impulsion-1",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000b",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 60,
+                    "x": 160,
+                    "y": 1120
+                  },
+                  {
+                    "frame": 120,
+                    "x": 920,
+                    "y": 1120
+                  }
+                ],
+                "start": 60,
+                "easing": "linear"
+              },
+              {
+                "id": "impulsion-2",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_14100000000b",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 100,
+                    "x": 160,
+                    "y": 1120
+                  },
+                  {
+                    "frame": 160,
+                    "x": 920,
+                    "y": 1120
+                  }
+                ],
+                "start": 100,
+                "easing": "linear"
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "concentration"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 30,
+                    "end": 90,
+                    "name": "montrer"
+                  },
+                  {
+                    "start": 110,
+                    "end": 170,
+                    "name": "tenir-cable"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 130
+        }
+      }
+    },
+    {
+      "id": "chute",
+      "duration_frames": 180,
+      "intent": {
+        "narration": "Moralité : même fréquence ne veut pas forcément dire même instant !",
+        "purpose": "Chute : les deux chronomètres enfin alignés, Voltix triomphe.",
+        "mood": "drôle, conclusif"
+      },
+      "render": {
+        "layers": [
+          {
+            "id": "decor",
+            "objects": [
+              {
+                "id": "plateau",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 960
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "chronos",
+            "objects": [
+              {
+                "id": "chrono-a",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 300,
+                    "y": 800
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": 0
+                  },
+                  {
+                    "frame": 60,
+                    "value": 120
+                  },
+                  {
+                    "frame": 179,
+                    "value": 360
+                  }
+                ]
+              },
+              {
+                "id": "chrono-b",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_141000000004",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 780,
+                    "y": 800
+                  }
+                ],
+                "rotation": [
+                  {
+                    "frame": 0,
+                    "value": 40
+                  },
+                  {
+                    "frame": 60,
+                    "value": 120
+                  },
+                  {
+                    "frame": 179,
+                    "value": 360
+                  }
+                ]
+              },
+              {
+                "id": "morale",
+                "type": "text",
+                "text": {
+                  "content": "Même fréquence ≠ même instant",
+                  "style": "subtitle"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1100
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "voltix",
+            "objects": [
+              {
+                "id": "voltix",
+                "type": "asset",
+                "asset": {
+                  "id": "ast_136000000001",
+                  "version": "latest"
+                },
+                "position": [
+                  {
+                    "frame": 0,
+                    "x": 540,
+                    "y": 1650
+                  }
+                ],
+                "easing": "spring",
+                "scale": [
+                  {
+                    "frame": 0,
+                    "value": 1.0
+                  }
+                ],
+                "expressions": [
+                  {
+                    "frame": 0,
+                    "name": "sourire"
+                  },
+                  {
+                    "frame": 120,
+                    "name": "surprise"
+                  },
+                  {
+                    "frame": 150,
+                    "name": "sourire"
+                  }
+                ],
+                "gestures": [
+                  {
+                    "start": 0,
+                    "end": 60,
+                    "name": "rebond"
+                  },
+                  {
+                    "start": 70,
+                    "end": 120,
+                    "name": "saluer"
+                  },
+                  {
+                    "start": 130,
+                    "end": 175,
+                    "name": "cligner"
+                  }
+                ],
+                "lipsync": true
+              }
+            ]
+          }
+        ],
+        "transition_in": {
+          "type": "cut",
+          "frames": 0
+        },
+        "transition_out": {
+          "type": "cut",
+          "frames": 0
+        },
+        "fallback": {
+          "type": "still",
+          "frame": 100
+        }
+      }
+    }
+  ]
+}

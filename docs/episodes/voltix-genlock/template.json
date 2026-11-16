@@ -1,0 +1,37 @@
+{
+  "name": "Voltix — Le Genlock",
+  "description": "Épisode « Pourquoi synchroniser les caméras ? Le Genlock » de la série Voltix décrypte le broadcast (#141). Préproduction : voir docs/episodes/voltix-genlock.md.",
+  "payload": {
+    "duration_min": 45,
+    "duration_max": 65,
+    "narration_pace": "rapide",
+    "scenes_per_minute_min": 8,
+    "scenes_per_minute_max": 11,
+    "structure": [
+      "Hook : même cadence, mais images pas forcément synchronisées",
+      "Métaphore : deux musiciens à la même vitesse, pas sur le même tempo",
+      "Chaque caméra suit sa propre horloge : trames non alignées",
+      "Solution nommée : une référence commune, le Genlock",
+      "Démonstration : les trames s'alignent sur la référence",
+      "Bénéfice : synchronisation des sources et changements de plan",
+      "Nuance : certains mélangeurs resynchronisent des sources non verrouillées",
+      "Mises en garde : pas obligatoire partout, différent du timecode",
+      "La référence ne transporte pas l'image, seulement le timing",
+      "Chute : même fréquence ne veut pas forcément dire même instant"
+    ],
+    "standing_instructions": "Série Voltix décrypte le broadcast, personnage canonique Voltix sans modification. Français grand public, une seule idée centrale : le Genlock aligne le timing de plusieurs caméras sur une référence commune. Le Genlock n'est pas un timecode ; il ne transporte pas l'image ; il n'est pas obligatoire pour tous les directs car certains mélangeurs disposent de synchroniseurs d'image. Ne jamais affirmer qu'une source non verrouillée ne peut pas être commutée. Aucun chiffre de retard inventé. Script TTS-safe : nombres en toutes lettres, aucun sigle prononcé.",
+    "visual_rules": "Illustration vectorielle plate, contours brun foncé, 9:16. Schémas techniquement exacts avec légendes en français. Un seul générateur de référence, une branche vers l'entrée GENLOCK (BNC) de chaque caméra. Bandes de trames de même cadence, décalées puis alignées. Câble de référence fin (impulsions seulement) distinct du câble SDI (image). Une action visuelle toutes les 5 à 7 secondes.",
+    "visual_avoid": [
+      "Personnes réelles ou collègues reconnaissables",
+      "Logos ou marques de fabricants",
+      "Image ou vidéo circulant dans le câble de référence",
+      "Compteur de timecode présenté comme le Genlock",
+      "Valeur chiffrée de retard ou de décalage",
+      "Texte en anglais à l'écran",
+      "Modification de la silhouette ou de la palette de Voltix"
+    ],
+    "hook_notes": "Phrase d'accroche dans la première seconde : « Deux caméras filment à la même cadence. Alors pourquoi leurs images ne sont-elles pas forcément synchronisées ? », avec deux chronomètres qui tournent au même rythme mais décalés.",
+    "subtitle_notes": "Sous-titres français en phrases entières, apostrophes typographiques, « Genlock » avec majuscule, « timecode » en minuscules.",
+    "music_notes": "Musique instrumentale discrète et dynamique, droits vérifiés, environ 20 % sous la voix avec ducking, durée strictement limitée à la narration, aucun bip synthétique."
+  }
+}
