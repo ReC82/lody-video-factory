@@ -1,0 +1,23 @@
+# #221 — Livreur UX automatique de Lody (scripts/lody_ux_deliver.py). Installé par le propriétaire,
+# jamais par une session (voir docs/lody-livraison-ux.md, §4) :
+#   sudo install -m 644 deploy/systemd/lody-ux-deliver.service deploy/systemd/lody-ux-deliver.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now lody-ux-deliver.timer
+# Ne livre que des plages entièrement `ux-safe`, CI verte, sans rendu actif ; retour arrière automatique.
+# Arrêt immédiat : créer le fichier .lody-ops/ux-deliver.off du clone de production (ou désactiver le timer).
+# Mode simulation : retirer `--apply` ci-dessous (journal non écrit, rien livré).
+[Unit]
+Description=Lody — livraison UX automatique (ux-safe, CI verte, retour arrière)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/moneyprinterturbo
+Environment=LODY_OPS_DIR=/srv/moneyprinterturbo/.lody-ops
+Environment=LODY_SITE_URL=https://video.lodylands.com
+ExecStart=/usr/bin/python3 /srv/moneyprinterturbo/scripts/lody_ux_deliver.py --apply
+# Codes 2 (report : CI en cours, rendu actif) et 3 (refus motivé, journalisé) ne sont pas des pannes.
+SuccessExitStatus=2 3
+TimeoutStartSec=3600
+NoNewPrivileges=yes
+PrivateTmp=yes
