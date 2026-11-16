@@ -46,6 +46,12 @@ ainsi que l'existence des fichiers liés.
   **V3 « du HDMI familier au SDI »** : [script, storyboard 8 scènes, kit de 2 échantillons ElevenLabs,
   animatique muette](animation/voltix-137/v3/README.md).
 
+## Épisodes (préproduction)
+
+- [Voltix — Le Tally](episodes/voltix-tally.md) — scénario, script TTS-safe, storyboard
+  `lody.animation/1` et preset de production de l'épisode « Pourquoi une caméra a une lumière
+  rouge ? » (#140).
+
 ## Voix
 
 - [Catalogue des voix ElevenLabs](lody-elevenlabs-voices.md) — choix d'une voix ElevenLabs
